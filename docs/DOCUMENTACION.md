@@ -107,6 +107,10 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 
 ## 10. Registro de cambios
 
+### 2026-10-27 — Revisión en vista de teléfono (0.2.3)
+- Revisadas todas las páginas públicas, el perfil y el panel admin a 375 px y 320 px (emulación móvil en Chrome): sin desbordes horizontales, textos y formularios legibles, menú hamburguesa y menú de usuario funcionales.
+- `logo-planilla.png`: el fondo casi negro del PNG se convirtió en transparente (el ruido oscuro dejaba ver un rectángulo con motas junto al logo en header y footer).
+
 ### 2026-10-27 — Noticias antes de “Quiénes somos” en Inicio (0.2.2)
 - En la página de inicio, la sección **Últimas noticias** ahora va justo después del hero y antes de **Quiénes somos**. Orden actual: hero, noticias, quiénes somos, propuestas, banda “Tu opinión cuenta”. Se mantiene la alternancia **claro–oscuro–claro**: noticias (crema), quiénes somos (negro, título claro) y propuestas (crema, con tarjetas blancas para que resalten).
 
