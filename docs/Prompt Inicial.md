@@ -4,7 +4,7 @@ Este documento contiene el prompt completo que se le entregaría a una IA de pro
 
 **Antes de usarlo:** coloca en la carpeta de trabajo las imágenes de `docs/referencias/` (la IA debe verlas para replicar el estilo) y los logos que se mencionan en la sección 6. Las credenciales **nunca** se pegan en el prompt: se colocan después en `backend/.env`.
 
-**Última actualización del prompt:** 2026-10-26 (v0.2.1: cuentas solo para integrantes, perfil; sin aviso por correo).
+**Última actualización del prompt:** 2026-10-27 (v0.2.2: en Inicio, noticias antes de “Quiénes somos”; cuentas solo para integrantes, perfil; sin aviso por correo).
 
 ---
 
@@ -101,7 +101,7 @@ Estilo **“papel rasgado”** tipo collage de cartel: capas de papel crema con 
 
 Header fijo negro con borde rojo inferior: logo de la planilla y navegación (Inicio, Propuestas, Noticias, Buzón, Equipo, y “Panel” si eres admin o “Acceso” si no hay sesión). **Sin logo de la ENSFA.** Con sesión iniciada aparece un **menú desplegable de perfil** (foto o iniciales + nombre) con **“Ver perfil”** y **“Cerrar sesión”**; cerrar sesión pide **confirmación** en un `<dialog>` modal con el foco inicial en “Cancelar”. El menú se cierra con clic fuera o Esc y funciona en móvil junto a la hamburguesa. Footer con ambos logos, lema, aviso de derechos y enlace “Acceso integrantes” (solo sin sesión).
 
-1. **Inicio `/`**: hero (logo grande dentro de un `<h1>` con su `alt`, “Planilla del Consejo Estudiantil de la ENSFA”, botones al buzón y a propuestas); **Quiénes somos** (texto de la sección 8 + logo ENSFA); 3 propuestas destacadas; 3 últimas noticias; banda roja “Tu opinión cuenta” con enlace al buzón.
+1. **Inicio `/`**: hero (logo grande dentro de un `<h1>` con su `alt`, “Planilla del Consejo Estudiantil de la ENSFA”, botones al buzón y a propuestas); 3 últimas noticias (primera sección tras el hero, fondo crema); **Quiénes somos** (fondo negro; texto de la sección 8 + logo ENSFA); 3 propuestas destacadas (fondo crema, tarjetas blancas); banda roja “Tu opinión cuenta” con enlace al buzón.
 2. **Propuestas `/propuestas`**: todas las propuestas publicadas.
 3. **Noticias `/noticias`** y **detalle `/noticias/:slug`** (portada, fecha, autor, párrafos).
 4. **Buzón `/buzon`**: elegir tipo (queja, propuesta, pregunta, problema) con chips; elegir **anónimo** o **con mis datos**. Si es con datos aparecen: nombre completo, licenciatura (desplegable), semestre (desplegable), grupo (desplegable), todos obligatorios, tomados de `/settings`. Siempre: asunto y mensaje (contador 0/4000). Si es anónimo, mostrar “No guardamos ningún dato personal con tu mensaje” y **no enviar** datos personales. Pantalla de agradecimiento tras el envío con opción de enviar otro.

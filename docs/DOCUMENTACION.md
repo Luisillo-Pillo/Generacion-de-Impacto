@@ -107,6 +107,9 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 
 ## 10. Registro de cambios
 
+### 2026-10-27 — Noticias antes de “Quiénes somos” en Inicio (0.2.2)
+- En la página de inicio, la sección **Últimas noticias** ahora va justo después del hero y antes de **Quiénes somos**. Orden actual: hero, noticias, quiénes somos, propuestas, banda “Tu opinión cuenta”. Se mantiene la alternancia **claro–oscuro–claro**: noticias (crema), quiénes somos (negro, título claro) y propuestas (crema, con tarjetas blancas para que resalten).
+
 ### 2026-10-26 — Se retira el aviso por correo (0.2.1)
 - Por decisión del cliente, **no se incluye el aviso por correo** de mensajes nuevos: se eliminaron `notify.js`, la dependencia `nodemailer`, las variables `MAIL_*`, `BREVO_API_KEY`, `SMTP_*` y `SITE_URL`, y su documentación. El buzón solo guarda el mensaje; se consultan en Panel → Mensajes. Ver nota en “Pendientes” por si se retoma.
 
