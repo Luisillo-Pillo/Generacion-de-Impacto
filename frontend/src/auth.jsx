@@ -6,31 +6,36 @@ export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [member, setMember] = useState(null); // ficha de integrante de la planilla
   const [loading, setLoading] = useState(!!getToken());
+
+  const applySession = useCallback((d) => {
+    setUser(d.user);
+    setMember(d.member);
+  }, []);
 
   useEffect(() => {
     if (!getToken()) return;
     api('/auth/me')
-      .then((d) => setUser(d.user))
+      .then(applySession)
       .catch(() => setToken(null))
       .finally(() => setLoading(false));
-  }, []);
-
-  const authenticate = useCallback(async (path, body) => {
-    const d = await api(path, { method: 'POST', body });
-    setToken(d.token);
-    setUser(d.user);
-    return d.user;
-  }, []);
+  }, [applySession]);
 
   const value = {
     user,
+    member,
     loading,
-    login: (email, password) => authenticate('/auth/login', { email, password }),
-    register: (name, email, password) => authenticate('/auth/register', { name, email, password }),
+    login: async (email, password) => {
+      const d = await api('/auth/login', { method: 'POST', body: { email, password } });
+      setToken(d.token);
+      applySession(d);
+      return d.user;
+    },
     logout: () => {
       setToken(null);
       setUser(null);
+      setMember(null);
     },
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

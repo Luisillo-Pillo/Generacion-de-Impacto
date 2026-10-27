@@ -1,26 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import mongoose from 'mongoose';
-import { News, Proposal, Member, Setting, DEFAULT_SETTINGS } from '../models.js';
+import { News, Proposal, Setting, DEFAULT_SETTINGS } from '../models.js';
 import { adminOnly } from '../auth.js';
-import { getBucket } from '../db.js';
+import { deleteFile } from '../db.js';
+import { objectId } from '../validators.js';
 
 const router = Router();
-
-const objectId = z
-  .string()
-  .refine((v) => mongoose.isValidObjectId(v), 'Id inválido')
-  .nullable()
-  .optional();
-
-async function deleteFile(id) {
-  if (!id) return;
-  try {
-    await getBucket().delete(new mongoose.Types.ObjectId(String(id)));
-  } catch {
-    /* ya no existía */
-  }
-}
 
 const slugify = (text) =>
   text
@@ -134,41 +119,6 @@ router.put('/proposals/:id', adminOnly, async (req, res) => {
 router.delete('/proposals/:id', adminOnly, async (req, res) => {
   const item = await Proposal.findByIdAndDelete(req.params.id);
   if (item) await deleteFile(item.image);
-  res.status(204).end();
-});
-
-// ---------------- Equipo ----------------
-const memberSchema = z.object({
-  name: z.string().trim().min(2).max(100),
-  role: z.string().trim().max(100).optional().default(''),
-  degree: z.string().trim().max(120).optional().default(''),
-  photo: objectId,
-  order: z.number().int().optional().default(0),
-});
-
-router.get('/members', async (_req, res) => {
-  res.json(await Member.find().sort({ order: 1, createdAt: 1 }));
-});
-
-router.post('/members', adminOnly, async (req, res) => {
-  const data = memberSchema.parse(req.body);
-  res.status(201).json(await Member.create({ ...data, photo: data.photo || undefined }));
-});
-
-router.put('/members/:id', adminOnly, async (req, res) => {
-  const data = memberSchema.parse(req.body);
-  const item = await Member.findById(req.params.id);
-  if (!item) return res.status(404).json({ error: 'Integrante no encontrado' });
-  const newPhoto = data.photo || undefined;
-  if (item.photo && String(item.photo) !== String(newPhoto)) await deleteFile(item.photo);
-  Object.assign(item, { ...data, photo: newPhoto });
-  await item.save();
-  res.json(item);
-});
-
-router.delete('/members/:id', adminOnly, async (req, res) => {
-  const item = await Member.findByIdAndDelete(req.params.id);
-  if (item) await deleteFile(item.photo);
   res.status(204).end();
 });
 

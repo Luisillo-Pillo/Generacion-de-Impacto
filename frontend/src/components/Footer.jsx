@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 
 export default function Footer() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   return (
     <footer className="footer">
       <div className="container footer-inner">
@@ -12,11 +12,7 @@ export default function Footer() {
       </div>
       <div className="container footer-bottom">
         <span>© {new Date().getFullYear()} Generación de Impacto · ENSFA “Profr. José Santos Valdés”</span>
-        {user ? (
-          <button className="link-btn" onClick={logout}>Cerrar sesión ({user.name})</button>
-        ) : (
-          <Link to="/acceso">Acceso</Link>
-        )}
+        {!user && <Link to="/acceso">Acceso integrantes</Link>}
       </div>
     </footer>
   );

@@ -14,3 +14,13 @@ export function getBucket() {
   if (!bucket) throw new Error('GridFS no inicializado');
   return bucket;
 }
+
+// Borra un archivo de GridFS; si ya no existe, no pasa nada.
+export async function deleteFile(id) {
+  if (!id) return;
+  try {
+    await getBucket().delete(new mongoose.Types.ObjectId(String(id)));
+  } catch {
+    /* ya no existía */
+  }
+}

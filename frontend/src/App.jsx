@@ -9,6 +9,7 @@ import NewsDetail from './pages/NewsDetail.jsx';
 import Mailbox from './pages/Mailbox.jsx';
 import Team from './pages/Team.jsx';
 import Login from './pages/Login.jsx';
+import Profile from './pages/Profile.jsx';
 import Admin from './pages/Admin.jsx';
 
 function ScrollToTop() {
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/buzon" element={<Mailbox />} />
           <Route path="/equipo" element={<Team />} />
           <Route path="/acceso" element={<Login />} />
+          <Route path="/perfil" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<div className="container section"><h1 className="title">Página no encontrada</h1></div>} />
         </Routes>

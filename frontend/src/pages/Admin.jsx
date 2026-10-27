@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import { api, fileUrl, formatDate, uploadImage } from '../api.js';
+import PasswordInput from '../components/PasswordInput.jsx';
 
 const TABS = [
   ['mensajes', 'Mensajes'],
@@ -9,7 +10,6 @@ const TABS = [
   ['propuestas', 'Propuestas'],
   ['equipo', 'Equipo'],
   ['ajustes', 'Ajustes'],
-  ['usuarios', 'Usuarios'],
 ];
 
 export default function Admin() {
@@ -29,7 +29,7 @@ export default function Admin() {
     );
   }
 
-  const Panel = { mensajes: Messages, noticias: NewsAdmin, propuestas: ProposalsAdmin, equipo: TeamAdmin, ajustes: SettingsAdmin, usuarios: UsersAdmin }[tab];
+  const Panel = { mensajes: Messages, noticias: NewsAdmin, propuestas: ProposalsAdmin, equipo: TeamAdmin, ajustes: SettingsAdmin }[tab];
   return (
     <section className="section paper page-min">
       <div className="container">
@@ -229,15 +229,20 @@ function ProposalsAdmin() {
 function TeamAdmin() {
   return (
     <CrudPanel
-      listPath="/members" endpoint="/members" newLabel="Nuevo integrante"
-      blank={(items) => ({ name: '', role: '', degree: '', photo: null, order: items?.length || 0 })}
-      summary={(m) => <><strong>{m.name}</strong><br /><span className="muted">{m.role}</span></>}
+      listPath="/members/all" endpoint="/members" newLabel="Nuevo integrante"
+      blank={(items) => ({ name: '', role: '', degree: '', photo: null, order: items?.length || 0, email: '', password: '' })}
+      summary={(m) => <><strong>{m.name}</strong><br /><span className="muted">{m.role ? `${m.role} · ` : ''}{m.email}</span></>}
       fields={(m, set) => (
         <>
           {text('Nombre', m.name, set('name'), { required: true, maxLength: 100 })}
           {text('Cargo (ej. Presidente/a)', m.role, set('role'), { maxLength: 100 })}
           {text('Licenciatura', m.degree, set('degree'), { maxLength: 120 })}
           {text('Orden', m.order, (v) => set('order')(Number(v)), { type: 'number' })}
+          <p className="hint">Todo integrante recibe una cuenta con acceso de administrador a este panel.</p>
+          {text('Correo de acceso', m.email, set('email'), { type: 'email', required: true, autoComplete: 'off' })}
+          <label>{m._id ? 'Nueva contraseña (déjala vacía para no cambiarla)' : 'Contraseña (mínimo 8 caracteres)'}
+            <PasswordInput required={!m._id} minLength={8} value={m.password ?? ''} onChange={(e) => set('password')(e.target.value)} autoComplete="new-password" />
+          </label>
           <ImageField label="Foto" value={m.photo} onChange={set('photo')} />
         </>
       )}
@@ -287,28 +292,5 @@ function SettingsAdmin() {
       {social('email', 'Correo de contacto')}
       <div className="row"><button className="btn btn-red">Guardar ajustes</button><span>{msg}</span></div>
     </form>
-  );
-}
-
-// ---------- Usuarios ----------
-function UsersAdmin() {
-  const { user: me } = useAuth();
-  const { items, error, reload, setError } = useList('/auth/users');
-
-  const setRole = (u, role) =>
-    api(`/auth/users/${u.id}/role`, { method: 'PATCH', body: { role } }).then(reload).catch((e) => setError(e.message));
-
-  return (
-    <div>
-      {error && <p className="error">{error}</p>}
-      {items?.map((u) => (
-        <article key={u.id} className="card row between">
-          <div><strong>{u.name}</strong> {u.id === me.id && <span className="tag">tú</span>}<br /><span className="muted">{u.email} · {u.role === 'admin' ? 'Administrador' : 'Usuario'}</span></div>
-          {u.role === 'admin'
-            ? <button className="btn btn-dark sm" onClick={() => setRole(u, 'user')}>Quitar admin</button>
-            : <button className="btn btn-red sm" onClick={() => setRole(u, 'admin')}>Hacer admin</button>}
-        </article>
-      ))}
-    </div>
   );
 }

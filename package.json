@@ -10,7 +10,8 @@
     "dev:frontend": "npm run dev -w frontend",
     "build": "npm run build -w frontend",
     "start": "npm run start -w backend",
-    "seed": "npm run seed -w backend"
+    "seed": "npm run seed -w backend",
+    "create-admin": "npm run create-admin -w backend"
   },
   "devDependencies": {
     "concurrently": "^9.0.0"

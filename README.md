@@ -11,8 +11,9 @@ Sitio web de la planilla **Generación de Impacto** para el Consejo Estudiantil 
 ```bash
 npm install
 cp backend/.env.example backend/.env   # completa MONGODB_URI y JWT_SECRET
-npm run seed
+npm run seed                           # contenido inicial
+npm run create-admin                   # primer administrador (no hay registro público)
 npm run dev
 ```
 
-El primer usuario que se registre en `/acceso` será administrador. Más detalles de despliegue y API en la [documentación](docs/DOCUMENTACION.md).
+Los demás integrantes se dan de alta en Panel → Equipo (con correo y contraseña) y son administradores. Detalles de despliegue y API en la [documentación](docs/DOCUMENTACION.md).

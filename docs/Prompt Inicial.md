@@ -4,7 +4,7 @@ Este documento contiene el prompt completo que se le entregaría a una IA de pro
 
 **Antes de usarlo:** coloca en la carpeta de trabajo las imágenes de `docs/referencias/` (la IA debe verlas para replicar el estilo) y los logos que se mencionan en la sección 6. Las credenciales **nunca** se pegan en el prompt: se colocan después en `backend/.env`.
 
-**Última actualización del prompt:** 2026-10-26.
+**Última actualización del prompt:** 2026-10-26 (v0.2.1: cuentas solo para integrantes, perfil; sin aviso por correo).
 
 ---
 
@@ -23,10 +23,10 @@ Entrega código funcional, probado y documentado. Antes de dar algo por terminad
 ### 2. Stack y estructura del monorepo
 
 - Monorepo con **npm workspaces**. Carpetas **`frontend/`** y **`backend/`** (estos nombres exactos).
-- **frontend**: React 18 + Vite + React Router 6, JavaScript, CSS plano (sin frameworks de UI). Se despliega en **Vercel** (Root Directory = `frontend`, con `vercel.json` que reescribe todo a `/index.html` para el router).
-- **backend**: Node ≥ 20, Express 5, Mongoose 8, ESM (`"type": "module"`). Librerías: `zod` (validación), `bcryptjs`, `jsonwebtoken`, `multer` (memoria), `helmet`, `cors`. Se despliega en **Render** como Web Service (`render.yaml` en la raíz con `rootDir: backend`, `healthCheckPath: /api/health`).
+- **frontend**: React 18 + Vite + React Router 7, JavaScript, CSS plano (sin frameworks de UI). Se despliega en **Vercel** (Root Directory = `frontend`, con `vercel.json` que reescribe todo a `/index.html` para el router).
+- **backend**: Node ≥ 20, Express 5, Mongoose 8, ESM (`"type": "module"`). Librerías: `zod` 4 (validación), `bcryptjs`, `jsonwebtoken`, `multer` (memoria), `helmet`, `cors`. Se despliega en **Render** como Web Service (`render.yaml` en la raíz con `rootDir: backend`, `healthCheckPath: /api/health`).
 - Base de datos: **MongoDB Atlas** (Mongoose). **Los mensajes y todos los recursos visuales subidos desde el panel se guardan en MongoDB**; las imágenes van en **GridFS** (bucket `files`).
-- Scripts raíz: `dev` (backend + frontend con `concurrently`), `build`, `start`, `seed`.
+- Scripts raíz: `dev` (backend + frontend con `concurrently`), `build`, `start`, `seed`, `create-admin`.
 - En desarrollo, Vite hace proxy de `/api` a `http://localhost:4000`. En producción el frontend usa `VITE_API_URL` (URL del backend en Render, sin barra final).
 - Variables de entorno (con archivos `.env.example` solo con marcadores, y `.env` ignorado por git):
   - backend: `MONGODB_URI`, `JWT_SECRET`, `CORS_ORIGIN` (lista separada por comas), `PORT`.
@@ -35,19 +35,21 @@ Entrega código funcional, probado y documentado. Antes de dar algo por terminad
 
 ### 3. Modelo de datos (colecciones)
 
-- **User**: `name`, `email` (único, minúsculas), `passwordHash` (bcrypt), `role` (`admin` | `user`, por defecto `user`), timestamps.
+- **User**: `name`, `email` (único, minúsculas), `passwordHash` (bcrypt), `role` (`admin` | `user`; todas las cuentas que crea la app son `admin`), timestamps.
 - **Message**: `type` (`queja` | `propuesta` | `pregunta` | `problema`), `anonymous` (bool), `name`, `degree` (licenciatura), `semester`, `group`, `subject` (≤140), `body` (≤4000), `status` (`nuevo` | `leido` | `archivado`, por defecto `nuevo`), timestamps. **Si `anonymous` es true no se guarda ningún dato personal** (la API descarta `name`, `degree`, `semester`, `group` aunque lleguen).
 - **News**: `title`, `slug` (único, generado del título sin acentos y con sufijo numérico si se repite), `excerpt` (≤300), `body` (≤20 000, párrafos separados por línea en blanco), `coverImage` (ObjectId de GridFS), `published`, `publishedAt`, `author` (nombre del admin que la crea).
 - **Proposal**: `number` (único), `title`, `objective`, `image` (opcional, GridFS), `published`.
-- **Member** (equipo): `name`, `role`, `degree`, `photo` (GridFS), `order`.
+- **Member** (equipo): `name`, `role` (cargo), `degree`, `photo` (GridFS), `order`, `user` (ObjectId de su cuenta; nunca se expone en la API pública).
 - **Setting** (clave/valor): `degrees` (lista de licenciaturas), `semesters` (lista, por defecto 1–8), `groups` (lista, por defecto A–D), `social` (`instagram`, `facebook`, `tiktok`, `email`). Estas listas alimentan los desplegables del buzón y son editables en el panel. Valores por defecto en código si no existen en BD.
 
-### 4. Autenticación y roles
+### 4. Cuentas y acceso
 
-- Registro y login con **correo + contraseña** (mínimo 8 caracteres). Sesión con **JWT de 7 días** enviado como `Authorization: Bearer`. El token solo contiene el id; **el rol se lee de la base de datos en cada petición**, de modo que quitar el rol surte efecto de inmediato.
-- Registro **abierto** a cualquiera. **La primera cuenta registrada en el sistema se convierte en `admin`**; las demás son `user`. (Decisión explícita del cliente: sin código de instalación; el primer registro debe hacerlo el equipo justo después del primer despliegue.)
-- Los admins pueden **dar o quitar el rol admin** a cualquier usuario desde el panel. **Nunca debe poder quitarse el último admin** (responder 400 “Debe quedar al menos un administrador”).
-- Solo los `admin` acceden al panel y a las rutas de gestión. Un `user` sin rol admin ve un mensaje de “Sin acceso”.
+- **No hay registro público.** Solo los integrantes de la planilla tienen cuenta. Login con **correo + contraseña** (mínimo 8 caracteres), sesión con **JWT de 7 días** (`Authorization: Bearer`). El token solo contiene el id; **el rol se lee de la base de datos en cada petición**.
+- **Todo integrante es administrador** automáticamente. Al **dar de alta un integrante** (panel → Equipo) son obligatorios **correo y contraseña**: la API crea la cuenta (`role: admin`) y la ficha juntas; si falla la ficha, se revierte la cuenta. Correo único (409 si existe), normalizado a minúsculas.
+- Al **editar** un integrante se puede cambiar el correo y restablecer la contraseña (vacía = no cambiar); el nombre se sincroniza con la cuenta. Al **eliminar** un integrante se elimina también su cuenta (su sesión deja de funcionar al instante). **Nadie puede eliminar su propia ficha**, de modo que siempre queda al menos un admin.
+- **Primer administrador:** script `npm run create-admin` (interactivo con contraseña oculta, o con `ADMIN_NAME`/`ADMIN_EMAIL`/`ADMIN_PASSWORD`). Crea cuenta + ficha; si el correo ya tiene cuenta sin ficha, solo crea la ficha y la vincula sin cambiar la contraseña; falla si ya es integrante.
+- **Perfil:** cualquier usuario con sesión puede ver su perfil y **cambiar su contraseña** (pide la actual, mínimo 8 caracteres para la nueva).
+- Solo los `admin` acceden al panel y a las rutas de gestión.
 - El buzón digital es público y **no lleva protección anti-spam por ahora** (decisión del cliente: sin rate limit, sin captcha). Sí hay validación estricta de longitudes y tipos.
 
 ### 5. API REST (prefijo `/api`)
@@ -57,12 +59,10 @@ Los errores devuelven `{ "error": "mensaje en español" }`; los de validación (
 | Método y ruta | Acceso | Descripción |
 |---|---|---|
 | `GET /health` | público | `{ ok: true }` |
-| `POST /auth/register` | público | `{name,email,password}` → `{token,user}`; 409 si el correo existe |
-| `POST /auth/login` | público | `{email,password}` → `{token,user}`; 401 genérico |
-| `GET /auth/me` | sesión | usuario actual |
-| `GET /auth/users` | admin | lista de usuarios |
-| `PATCH /auth/users/:id/role` | admin | `{role}`; protege al último admin |
-| `POST /messages` | público | crea mensaje (unión discriminada por `anonymous`: si es `false`, `name`, `degree`, `semester` y `group` son obligatorios) |
+| `POST /auth/login` | público | `{email,password}` → `{token,user,member}`; 401 genérico |
+| `GET /auth/me` | sesión | `{user,member}` (ficha de integrante, sin el campo `user`) |
+| `PATCH /auth/password` | sesión | `{currentPassword,newPassword}`; 400 si la actual no coincide |
+| `POST /messages` | público | crea mensaje (unión discriminada por `anonymous`: si es `false`, `name`, `degree`, `semester` y `group` son obligatorios) (sin aviso por correo) |
 | `GET /messages?status=` | admin | lista (más recientes primero, máx. 500) |
 | `PATCH /messages/:id` | admin | `{status}` |
 | `DELETE /messages/:id` | admin | elimina |
@@ -73,8 +73,11 @@ Los errores devuelven `{ "error": "mensaje en español" }`; los de validación (
 | `GET /news/all` · `POST/PUT/DELETE /news[/:id]` | admin | CRUD; al cambiar o quitar la portada se borra el archivo anterior de GridFS; al eliminar la noticia se borra su portada |
 | `GET /proposals` | público | publicadas, por `number` |
 | `GET /proposals/all` · `POST/PUT/DELETE /proposals[/:id]` | admin | CRUD; 409 si el número se repite |
-| `GET /members` | público | por `order` |
-| `POST/PUT/DELETE /members[/:id]` | admin | CRUD |
+| `GET /members` | público | por `order`; sin correo ni cuenta |
+| `GET /members/all` | admin | igual, con el `email` de cada cuenta |
+| `POST /members` | admin | `name` + **`email` + `password` obligatorios**; crea cuenta admin y ficha |
+| `PUT /members/:id` | admin | `email` y `password` opcionales (vacío = sin cambio); 409 si el correo es de otra cuenta |
+| `DELETE /members/:id` | admin | elimina ficha, foto y cuenta; 400 si es la propia ficha |
 | `GET /settings` | público | todos los ajustes (con valores por defecto) |
 | `PUT /settings/:key` | admin | `{value}` para `degrees`, `groups`, `semesters`, `social` |
 
@@ -91,20 +94,21 @@ Estilo **“papel rasgado”** tipo collage de cartel: capas de papel crema con 
 - Tarjetas de propuestas: papel crema, número grande en rojo (Anton), título en mayúsculas, sombra dura roja desplazada, y recuadro blanco con etiqueta pill roja oscura **“OBJETIVO”** seguida del texto.
 - Tarjetas de noticias: blancas con sombra dura negra, portada 4:3, fecha, título, resumen y “Leer más →”.
 - Botones: píldora, mayúsculas, rojo / crema / negro.
-- **Logos** (ambos obligatorios; header y footer): logo de la planilla (puño rojo con aro, “GENERACIÓN DE IMPACTO”) en `frontend/public/brand/logo-planilla.png` (recortado de `docs/referencias/tarjeta-generacion-de-impacto.jpg` / cartel, sin el lema; fusionado con el fondo oscuro con `mix-blend-mode: lighten`) y logo de la ENSFA en `frontend/public/brand/logo-ensfa.png` (original en `docs/referencias/logo-ensfa-original.png`, 512 px). Favicon: logo ENSFA reducido.
+- **Logos** (ambos obligatorios; el de la planilla va en header y footer, el de la ENSFA en el footer y en “Quiénes somos”, **no en el header**): logo de la planilla (puño rojo con aro, “GENERACIÓN DE IMPACTO”) en `frontend/public/brand/logo-planilla.png` (recortado de `docs/referencias/tarjeta-generacion-de-impacto.jpg` / cartel, sin el lema; fusionado con el fondo oscuro con `mix-blend-mode: lighten`) y logo de la ENSFA en `frontend/public/brand/logo-ensfa.png` (original en `docs/referencias/logo-ensfa-original.png`, 512 px). **Favicon: el emblema del puño de la planilla** (recorte cuadrado de `logo-planilla.png`, 128 px), no el de la ENSFA.
 - Tema único (sin modo oscuro). Diseño **responsive** (menú hamburguesa ≤ 820 px; sin desbordamiento horizontal a 390 px), foco visible, `prefers-reduced-motion` respetado, formularios con etiquetas.
 
 ### 7. Páginas del frontend
 
-Header fijo negro con borde rojo inferior: logo planilla, navegación (Inicio, Propuestas, Noticias, Buzón, Equipo, y “Panel” si eres admin o “Acceso” si no hay sesión) y logo ENSFA. Footer con ambos logos, lema, aviso de derechos y enlace Acceso/Cerrar sesión.
+Header fijo negro con borde rojo inferior: logo de la planilla y navegación (Inicio, Propuestas, Noticias, Buzón, Equipo, y “Panel” si eres admin o “Acceso” si no hay sesión). **Sin logo de la ENSFA.** Con sesión iniciada aparece un **menú desplegable de perfil** (foto o iniciales + nombre) con **“Ver perfil”** y **“Cerrar sesión”**; cerrar sesión pide **confirmación** en un `<dialog>` modal con el foco inicial en “Cancelar”. El menú se cierra con clic fuera o Esc y funciona en móvil junto a la hamburguesa. Footer con ambos logos, lema, aviso de derechos y enlace “Acceso integrantes” (solo sin sesión).
 
-1. **Inicio `/`**: hero (logo grande, “Planilla del Consejo Estudiantil de la ENSFA”, botones al buzón y a propuestas); **Quiénes somos** (texto de la sección 8 + logo ENSFA); 3 propuestas destacadas; 3 últimas noticias; banda roja “Tu opinión cuenta” con enlace al buzón.
+1. **Inicio `/`**: hero (logo grande dentro de un `<h1>` con su `alt`, “Planilla del Consejo Estudiantil de la ENSFA”, botones al buzón y a propuestas); **Quiénes somos** (texto de la sección 8 + logo ENSFA); 3 propuestas destacadas; 3 últimas noticias; banda roja “Tu opinión cuenta” con enlace al buzón.
 2. **Propuestas `/propuestas`**: todas las propuestas publicadas.
 3. **Noticias `/noticias`** y **detalle `/noticias/:slug`** (portada, fecha, autor, párrafos).
 4. **Buzón `/buzon`**: elegir tipo (queja, propuesta, pregunta, problema) con chips; elegir **anónimo** o **con mis datos**. Si es con datos aparecen: nombre completo, licenciatura (desplegable), semestre (desplegable), grupo (desplegable), todos obligatorios, tomados de `/settings`. Siempre: asunto y mensaje (contador 0/4000). Si es anónimo, mostrar “No guardamos ningún dato personal con tu mensaje” y **no enviar** datos personales. Pantalla de agradecimiento tras el envío con opción de enviar otro.
 5. **Equipo `/equipo`**: integrantes con foto (o iniciales) y cargo; bloque de contacto y redes (solo muestra las que tengan valor).
-6. **Acceso `/acceso`**: iniciar sesión / crear cuenta en el mismo formulario; tras entrar, admins van a `/admin`.
-7. **Panel `/admin`** (protegido) con pestañas: **Mensajes** (filtros Nuevos/Leídos/Archivados/Todos; marcar leído, archivar, marcar nuevo, eliminar con confirmación; muestra “Anónimo” o los datos del remitente), **Noticias**, **Propuestas** y **Equipo** (CRUD con subida de imagen y vista previa), **Ajustes** (licenciaturas, semestres, grupos —una por línea— y redes/correo) y **Usuarios** (hacer/quitar admin).
+6. **Acceso `/acceso`**: solo iniciar sesión (**sin opción de registrarse**; indica que es para integrantes). Tras entrar va a `/admin`. **Todos los campos de contraseña de la app (acceso, perfil, alta de integrante) llevan un botón de “ojo”** (con `aria-label` y `aria-pressed`) para mostrar u ocultar lo escrito.
+   - **Perfil `/perfil`** (protegido): foto o iniciales, nombre, correo, cargo y licenciatura, y formulario **Cambiar contraseña** (actual, nueva y confirmación).
+7. **Panel `/admin`** (protegido) con pestañas: **Mensajes** (filtros Nuevos/Leídos/Archivados/Todos; marcar leído, archivar, marcar nuevo, eliminar con confirmación; muestra “Anónimo” o los datos del remitente), **Noticias**, **Propuestas** y **Equipo** (CRUD con subida de imagen y vista previa; el alta pide **correo y contraseña** y avisa que el integrante recibe acceso de administrador; al editar, la contraseña es opcional), y **Ajustes** (licenciaturas, semestres, grupos —una por línea— y redes/correo). No hay pestaña de usuarios ni gestión de roles.
 8. Ruta desconocida: mensaje “Página no encontrada”.
 
 ### 8. Contenido inicial (script `npm run seed`, idempotente)
@@ -127,17 +131,23 @@ Header fijo negro con borde rojo inferior: logo planilla, navegación (Inicio, P
 
 **Ajustes por defecto:** licenciaturas (editables; **confirmar con la ENSFA**): Educación Preescolar, Primaria, Secundaria, Física y Especial; semestres 1–8; grupos A–D; redes vacías.
 
-### 9. Despliegue (documentar paso a paso en `docs/DOCUMENTACION.md`)
+### 9. Fuera de alcance por ahora
+
+- **Aviso por correo** de mensajes nuevos: el cliente pidió **no incluirlo de momento**. No agregar `nodemailer`, proveedores de correo ni variables relacionadas; los mensajes se consultan solo desde el panel.
+- Anti-spam del buzón, límite de intentos de login, registro público y gestión de roles (ver secciones 4 y 5).
+
+### 10. Despliegue (documentar paso a paso en `docs/DOCUMENTACION.md`)
 
 1. **MongoDB Atlas**: cluster, usuario de base de datos, *Network Access* que permita a Render (0.0.0.0/0 en plan gratuito), URI con base `generacion_impacto`.
-2. **Render**: Blueprint desde `render.yaml`; definir `MONGODB_URI` y `CORS_ORIGIN` (URL de Vercel); `JWT_SECRET` se genera solo. Ejecutar `npm run seed` una vez (localmente apuntando a Atlas o con la Shell de Render). Nota: el plan gratuito se duerme tras inactividad (primera petición lenta).
+2. **Render**: Blueprint desde `render.yaml`; definir `MONGODB_URI` y `CORS_ORIGIN` (URL de Vercel); `JWT_SECRET` se genera solo. Nota: el plan gratuito se duerme tras inactividad (primera petición lenta).
 3. **Vercel**: importar el repo, Root Directory `frontend`, variable `VITE_API_URL` con la URL de Render.
-4. **Primer registro**: crear inmediatamente la cuenta del equipo en `/acceso` (será admin) y, desde Panel → Usuarios, asignar admin a los demás integrantes.
+4. **Datos y primer admin**: desde el equipo del desarrollador, con `MONGODB_URI` de Atlas, ejecutar `npm run seed` y `npm run create-admin`; luego iniciar sesión en `/acceso` y dar de alta al resto del equipo en Panel → Equipo.
 
-### 10. Calidad y entregables
+### 11. Calidad y entregables
 
 - Código claro, sin dependencias innecesarias, comentarios solo donde expliquen un porqué.
-- Probar con una base de datos **aparte** (no la de producción): registro (primer admin / segundo usuario), permisos 401/403, protección del último admin, mensajes anónimos (descartan datos personales) e identificados (validan campos), subida de imágenes (rechaza SVG), descarga con caché, CRUD de noticias, y que el build del frontend compile. Verificar visualmente inicio, buzón y vista móvil.
+- Probar con una base de datos **aparte** (nunca la de producción, y confirmar por código que el URI apunta a ella antes de ejecutar): login, permisos 401/403, que el registro público y la gestión de roles **no existan** (404), alta/edición/baja de integrantes (cuenta admin creada, correo duplicado 409, no poder borrarse a sí mismo, sesión invalidada al darlo de baja), cambio de contraseña, mensajes anónimos (descartan datos personales) e identificados (validan campos), subida de imágenes (rechaza SVG y > 5 MB), descarga con caché y CRUD de noticias y propuestas. Probar en navegador headless: menú de perfil, diálogo de confirmación, botón de “ojo”, formulario del buzón en ambos modos, ausencia de errores de consola en cada ruta y de desbordamiento horizontal a 390 px; verificar visualmente inicio, buzón y móvil.
+- **Revisión final**: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS y exports sin uso, `npm audit` sin vulnerabilidades, y cerrar **todos** los procesos de desarrollo (`node --watch` revive al hijo si solo se mata el servidor).
 - Crear **`README.md`** (arranque rápido), **`CLAUDE.md`** (reglas del proyecto y la **regla de documentación**), **`docs/DOCUMENTACION.md`** (arquitectura, variables, API, despliegue, registro de cambios) y este **`docs/Prompt Inicial.md`**.
 - **Regla de documentación:** tras cada actualización importante, actualizar automáticamente `docs/DOCUMENTACION.md` (incluido su registro de cambios) y, si cambian los requisitos base, este prompt, sin que el usuario lo pida.
 - No escribir secretos en archivos versionados ni repetirlos en la conversación.

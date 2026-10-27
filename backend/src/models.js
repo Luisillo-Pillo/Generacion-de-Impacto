@@ -60,6 +60,8 @@ const memberSchema = new Schema(
     degree: { type: String, trim: true, maxlength: 120, default: '' },
     photo: { type: Schema.Types.ObjectId },
     order: { type: Number, default: 0 },
+    // Cuenta de acceso del integrante; todo integrante con cuenta es administrador.
+    user: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );

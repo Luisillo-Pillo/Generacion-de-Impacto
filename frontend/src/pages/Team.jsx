@@ -1,7 +1,6 @@
 import { useFetch } from '../hooks.js';
 import { fileUrl } from '../api.js';
-
-const initials = (name) => name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+import { initials } from '../utils.js';
 
 export default function Team() {
   const members = useFetch('/members');

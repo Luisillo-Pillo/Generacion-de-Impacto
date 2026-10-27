@@ -6,6 +6,7 @@ import { connectDb } from './db.js';
 import authRoutes from './routes/auth.js';
 import fileRoutes from './routes/files.js';
 import messageRoutes from './routes/messages.js';
+import memberRoutes from './routes/members.js';
 import contentRoutes from './routes/content.js';
 
 const app = express();
@@ -24,11 +25,12 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/members', memberRoutes);
 app.use('/api', contentRoutes);
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
-// eslint-disable-next-line no-unused-vars
+// Express identifica el manejador de errores por sus 4 parámetros, aunque _next no se use.
 app.use((err, _req, res, _next) => {
   if (err instanceof ZodError) {
     return res.status(400).json({ error: err.issues[0]?.message || 'Datos inválidos', issues: err.issues });
