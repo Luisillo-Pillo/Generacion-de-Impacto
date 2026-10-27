@@ -235,10 +235,10 @@ function TeamAdmin() {
       fields={(m, set) => (
         <>
           {text('Nombre', m.name, set('name'), { required: true, maxLength: 100 })}
-          {text('Cargo (ej. Presidente/a)', m.role, set('role'), { maxLength: 100 })}
+          {text('Cargo', m.role, set('role'), { maxLength: 100 })}
           {text('Licenciatura', m.degree, set('degree'), { maxLength: 120 })}
           {text('Orden', m.order, (v) => set('order')(Number(v)), { type: 'number' })}
-          <p className="hint">Todo integrante recibe una cuenta con acceso de administrador a este panel.</p>
+          
           {text('Correo de acceso', m.email, set('email'), { type: 'email', required: true, autoComplete: 'off' })}
           <label>{m._id ? 'Nueva contraseña (déjala vacía para no cambiarla)' : 'Contraseña (mínimo 8 caracteres)'}
             <PasswordInput required={!m._id} minLength={8} value={m.password ?? ''} onChange={(e) => set('password')(e.target.value)} autoComplete="new-password" />

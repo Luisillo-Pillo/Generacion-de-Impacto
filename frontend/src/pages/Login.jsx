@@ -32,7 +32,7 @@ export default function Login() {
     <section className="section paper page-min">
       <div className="container narrow">
         <h1 className="title">Acceso <mark>integrantes</mark></h1>
-        <p className="lead">Solo para integrantes de la planilla. Si necesitas acceso, pídeselo a un compañero del equipo.</p>
+        <p className="lead">Solo para integrantes de la planilla</p>
         <form className="form" onSubmit={submit}>
           <label>Correo
             <input required type="email" value={form.email} onChange={set('email')} autoComplete="email" />
