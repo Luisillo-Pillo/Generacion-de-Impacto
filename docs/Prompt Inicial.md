@@ -1,0 +1,145 @@
+# Prompt Inicial
+
+Este documento contiene el prompt completo que se le entregaría a una IA de programación (Claude Code u otra) para generar **desde cero** el sitio web de la planilla *Generación de Impacto*. Describe el producto, la arquitectura, los datos, la API, el diseño, el contenido y el despliegue tal como existen hoy. Se actualiza cada vez que cambian los requisitos base (ver `CLAUDE.md`).
+
+**Antes de usarlo:** coloca en la carpeta de trabajo las imágenes de `docs/referencias/` (la IA debe verlas para replicar el estilo) y los logos que se mencionan en la sección 6. Las credenciales **nunca** se pegan en el prompt: se colocan después en `backend/.env`.
+
+**Última actualización del prompt:** 2026-10-26.
+
+---
+
+## PROMPT (copiar desde aquí)
+
+Actúa como desarrollador full-stack senior. Construye desde cero un sitio web completo, en español de México, para **Generación de Impacto**, una planilla que compite por el Consejo Estudiantil de la **Escuela Normal Superior Federal de Aguascalientes (ENSFA) “Profr. José Santos Valdés”**. Lema: **“Nuestra voz, nuestras ideas, nuestro impacto.”**
+
+Entrega código funcional, probado y documentado. Antes de dar algo por terminado, ejecuta el build, levanta los servidores y prueba los endpoints; no declares funcionalidad verificada si no la verificaste.
+
+### 1. Propósito del sitio
+
+1. Dar a conocer la planilla (quiénes son, propuestas, equipo, redes).
+2. Publicar noticias y avisos (ej. campañas, eventos).
+3. Ofrecer un **buzón digital** para que estudiantes envíen quejas, propuestas, preguntas o problemas, de forma **anónima** o **identificándose**.
+
+### 2. Stack y estructura del monorepo
+
+- Monorepo con **npm workspaces**. Carpetas **`frontend/`** y **`backend/`** (estos nombres exactos).
+- **frontend**: React 18 + Vite + React Router 6, JavaScript, CSS plano (sin frameworks de UI). Se despliega en **Vercel** (Root Directory = `frontend`, con `vercel.json` que reescribe todo a `/index.html` para el router).
+- **backend**: Node ≥ 20, Express 5, Mongoose 8, ESM (`"type": "module"`). Librerías: `zod` (validación), `bcryptjs`, `jsonwebtoken`, `multer` (memoria), `helmet`, `cors`. Se despliega en **Render** como Web Service (`render.yaml` en la raíz con `rootDir: backend`, `healthCheckPath: /api/health`).
+- Base de datos: **MongoDB Atlas** (Mongoose). **Los mensajes y todos los recursos visuales subidos desde el panel se guardan en MongoDB**; las imágenes van en **GridFS** (bucket `files`).
+- Scripts raíz: `dev` (backend + frontend con `concurrently`), `build`, `start`, `seed`.
+- En desarrollo, Vite hace proxy de `/api` a `http://localhost:4000`. En producción el frontend usa `VITE_API_URL` (URL del backend en Render, sin barra final).
+- Variables de entorno (con archivos `.env.example` solo con marcadores, y `.env` ignorado por git):
+  - backend: `MONGODB_URI`, `JWT_SECRET`, `CORS_ORIGIN` (lista separada por comas), `PORT`.
+  - frontend: `VITE_API_URL`.
+- El script `dev` del backend usa `node --watch --env-file-if-exists=.env src/index.js`.
+
+### 3. Modelo de datos (colecciones)
+
+- **User**: `name`, `email` (único, minúsculas), `passwordHash` (bcrypt), `role` (`admin` | `user`, por defecto `user`), timestamps.
+- **Message**: `type` (`queja` | `propuesta` | `pregunta` | `problema`), `anonymous` (bool), `name`, `degree` (licenciatura), `semester`, `group`, `subject` (≤140), `body` (≤4000), `status` (`nuevo` | `leido` | `archivado`, por defecto `nuevo`), timestamps. **Si `anonymous` es true no se guarda ningún dato personal** (la API descarta `name`, `degree`, `semester`, `group` aunque lleguen).
+- **News**: `title`, `slug` (único, generado del título sin acentos y con sufijo numérico si se repite), `excerpt` (≤300), `body` (≤20 000, párrafos separados por línea en blanco), `coverImage` (ObjectId de GridFS), `published`, `publishedAt`, `author` (nombre del admin que la crea).
+- **Proposal**: `number` (único), `title`, `objective`, `image` (opcional, GridFS), `published`.
+- **Member** (equipo): `name`, `role`, `degree`, `photo` (GridFS), `order`.
+- **Setting** (clave/valor): `degrees` (lista de licenciaturas), `semesters` (lista, por defecto 1–8), `groups` (lista, por defecto A–D), `social` (`instagram`, `facebook`, `tiktok`, `email`). Estas listas alimentan los desplegables del buzón y son editables en el panel. Valores por defecto en código si no existen en BD.
+
+### 4. Autenticación y roles
+
+- Registro y login con **correo + contraseña** (mínimo 8 caracteres). Sesión con **JWT de 7 días** enviado como `Authorization: Bearer`. El token solo contiene el id; **el rol se lee de la base de datos en cada petición**, de modo que quitar el rol surte efecto de inmediato.
+- Registro **abierto** a cualquiera. **La primera cuenta registrada en el sistema se convierte en `admin`**; las demás son `user`. (Decisión explícita del cliente: sin código de instalación; el primer registro debe hacerlo el equipo justo después del primer despliegue.)
+- Los admins pueden **dar o quitar el rol admin** a cualquier usuario desde el panel. **Nunca debe poder quitarse el último admin** (responder 400 “Debe quedar al menos un administrador”).
+- Solo los `admin` acceden al panel y a las rutas de gestión. Un `user` sin rol admin ve un mensaje de “Sin acceso”.
+- El buzón digital es público y **no lleva protección anti-spam por ahora** (decisión del cliente: sin rate limit, sin captcha). Sí hay validación estricta de longitudes y tipos.
+
+### 5. API REST (prefijo `/api`)
+
+Los errores devuelven `{ "error": "mensaje en español" }`; los de validación (zod) responden 400. JSON limitado a 100 kb.
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `GET /health` | público | `{ ok: true }` |
+| `POST /auth/register` | público | `{name,email,password}` → `{token,user}`; 409 si el correo existe |
+| `POST /auth/login` | público | `{email,password}` → `{token,user}`; 401 genérico |
+| `GET /auth/me` | sesión | usuario actual |
+| `GET /auth/users` | admin | lista de usuarios |
+| `PATCH /auth/users/:id/role` | admin | `{role}`; protege al último admin |
+| `POST /messages` | público | crea mensaje (unión discriminada por `anonymous`: si es `false`, `name`, `degree`, `semester` y `group` son obligatorios) |
+| `GET /messages?status=` | admin | lista (más recientes primero, máx. 500) |
+| `PATCH /messages/:id` | admin | `{status}` |
+| `DELETE /messages/:id` | admin | elimina |
+| `POST /files` | admin | multipart `file`; solo JPG/PNG/WEBP/GIF (**nunca SVG**), máx. 5 MB → `{id,url}` |
+| `GET /files/:id` | público | stream desde GridFS con `Content-Type` correcto y `Cache-Control: public, max-age=31536000, immutable` |
+| `DELETE /files/:id` | admin | borra el archivo |
+| `GET /news` · `GET /news/:slug` | público | solo publicadas (la lista sin `body`) |
+| `GET /news/all` · `POST/PUT/DELETE /news[/:id]` | admin | CRUD; al cambiar o quitar la portada se borra el archivo anterior de GridFS; al eliminar la noticia se borra su portada |
+| `GET /proposals` | público | publicadas, por `number` |
+| `GET /proposals/all` · `POST/PUT/DELETE /proposals[/:id]` | admin | CRUD; 409 si el número se repite |
+| `GET /members` | público | por `order` |
+| `POST/PUT/DELETE /members[/:id]` | admin | CRUD |
+| `GET /settings` | público | todos los ajustes (con valores por defecto) |
+| `PUT /settings/:key` | admin | `{value}` para `degrees`, `groups`, `semesters`, `social` |
+
+Detalles de seguridad: `helmet` (con `Cross-Origin-Resource-Policy: cross-origin` para poder mostrar imágenes desde otro dominio), CORS restringido a `CORS_ORIGIN`, `trust proxy` activado (Render), manejador de errores central que no filtra trazas.
+
+### 6. Identidad visual (replicar las imágenes de `docs/referencias/`)
+
+Estilo **“papel rasgado”** tipo collage de cartel: capas de papel crema con bordes irregulares sobre fondo negro, con rojo intenso como acento, tipografía gruesa en mayúsculas y detalles de garabato.
+
+- Colores: crema `#f1e8db`, rojo `#d4141c`, rojo oscuro `#a8101a`, negro `#121212`, texto `#1b1b1b`.
+- Tipografías (Google Fonts): **Anton** (títulos, en mayúsculas), **Poppins** (texto), **Permanent Marker** (acentos manuscritos).
+- Palabras clave de los títulos resaltadas con un **bloque rojo ligeramente girado** (`<mark>` con sombra), como “CONVIVENCIA” o “ESTUDIANTES” en los carteles.
+- Secciones con bordes superiores e inferiores irregulares (`clip-path: polygon(...)` en una variable CSS reutilizable) que se superponen con margen negativo para que se vea el fondo negro entre capas. Franja roja rasgada al final del hero.
+- Tarjetas de propuestas: papel crema, número grande en rojo (Anton), título en mayúsculas, sombra dura roja desplazada, y recuadro blanco con etiqueta pill roja oscura **“OBJETIVO”** seguida del texto.
+- Tarjetas de noticias: blancas con sombra dura negra, portada 4:3, fecha, título, resumen y “Leer más →”.
+- Botones: píldora, mayúsculas, rojo / crema / negro.
+- **Logos** (ambos obligatorios; header y footer): logo de la planilla (puño rojo con aro, “GENERACIÓN DE IMPACTO”) en `frontend/public/brand/logo-planilla.png` (recortado de `docs/referencias/tarjeta-generacion-de-impacto.jpg` / cartel, sin el lema; fusionado con el fondo oscuro con `mix-blend-mode: lighten`) y logo de la ENSFA en `frontend/public/brand/logo-ensfa.png` (original en `docs/referencias/logo-ensfa-original.png`, 512 px). Favicon: logo ENSFA reducido.
+- Tema único (sin modo oscuro). Diseño **responsive** (menú hamburguesa ≤ 820 px; sin desbordamiento horizontal a 390 px), foco visible, `prefers-reduced-motion` respetado, formularios con etiquetas.
+
+### 7. Páginas del frontend
+
+Header fijo negro con borde rojo inferior: logo planilla, navegación (Inicio, Propuestas, Noticias, Buzón, Equipo, y “Panel” si eres admin o “Acceso” si no hay sesión) y logo ENSFA. Footer con ambos logos, lema, aviso de derechos y enlace Acceso/Cerrar sesión.
+
+1. **Inicio `/`**: hero (logo grande, “Planilla del Consejo Estudiantil de la ENSFA”, botones al buzón y a propuestas); **Quiénes somos** (texto de la sección 8 + logo ENSFA); 3 propuestas destacadas; 3 últimas noticias; banda roja “Tu opinión cuenta” con enlace al buzón.
+2. **Propuestas `/propuestas`**: todas las propuestas publicadas.
+3. **Noticias `/noticias`** y **detalle `/noticias/:slug`** (portada, fecha, autor, párrafos).
+4. **Buzón `/buzon`**: elegir tipo (queja, propuesta, pregunta, problema) con chips; elegir **anónimo** o **con mis datos**. Si es con datos aparecen: nombre completo, licenciatura (desplegable), semestre (desplegable), grupo (desplegable), todos obligatorios, tomados de `/settings`. Siempre: asunto y mensaje (contador 0/4000). Si es anónimo, mostrar “No guardamos ningún dato personal con tu mensaje” y **no enviar** datos personales. Pantalla de agradecimiento tras el envío con opción de enviar otro.
+5. **Equipo `/equipo`**: integrantes con foto (o iniciales) y cargo; bloque de contacto y redes (solo muestra las que tengan valor).
+6. **Acceso `/acceso`**: iniciar sesión / crear cuenta en el mismo formulario; tras entrar, admins van a `/admin`.
+7. **Panel `/admin`** (protegido) con pestañas: **Mensajes** (filtros Nuevos/Leídos/Archivados/Todos; marcar leído, archivar, marcar nuevo, eliminar con confirmación; muestra “Anónimo” o los datos del remitente), **Noticias**, **Propuestas** y **Equipo** (CRUD con subida de imagen y vista previa), **Ajustes** (licenciaturas, semestres, grupos —una por línea— y redes/correo) y **Usuarios** (hacer/quitar admin).
+8. Ruta desconocida: mensaje “Página no encontrada”.
+
+### 8. Contenido inicial (script `npm run seed`, idempotente)
+
+**Quiénes somos:** “**Generación de Impacto** propone un Consejo Estudiantil cercano a la comunidad de la ENSFA, que escuche a los distintos grupos, dé seguimiento a sus inquietudes y organice actividades que fortalezcan la formación docente, la convivencia y la responsabilidad social. Promover la participación y el bienestar de la comunidad estudiantil de la ENSFA mediante acciones académicas, recreativas, solidarias y de representación, con mecanismos claros de diálogo, gestión y rendición de cuentas.”
+
+**Propuestas** (la **#7 aún no existe**; no inventarla, se agrega desde el panel):
+
+1. Jornadas de activación física y convivencia — *Promover espacios periódicos de movimiento, recreación y convivencia.*
+2. Conferencia mensual para la formación docente y personal — *Complementar la formación profesional y humana de los futuros docentes.*
+3. Mesas de diálogo con jefes de grupo y Consejo Estudiantil — *Que los estudiantes puedan estar en comunicación para radicar con problemas e inquietudes generadas.*
+4. Academia de representantes de grupo — *Crear un espacio periódico de coordinación con jefes y docentes.*
+5. Concientización del cuidado de baños, áreas verdes y espacios comunes — *Fomentar el uso responsable y el cuidado compartido de las instalaciones.*
+6. Programa de orientación y acompañamiento estudiantil — *Brindar apoyo y orientación a los estudiantes que enfrenten dificultades académicas o situaciones con docentes, personal administrativo o directivos.*
+8. Campañas solidarias — *Fomentar la participación de la comunidad estudiantil en acciones solidarias que beneficien a distintos sectores de la sociedad.*
+9. Red de tutorías y asesorías entre estudiantes — *Facilitar apoyo académico voluntario en asignaturas que representen dificultad por parte de los estudiantes a estudiantes.*
+10. Buzón digital permanente — *Recibir de manera continua sugerencias, inquietudes y propuestas de los estudiantes.*
+
+**Primera noticia:** “Reto Impacto: Tapitas con Causa” (propuesta #8, Campañas solidarias). Del 27 al 30 de octubre participan todos los grupos de la ENSFA; las tapitas se entregan al **CRIT Aguascalientes (Teletón)**; el grupo que más tapitas reúna gana un premio. Lema: “Pequeñas tapitas, grandes cambios”. Portada: el cartel `docs/referencias/cartel-reto-impacto-tapitas.png` convertido a JPG y subido a GridFS por el seed.
+
+**Ajustes por defecto:** licenciaturas (editables; **confirmar con la ENSFA**): Educación Preescolar, Primaria, Secundaria, Física y Especial; semestres 1–8; grupos A–D; redes vacías.
+
+### 9. Despliegue (documentar paso a paso en `docs/DOCUMENTACION.md`)
+
+1. **MongoDB Atlas**: cluster, usuario de base de datos, *Network Access* que permita a Render (0.0.0.0/0 en plan gratuito), URI con base `generacion_impacto`.
+2. **Render**: Blueprint desde `render.yaml`; definir `MONGODB_URI` y `CORS_ORIGIN` (URL de Vercel); `JWT_SECRET` se genera solo. Ejecutar `npm run seed` una vez (localmente apuntando a Atlas o con la Shell de Render). Nota: el plan gratuito se duerme tras inactividad (primera petición lenta).
+3. **Vercel**: importar el repo, Root Directory `frontend`, variable `VITE_API_URL` con la URL de Render.
+4. **Primer registro**: crear inmediatamente la cuenta del equipo en `/acceso` (será admin) y, desde Panel → Usuarios, asignar admin a los demás integrantes.
+
+### 10. Calidad y entregables
+
+- Código claro, sin dependencias innecesarias, comentarios solo donde expliquen un porqué.
+- Probar con una base de datos **aparte** (no la de producción): registro (primer admin / segundo usuario), permisos 401/403, protección del último admin, mensajes anónimos (descartan datos personales) e identificados (validan campos), subida de imágenes (rechaza SVG), descarga con caché, CRUD de noticias, y que el build del frontend compile. Verificar visualmente inicio, buzón y vista móvil.
+- Crear **`README.md`** (arranque rápido), **`CLAUDE.md`** (reglas del proyecto y la **regla de documentación**), **`docs/DOCUMENTACION.md`** (arquitectura, variables, API, despliegue, registro de cambios) y este **`docs/Prompt Inicial.md`**.
+- **Regla de documentación:** tras cada actualización importante, actualizar automáticamente `docs/DOCUMENTACION.md` (incluido su registro de cambios) y, si cambian los requisitos base, este prompt, sin que el usuario lo pida.
+- No escribir secretos en archivos versionados ni repetirlos en la conversación.
+
+## FIN DEL PROMPT

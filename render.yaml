@@ -1,0 +1,20 @@
+# Blueprint de Render para el backend (monorepo: el código de la API vive en /backend).
+# El frontend se despliega por separado en Vercel con Root Directory = frontend.
+services:
+  - type: web
+    name: generacion-impacto-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: MONGODB_URI
+        sync: false # se captura en el panel de Render; nunca se guarda en el repo
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false # URL(s) de Vercel separadas por coma, ej. https://generacion-impacto.vercel.app

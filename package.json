@@ -1,0 +1,21 @@
+{
+  "name": "generacion-de-impacto",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Sitio web de la planilla Generación de Impacto (Consejo Estudiantil ENSFA)",
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c red,white \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "build": "npm run build -w frontend",
+    "start": "npm run start -w backend",
+    "seed": "npm run seed -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
