@@ -12,6 +12,7 @@ Cada vez que hagas una **actualización importante** (nueva funcionalidad, cambi
 ## Reglas del proyecto
 
 - Idioma de la interfaz, textos y mensajes de error: español (México).
+- No usar `alert()`, `confirm()` ni `prompt()`: las confirmaciones y avisos van en el diálogo propio del sitio (`useDialog()` en `frontend/src/components/Dialog.jsx`).
 - Nunca escribir credenciales en archivos versionados. Los secretos van en `backend/.env` (ignorado por git) y en las variables de entorno de Render/Vercel. Los `.env.example` llevan solo marcadores.
 - No hay registro público. Las cuentas nacen al dar de alta a un integrante de la planilla (correo + contraseña obligatorios) y todo integrante es administrador; el primer admin se crea con `npm run create-admin`. Nadie puede eliminar su propia ficha, así que siempre queda un administrador.
 - Mensajes anónimos del buzón: nunca guardar datos personales (la API los descarta).

@@ -12,7 +12,7 @@ export default function Home() {
       <section className="hero">
         <div className="container hero-inner">
           <h1 className="hero-title">
-            <img className="hero-logo" src="/brand/logo-planilla.png" alt="Generación de Impacto" />
+            <img className="hero-logo" src="/brand/logo-planilla.svg" alt="Generación de Impacto" />
           </h1>
           <p className="hero-sub">Planilla del Consejo Estudiantil de la ENSFA</p>
           <div className="hero-cta">

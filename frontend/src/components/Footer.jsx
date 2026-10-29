@@ -6,7 +6,7 @@ export default function Footer() {
   return (
     <footer className="footer">
       <div className="container footer-inner">
-        <img src="/brand/logo-planilla.png" alt="Generación de Impacto" className="footer-logo" />
+        <img src="/brand/logo-planilla.svg" alt="Generación de Impacto" className="footer-logo" />
         <p className="footer-tagline">NUESTRA VOZ, NUESTRAS IDEAS, NUESTRO IMPACTO.</p>
         <img src="/brand/logo-ensfa.png" alt="ENSFA" className="footer-ensfa" />
       </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useFetch } from '../hooks.js';
 
@@ -39,9 +40,12 @@ export default function Mailbox() {
         <div className="container narrow center">
           <h1 className="title">¡Gracias por <mark>escribirnos</mark>!</h1>
           <p className="lead">Tu mensaje fue recibido. Lo revisaremos y le daremos seguimiento.</p>
-          <button className="btn btn-red" onClick={() => setStatus({ sending: false, error: '', done: false })}>
-            Enviar otro mensaje
-          </button>
+          <div className="btn-row">
+            <Link to="/" className="btn btn-red">Inicio</Link>
+            <button className="btn btn-dark" onClick={() => setStatus({ sending: false, error: '', done: false })}>
+              Enviar otro mensaje
+            </button>
+          </div>
         </div>
       </section>
     );

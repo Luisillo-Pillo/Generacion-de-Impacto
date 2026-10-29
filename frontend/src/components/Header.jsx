@@ -20,7 +20,7 @@ export default function Header() {
     <header className="header">
       <div className="container header-inner">
         <Link to="/" className="brand" onClick={close} aria-label="Generación de Impacto, inicio">
-          <img src="/brand/logo-planilla.png" alt="Generación de Impacto" />
+          <img src="/brand/logo-planilla.svg" alt="Generación de Impacto" />
         </Link>
         <nav className={`nav ${open ? 'open' : ''}`}>
           {links.map(([to, label]) => (

@@ -13,9 +13,14 @@ const userSchema = new Schema(
 );
 
 // Los datos personales (name, degree, semester, group) solo existen si el mensaje NO es anónimo.
+export const MESSAGE_TYPES = ['queja', 'propuesta', 'pregunta', 'problema'];
+export const MESSAGE_STATUS = ['nuevo', 'leido', 'archivado'];
+// Seguimiento que le da el equipo al mensaje, independiente de si ya se leyó o se archivó
+export const MESSAGE_REVIEW = ['pendiente', 'en_proceso', 'completado', 'rechazado'];
+
 const messageSchema = new Schema(
   {
-    type: { type: String, enum: ['queja', 'propuesta', 'pregunta', 'problema'], required: true },
+    type: { type: String, enum: MESSAGE_TYPES, required: true },
     anonymous: { type: Boolean, default: true },
     name: { type: String, trim: true, maxlength: 120 },
     degree: { type: String, trim: true, maxlength: 120 },
@@ -23,7 +28,8 @@ const messageSchema = new Schema(
     group: { type: String, trim: true, maxlength: 20 },
     subject: { type: String, required: true, trim: true, maxlength: 140 },
     body: { type: String, required: true, trim: true, maxlength: 4000 },
-    status: { type: String, enum: ['nuevo', 'leido', 'archivado'], default: 'nuevo' },
+    status: { type: String, enum: MESSAGE_STATUS, default: 'nuevo' },
+    review: { type: String, enum: MESSAGE_REVIEW, default: 'pendiente' },
   },
   { timestamps: true }
 );

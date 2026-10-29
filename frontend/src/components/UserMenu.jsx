@@ -3,13 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import { fileUrl } from '../api.js';
 import { initials } from '../utils.js';
-import ConfirmDialog from './ConfirmDialog.jsx';
+import { useDialog } from './Dialog.jsx';
 
 // Menú desplegable del perfil (solo con sesión iniciada): ver perfil y cerrar sesión con confirmación.
 export default function UserMenu() {
   const { user, member, logout } = useAuth();
   const [open, setOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  const { confirm } = useDialog();
   const ref = useRef(null);
   const navigate = useNavigate();
 
@@ -25,8 +25,14 @@ export default function UserMenu() {
     };
   }, [open]);
 
-  function confirmLogout() {
-    setConfirming(false);
+  async function askLogout() {
+    setOpen(false);
+    const ok = await confirm({
+      title: '¿Cerrar sesión?',
+      message: 'Tendrás que iniciar sesión de nuevo para entrar al panel.',
+      confirmLabel: 'Cerrar sesión',
+    });
+    if (!ok) return;
     logout();
     navigate('/');
   }
@@ -45,17 +51,9 @@ export default function UserMenu() {
             <small>{user.email}</small>
           </div>
           <Link to="/perfil" role="menuitem" onClick={() => setOpen(false)}>Ver perfil</Link>
-          <button role="menuitem" onClick={() => { setOpen(false); setConfirming(true); }}>Cerrar sesión</button>
+          <button role="menuitem" onClick={askLogout}>Cerrar sesión</button>
         </div>
       )}
-      <ConfirmDialog
-        open={confirming}
-        title="¿Cerrar sesión?"
-        message="Tendrás que iniciar sesión de nuevo para entrar al panel."
-        confirmLabel="Cerrar sesión"
-        onConfirm={confirmLogout}
-        onCancel={() => setConfirming(false)}
-      />
     </div>
   );
 }

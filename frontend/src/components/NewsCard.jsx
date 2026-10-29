@@ -8,7 +8,7 @@ export default function NewsCard({ n }) {
         {n.coverImage ? (
           <img src={fileUrl(n.coverImage)} alt="" loading="lazy" />
         ) : (
-          <img className="news-placeholder" src="/brand/logo-planilla.png" alt="" />
+          <img className="news-placeholder" src="/brand/logo-planilla.svg" alt="" />
         )}
       </div>
       <div className="news-card-body">

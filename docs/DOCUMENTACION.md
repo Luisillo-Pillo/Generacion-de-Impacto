@@ -9,8 +9,8 @@ Sitio web de la planilla **Generación de Impacto** (Consejo Estudiantil de la E
 ```
 Generacion-de-Impacto/
 ├── frontend/            React 18 + Vite + React Router 7 → Vercel
-│   ├── public/brand/    logo-planilla.png, logo-ensfa.png   (favicon.png = emblema de la planilla)
-│   └── src/             App, auth, api, hooks, utils, pages/, components/, styles.css
+│   ├── public/brand/    logo-planilla.svg, logo-ensfa.png   (favicon.png = emblema de la planilla)
+│   └── src/             App, auth, api, hooks, utils, pages/ (admin/: una página por sección del panel), components/, styles.css
 ├── backend/             Express 5 + Mongoose + Zod 4 → Render
 │   ├── src/             index, db (GridFS), auth, models, validators,
 │   │                    seed, create-admin, routes/ (auth, messages, members, files, content)
@@ -52,6 +52,7 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 
 Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, más `files.files` / `files.chunks` (GridFS). Detalle de campos en `backend/src/models.js`.
 
+- Cada mensaje tiene un **tipo** (`queja`, `propuesta`, `pregunta`, `problema`), un **estado de bandeja** (`status`: `nuevo`, `leido`, `archivado`) y un **estado de revisión** (`review`: `pendiente` por defecto, `en_proceso`, `completado`, `rechazado`). Son independientes: un mensaje puede estar leído y a la vez en proceso. Los mensajes anteriores a `review` se tratan como pendientes.
 - Un mensaje **anónimo** nunca almacena nombre, licenciatura, semestre ni grupo.
 - Cada **integrante** (`members`) apunta a su cuenta (`users`) mediante `member.user`. La API pública de integrantes nunca devuelve ese campo ni el correo.
 - Las listas de licenciaturas, semestres y grupos del formulario viven en `settings` y se editan desde el panel.
@@ -73,7 +74,7 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, m�
 Resumen (detalle de validaciones en `backend/src/routes/`):
 
 - Auth: `POST /api/auth/login`, `GET /api/auth/me`, `PATCH /api/auth/password`.
-- Buzón: `POST /api/messages` (público); `GET`, `PATCH /:id`, `DELETE /:id` (admin).
+- Buzón: `POST /api/messages` (público); admin: `GET /api/messages?status=&type=&review=` (filtros opcionales y combinables), `PATCH /:id` (`{status?, review?}`, al menos uno) y `DELETE /:id`.
 - Integrantes: `GET /api/members` (público, sin correo); `GET /api/members/all`, `POST`, `PUT /:id`, `DELETE /:id` (admin).
 - Archivos: `POST /api/files` (admin, JPG/PNG/WEBP/GIF ≤ 5 MB, sin SVG), `GET /api/files/:id`, `DELETE /api/files/:id` (admin).
 - Contenido: `/api/news`, `/api/proposals` (lectura pública; escritura admin; `/news/all` y `/proposals/all` incluyen no publicados), `GET /api/settings`, `PUT /api/settings/:key` (admin).
@@ -95,7 +96,7 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 - **Imágenes huérfanas**: si en el panel subes una imagen y cancelas sin guardar, el archivo queda en GridFS. Se limpian solo al reemplazar o eliminar el registro que las usa.
 - **Login sin límite de intentos**: no hay rate limit en `/api/auth/login`; con cuentas de administrador conviene agregarlo antes de promocionar el sitio.
 - **Buzón sin anti-spam** (decisión del cliente).
-- Las páginas comparten un único `<title>`.
+- Las páginas comparten un único `<title>` (“Generación de Impacto”).
 
 ## 9. Pendientes y decisiones abiertas
 
@@ -106,6 +107,28 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 - Rotar la contraseña de Atlas: la cadena de conexión se compartió en el chat durante el desarrollo.
 
 ## 10. Registro de cambios
+
+### 2026-10-29 — Filtros de mensajes como menús desplegables (0.3.1)
+- En Panel → Mensajes, los filtros **Tipo**, **Estado** y **Revisión** pasaron de chips a tres menús desplegables (con el estilo de selectores del sitio) en una fila compacta (ancho ajustado al contenido, que se acomoda en varias líneas en móvil). Siguen siendo combinables.
+- Corrección en `useList` (panel): `reload` ahora es estable, consulta siempre la ruta vigente y descarta respuestas tardías de rutas anteriores; antes, al cambiar un filtro justo después de otra acción, podía mostrarse una lista que ya no correspondía a los filtros.
+
+### 2026-10-29 — Panel por páginas, clasificación de mensajes, diálogos propios y selectores (0.3.0)
+- **Panel admin en rutas propias.** Cada pestaña es una página con su URL: `/admin/mensajes`, `/admin/noticias`, `/admin/propuestas`, `/admin/equipo` y `/admin/ajustes` (`/admin` redirige a mensajes). `pages/Admin.jsx` se dividió en `pages/admin/`: `AdminLayout` (protección de acceso, título y navegación con `NavLink` + `<Outlet />`), una página por sección y `shared.jsx` (lista, editor genérico, campo de imagen). La estructura visual es la misma; el botón Atrás y los enlaces directos funcionan.
+- **Mensajes: clasificación y revisión.** Nuevo campo `review` (`pendiente`, `en_proceso`, `completado`, `rechazado`) además del estado de bandeja. En Panel → Mensajes hay tres filtros combinables (Tipo, Estado, Revisión), cada tarjeta muestra el tipo y una insignia de revisión de color, y un selector permite cambiarla. API: `GET /api/messages` acepta `type` y `review`; `PATCH` acepta `status` y/o `review`.
+- **Sin `alert()`/`confirm()` del navegador.** Nuevo `components/Dialog.jsx` (`DialogProvider` + `useDialog()` con `confirm()` y `notify()`) muestra confirmaciones y avisos en un modal con el diseño del sitio (foco inicial en la opción segura, Esc y clic fuera cancelan). Se usa al eliminar elementos del panel, al cerrar sesión y para mostrar errores del servidor al eliminar (antes fallaban en silencio). Se retiró `ConfirmDialog.jsx`.
+- **Menús de selección con estilo.** Flecha roja propia y, en navegadores con `appearance: base-select` (Chrome/Edge 135+), lista desplegable crema con borde negro, sombra roja, opción resaltada en rojo y hover negro. En otros navegadores se conserva la lista nativa con el campo estilizado.
+- Buzón: en la pantalla de agradecimiento, **Inicio** es el botón primario (rojo) y va primero; “Enviar otro mensaje” es el secundario (negro).
+
+### 2026-10-29 — Título de la pestaña (0.2.6)
+- El `<title>` del sitio es ahora solo **Generación de Impacto** (antes incluía “| Consejo Estudiantil ENSFA”), en `frontend/index.html`.
+
+### 2026-10-29 — Botón “Inicio” tras enviar un mensaje (0.2.5)
+- En la pantalla de agradecimiento del buzón, junto a “Enviar otro mensaje” se agregó el botón **Inicio** (enlace a `/`).
+
+### 2026-10-29 — Logo de la planilla en SVG (0.2.4)
+- El logo se veía borroso (el PNG original medía solo 585 px). Se rehízo como **vector**: `frontend/public/brand/logo-planilla.svg` (sin fondo, sin ruido; ~40 KB). El puño y los dos arcos son el trazo vectorial del original (potrace) y los textos “GENERACIÓN DE” (Montserrat Bold) e “IMPACTO” (Montserrat ExtraBold) están convertidos a curvas, así que no depende de tipografías. Rojo `#d0191f`, blanco cálido `#f4f1ec`.
+- Header, hero, footer y la miniatura de noticias sin portada usan el SVG; se eliminó `logo-planilla.png` y la regla `mix-blend-mode: lighten`. El favicon sigue siendo `favicon.png` (PNG 128 px).
+- Nota: la restricción de “no SVG” aplica solo a las **imágenes subidas** por el panel (por seguridad), no a los recursos propios del sitio.
 
 ### 2026-10-27 — Revisión en vista de teléfono (0.2.3)
 - Revisadas todas las páginas públicas, el perfil y el panel admin a 375 px y 320 px (emulación móvil en Chrome): sin desbordes horizontales, textos y formularios legibles, menú hamburguesa y menú de usuario funcionales.
