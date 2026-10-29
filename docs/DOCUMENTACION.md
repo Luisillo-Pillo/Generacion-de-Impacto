@@ -109,6 +109,9 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 
 ## 10. Registro de cambios
 
+### 2026-10-29 — Hora de registro en las tarjetas de mensajes (0.4.2)
+- En Panel → Mensajes, la esquina superior de cada tarjeta muestra **fecha y hora de registro** (p. ej. “29 de octubre de 2026 · 2:35 p.m.”, en la hora local de quien consulta) en lugar del estado de bandeja. El estado sigue visible por el borde rojo de los mensajes nuevos y por el filtro Estado.
+
 ### 2026-10-29 — Ajustes del desplegable y del bloque de grupo (0.4.1)
 - Se retiró la lista desplegable personalizada (`appearance: base-select`): según el espacio disponible en la ventana, Chrome podía mostrarla con una sola opción. Ahora los `<select>` conservan el campo estilizado (borde, flecha roja) con la lista nativa del navegador, que siempre muestra todas las opciones.
 - Buzón: la etiqueta del selector es **“Grupo (Telesecundaria)”** y se quitó el texto de ayuda inferior, que además desalineaba el bloque respecto a Semestre.

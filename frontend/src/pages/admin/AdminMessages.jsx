@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, fileUrl, formatDate } from '../../api.js';
+import { api, fileUrl, formatDate, formatTime } from '../../api.js';
 import { useDialog } from '../../components/Dialog.jsx';
 import { formatPhone } from '../../utils.js';
 import { useList } from './shared.jsx';
@@ -57,7 +57,7 @@ export default function AdminMessages() {
                 <span className="tag">{TYPE_LABEL[m.type]}</span>
                 <span className={`badge review-${review}`}>{REVIEW_LABEL[review]}</span>
               </span>
-              <span className="muted">{formatDate(m.createdAt)} · {m.status}</span>
+              <span className="muted">{formatDate(m.createdAt)} · {formatTime(m.createdAt)}</span>
             </header>
             <h3>{m.subject}</h3>
             <p className="pre">{m.body}</p>

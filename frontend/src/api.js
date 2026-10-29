@@ -48,3 +48,7 @@ export async function uploadImage(file) {
 
 export const formatDate = (d) =>
   new Date(d).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+
+// "2:35 p. m." en la hora local de quien consulta
+export const formatTime = (d) =>
+  new Date(d).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true });
