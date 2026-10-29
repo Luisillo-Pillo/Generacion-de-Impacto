@@ -25,7 +25,9 @@ const messageSchema = new Schema(
     name: { type: String, trim: true, maxlength: 120 },
     degree: { type: String, trim: true, maxlength: 120 },
     semester: { type: String, trim: true, maxlength: 20 },
-    group: { type: String, trim: true, maxlength: 20 },
+    group: { type: String, trim: true, maxlength: 20 }, // solo en licenciaturas con varios grupos
+    phone: { type: String, match: /^\d{10}$/ }, // solo mensajes con datos; 10 dígitos sin espacios
+    images: [{ type: Schema.Types.ObjectId }], // archivos en GridFS adjuntados por quien escribe
     subject: { type: String, required: true, trim: true, maxlength: 140 },
     body: { type: String, required: true, trim: true, maxlength: 4000 },
     status: { type: String, enum: MESSAGE_STATUS, default: 'nuevo' },

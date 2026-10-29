@@ -1,30 +1,15 @@
 import { Router } from 'express';
-import multer from 'multer';
 import mongoose from 'mongoose';
-import { Readable } from 'node:stream';
 import { getBucket } from '../db.js';
 import { adminOnly } from '../auth.js';
+import { imageUpload, saveImage } from '../uploads.js';
 
 const router = Router();
 
-// SVG se excluye a propósito: puede contener scripts.
-const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) =>
-    ALLOWED.includes(file.mimetype) ? cb(null, true) : cb(new Error('Solo se permiten imágenes JPG, PNG, WEBP o GIF')),
-});
-
-router.post('/', adminOnly, upload.single('file'), async (req, res) => {
+router.post('/', adminOnly, imageUpload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Falta el archivo' });
-  const stream = getBucket().openUploadStream(req.file.originalname, {
-    metadata: { contentType: req.file.mimetype },
-  });
-  await new Promise((resolve, reject) => {
-    Readable.from(req.file.buffer).pipe(stream).on('finish', resolve).on('error', reject);
-  });
-  res.status(201).json({ id: String(stream.id), url: `/api/files/${stream.id}` });
+  const id = await saveImage(req.file);
+  res.status(201).json({ id: String(id), url: `/api/files/${id}` });
 });
 
 router.get('/:id', async (req, res) => {

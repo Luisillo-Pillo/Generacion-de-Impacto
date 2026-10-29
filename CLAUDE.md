@@ -15,7 +15,7 @@ Cada vez que hagas una **actualización importante** (nueva funcionalidad, cambi
 - No usar `alert()`, `confirm()` ni `prompt()`: las confirmaciones y avisos van en el diálogo propio del sitio (`useDialog()` en `frontend/src/components/Dialog.jsx`).
 - Nunca escribir credenciales en archivos versionados. Los secretos van en `backend/.env` (ignorado por git) y en las variables de entorno de Render/Vercel. Los `.env.example` llevan solo marcadores.
 - No hay registro público. Las cuentas nacen al dar de alta a un integrante de la planilla (correo + contraseña obligatorios) y todo integrante es administrador; el primer admin se crea con `npm run create-admin`. Nadie puede eliminar su propia ficha, así que siempre queda un administrador.
-- Mensajes anónimos del buzón: nunca guardar datos personales (la API los descarta).
+- Mensajes anónimos del buzón: nunca guardar datos personales (la API descarta nombre, teléfono, licenciatura, semestre y grupo). Las imágenes adjuntas se validan por tipo y firma real, máximo 3 de 5 MB.
 - El aviso por correo de mensajes nuevos está **aplazado por decisión del cliente**: no incluirlo hasta que lo pida (ver “Pendientes” en `docs/DOCUMENTACION.md`).
 - Las pruebas se hacen contra una base aparte (p. ej. `gi_test`), confirmando el URI por código antes de ejecutar, y se elimina al terminar. Nunca crear usuarios ni mensajes de prueba en la base real.
 - Al detener servidores de desarrollo, cerrar el árbol completo: `node --watch` revive el proceso hijo.

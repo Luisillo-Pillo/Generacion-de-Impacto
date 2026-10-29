@@ -12,7 +12,7 @@ Generacion-de-Impacto/
 │   ├── public/brand/    logo-planilla.svg, logo-ensfa.png   (favicon.png = emblema de la planilla)
 │   └── src/             App, auth, api, hooks, utils, pages/ (admin/: una página por sección del panel), components/, styles.css
 ├── backend/             Express 5 + Mongoose + Zod 4 → Render
-│   ├── src/             index, db (GridFS), auth, models, validators,
+│   ├── src/             index, db (GridFS), uploads (multer + firma de imágenes), settings, auth, models, validators,
 │   │                    seed, create-admin, routes/ (auth, messages, members, files, content)
 │   └── seed/            reto-impacto.jpg (portada de la primera noticia)
 ├── docs/                esta documentación, Prompt Inicial y referencias visuales
@@ -53,9 +53,10 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, más `files.files` / `files.chunks` (GridFS). Detalle de campos en `backend/src/models.js`.
 
 - Cada mensaje tiene un **tipo** (`queja`, `propuesta`, `pregunta`, `problema`), un **estado de bandeja** (`status`: `nuevo`, `leido`, `archivado`) y un **estado de revisión** (`review`: `pendiente` por defecto, `en_proceso`, `completado`, `rechazado`). Son independientes: un mensaje puede estar leído y a la vez en proceso. Los mensajes anteriores a `review` se tratan como pendientes.
-- Un mensaje **anónimo** nunca almacena nombre, licenciatura, semestre ni grupo.
+- Un mensaje **anónimo** nunca almacena nombre, teléfono, licenciatura, semestre ni grupo. Un mensaje **con datos** guarda además el **teléfono** (10 dígitos sin espacios; se captura y muestra como `000 000 0000`). El **grupo** solo se pide y guarda si la licenciatura elegida tiene varios grupos (ver Ajustes más abajo); en las demás se descarta.
+- Un mensaje puede llevar hasta **3 imágenes** (`images`, ids de GridFS; JPG/PNG/WEBP/GIF, 5 MB cada una, sin SVG), anónimo o no. Se validan por tipo y por la **firma real del archivo**; se envían en la misma petición multipart que el mensaje (si algo falla no quedan archivos huérfanos) y se borran de GridFS al eliminar el mensaje. Las imágenes pueden contener metadatos (p. ej. ubicación del EXIF) que no se eliminan: el formulario avisa a quien escribe de forma anónima que revise lo que adjunta.
 - Cada **integrante** (`members`) apunta a su cuenta (`users`) mediante `member.user`. La API pública de integrantes nunca devuelve ese campo ni el correo.
-- Las listas de licenciaturas, semestres y grupos del formulario viven en `settings` y se editan desde el panel.
+- Las listas de licenciaturas, semestres y grupos del formulario viven en `settings` y se editan desde el panel. `groupDegrees` es la lista de **licenciaturas con varios grupos** (casillas en Panel → Ajustes); mientras nadie la guarde, se deduce: toda licenciatura cuyo nombre contenga “telesecundaria”. El valor se calcula en `backend/src/settings.js` y se usa tanto en `GET /api/settings` como al validar un mensaje.
 
 ## 5. Cuentas, integrantes y acceso
 
@@ -74,10 +75,10 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, m�
 Resumen (detalle de validaciones en `backend/src/routes/`):
 
 - Auth: `POST /api/auth/login`, `GET /api/auth/me`, `PATCH /api/auth/password`.
-- Buzón: `POST /api/messages` (público); admin: `GET /api/messages?status=&type=&review=` (filtros opcionales y combinables), `PATCH /:id` (`{status?, review?}`, al menos uno) y `DELETE /:id`.
+- Buzón: `POST /api/messages` (público; multipart con los campos y hasta 3 archivos `images`, o JSON sin imágenes); admin: `GET /api/messages?status=&type=&review=` (filtros opcionales y combinables), `PATCH /:id` (`{status?, review?}`, al menos uno) y `DELETE /:id`.
 - Integrantes: `GET /api/members` (público, sin correo); `GET /api/members/all`, `POST`, `PUT /:id`, `DELETE /:id` (admin).
 - Archivos: `POST /api/files` (admin, JPG/PNG/WEBP/GIF ≤ 5 MB, sin SVG), `GET /api/files/:id`, `DELETE /api/files/:id` (admin).
-- Contenido: `/api/news`, `/api/proposals` (lectura pública; escritura admin; `/news/all` y `/proposals/all` incluyen no publicados), `GET /api/settings`, `PUT /api/settings/:key` (admin).
+- Contenido: `/api/news`, `/api/proposals` (lectura pública; escritura admin; `/news/all` y `/proposals/all` incluyen no publicados), `GET /api/settings`, `PUT /api/settings/:key` (admin; claves `degrees`, `groups`, `semesters`, `groupDegrees`, `social`).
 - `GET /api/health` para el health check de Render.
 
 ## 7. Despliegue
@@ -108,6 +109,16 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 
 ## 10. Registro de cambios
 
+### 2026-10-29 — Ajustes del desplegable y del bloque de grupo (0.4.1)
+- Se retiró la lista desplegable personalizada (`appearance: base-select`): según el espacio disponible en la ventana, Chrome podía mostrarla con una sola opción. Ahora los `<select>` conservan el campo estilizado (borde, flecha roja) con la lista nativa del navegador, que siempre muestra todas las opciones.
+- Buzón: la etiqueta del selector es **“Grupo (Telesecundaria)”** y se quitó el texto de ayuda inferior, que además desalineaba el bloque respecto a Semestre.
+
+### 2026-10-29 — Imágenes y teléfono en el buzón; grupos solo en Telesecundaria (0.4.0)
+- **Imágenes adjuntas.** El buzón permite adjuntar hasta 3 imágenes (JPG, PNG, WEBP o GIF, 5 MB cada una) con vista previa y botón para quitarlas. Se envían junto con el mensaje (multipart). Nuevo `backend/src/uploads.js` (multer, comprobación de firma, guardado en GridFS) que también usa `POST /api/files`. En Panel → Mensajes se ven como miniaturas que abren la imagen completa en otra pestaña.
+- **Teléfono.** Los mensajes con datos piden teléfono de 10 dígitos con máscara `000 000 0000` (solo números, máximo 10); se guarda sin espacios y el panel lo muestra con formato. Los anónimos no lo envían ni lo guardan.
+- **Grupo condicionado.** El selector de grupo está deshabilitado (“No aplica”) salvo que se elija una licenciatura con varios grupos (hoy, Telesecundaria); al cambiar de licenciatura se limpia. La API lo exige solo en esas licenciaturas y lo descarta en las demás. Nueva opción en Panel → Ajustes: “Licenciaturas con varios grupos” (`groupDegrees`).
+- Corrección de seguridad menor: `POST /api/files` ahora también verifica la firma real del archivo, no solo el tipo declarado.
+
 ### 2026-10-29 — Filtros de mensajes como menús desplegables (0.3.1)
 - En Panel → Mensajes, los filtros **Tipo**, **Estado** y **Revisión** pasaron de chips a tres menús desplegables (con el estilo de selectores del sitio) en una fila compacta (ancho ajustado al contenido, que se acomoda en varias líneas en móvil). Siguen siendo combinables.
 - Corrección en `useList` (panel): `reload` ahora es estable, consulta siempre la ruta vigente y descarta respuestas tardías de rutas anteriores; antes, al cambiar un filtro justo después de otra acción, podía mostrarse una lista que ya no correspondía a los filtros.
@@ -116,7 +127,7 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 - **Panel admin en rutas propias.** Cada pestaña es una página con su URL: `/admin/mensajes`, `/admin/noticias`, `/admin/propuestas`, `/admin/equipo` y `/admin/ajustes` (`/admin` redirige a mensajes). `pages/Admin.jsx` se dividió en `pages/admin/`: `AdminLayout` (protección de acceso, título y navegación con `NavLink` + `<Outlet />`), una página por sección y `shared.jsx` (lista, editor genérico, campo de imagen). La estructura visual es la misma; el botón Atrás y los enlaces directos funcionan.
 - **Mensajes: clasificación y revisión.** Nuevo campo `review` (`pendiente`, `en_proceso`, `completado`, `rechazado`) además del estado de bandeja. En Panel → Mensajes hay tres filtros combinables (Tipo, Estado, Revisión), cada tarjeta muestra el tipo y una insignia de revisión de color, y un selector permite cambiarla. API: `GET /api/messages` acepta `type` y `review`; `PATCH` acepta `status` y/o `review`.
 - **Sin `alert()`/`confirm()` del navegador.** Nuevo `components/Dialog.jsx` (`DialogProvider` + `useDialog()` con `confirm()` y `notify()`) muestra confirmaciones y avisos en un modal con el diseño del sitio (foco inicial en la opción segura, Esc y clic fuera cancelan). Se usa al eliminar elementos del panel, al cerrar sesión y para mostrar errores del servidor al eliminar (antes fallaban en silencio). Se retiró `ConfirmDialog.jsx`.
-- **Menús de selección con estilo.** Flecha roja propia y, en navegadores con `appearance: base-select` (Chrome/Edge 135+), lista desplegable crema con borde negro, sombra roja, opción resaltada en rojo y hover negro. En otros navegadores se conserva la lista nativa con el campo estilizado.
+- **Menús de selección con estilo.** Campo con borde negro y flecha roja propia. (Se probó una lista desplegable personalizada con `appearance: base-select`, pero en algunas pantallas Chrome la dejaba con una sola opción visible; se retiró en 0.4.1 y se usa la lista nativa del navegador.)
 - Buzón: en la pantalla de agradecimiento, **Inicio** es el botón primario (rojo) y va primero; “Enviar otro mensaje” es el secundario (negro).
 
 ### 2026-10-29 — Título de la pestaña (0.2.6)

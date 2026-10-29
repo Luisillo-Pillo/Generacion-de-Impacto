@@ -2,8 +2,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Message, MESSAGE_TYPES, MESSAGE_STATUS, MESSAGE_REVIEW } from '../models.js';
 import { adminOnly } from '../auth.js';
+import { deleteFile } from '../db.js';
+import { imageUpload, saveImage } from '../uploads.js';
+import { loadSettings } from '../settings.js';
 
 const router = Router();
+
+const MAX_IMAGES = 3;
 
 const base = {
   type: z.enum(MESSAGE_TYPES),
@@ -20,13 +25,34 @@ const createSchema = z.discriminatedUnion('anonymous', [
     name: z.string().trim().min(2, 'Escribe tu nombre').max(120),
     degree: z.string().trim().min(1, 'Selecciona tu licenciatura').max(120),
     semester: z.string().trim().min(1, 'Selecciona tu semestre').max(20),
-    group: z.string().trim().min(1, 'Selecciona tu grupo').max(20),
+    // Solo las licenciaturas con varios grupos piden grupo; se valida contra los ajustes al crear el mensaje
+    group: z.string().trim().max(20).optional(),
+    // Se acepta "000 000 0000" (con espacios o guiones) y se guarda solo con los 10 dígitos
+    phone: z
+      .string({ error: 'Escribe tu teléfono a 10 dígitos' })
+      .transform((v) => v.replace(/[\s-]/g, ''))
+      .pipe(z.string().regex(/^\d{10}$/, 'El teléfono debe tener 10 dígitos')),
   }),
 ]);
 
-router.post('/', async (req, res) => {
-  const data = createSchema.parse(req.body);
-  await Message.create(data);
+// Multipart: los campos de texto y hasta 3 imágenes (campo "images") llegan en una sola petición, así no quedan
+// archivos huérfanos si el mensaje no es válido. También se acepta JSON sin imágenes.
+router.post('/', imageUpload.array('images', MAX_IMAGES), async (req, res) => {
+  const body = { ...req.body, anonymous: req.body?.anonymous === true || req.body?.anonymous === 'true' };
+  const data = createSchema.parse(body);
+  if (!data.anonymous) {
+    const { groupDegrees } = await loadSettings();
+    if (!groupDegrees.includes(data.degree)) delete data.group; // no aplica: no se guarda
+    else if (!data.group) return res.status(400).json({ error: 'Selecciona tu grupo' });
+  }
+  const images = [];
+  try {
+    for (const file of req.files ?? []) images.push(await saveImage(file));
+    await Message.create({ ...data, images });
+  } catch (err) {
+    await Promise.all(images.map(deleteFile));
+    throw err;
+  }
   res.status(201).json({ ok: true });
 });
 
@@ -53,7 +79,8 @@ router.patch('/:id', adminOnly, async (req, res) => {
 });
 
 router.delete('/:id', adminOnly, async (req, res) => {
-  await Message.findByIdAndDelete(req.params.id);
+  const msg = await Message.findByIdAndDelete(req.params.id);
+  await Promise.all((msg?.images ?? []).map(deleteFile));
   res.status(204).end();
 });
 

@@ -36,7 +36,12 @@ app.use((err, _req, res, _next) => {
     return res.status(400).json({ error: err.issues[0]?.message || 'Datos inválidos', issues: err.issues });
   }
   if (err?.name === 'MulterError' || err?.message?.startsWith('Solo se permiten')) {
-    return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'La imagen excede 5 MB' : err.message });
+    const known = {
+      LIMIT_FILE_SIZE: 'Cada imagen debe pesar máximo 5 MB',
+      LIMIT_FILE_COUNT: 'Puedes adjuntar hasta 3 imágenes',
+      LIMIT_UNEXPECTED_FILE: 'Puedes adjuntar hasta 3 imágenes',
+    };
+    return res.status(400).json({ error: known[err.code] || err.message });
   }
   if (err?.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON inválido' });
   console.error(err);

@@ -258,7 +258,7 @@ input, select, textarea {
 input[type='checkbox'], input[type='radio'] { width: auto; }
 input:focus, select:focus, textarea:focus { outline: 3px solid var(--red); outline-offset: 0; }
 
-/* Menús de selección: flecha propia y, donde el navegador lo permite (Chrome/Edge 135+), lista desplegable con el estilo del sitio */
+/* Menús de selección: campo con flecha propia; la lista desplegable es la nativa del navegador (siempre muestra todas las opciones) */
 select {
   appearance: none;
   cursor: pointer;
@@ -267,21 +267,6 @@ select {
 }
 select:disabled { opacity: .6; cursor: not-allowed; }
 option { font: inherit; color: var(--ink); background: #fff; }
-@supports (appearance: base-select) {
-  select, ::picker(select) { appearance: base-select; }
-  select { background: #fff; display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
-  select::picker-icon { content: '▾'; color: var(--red); font-size: 1.1rem; line-height: 1; transition: rotate .15s; }
-  select:open::picker-icon { rotate: 180deg; }
-  ::picker(select) {
-    border: 2px solid #1b1b1b; border-radius: 10px; background: var(--paper); padding: .35rem;
-    box-shadow: 4px 4px 0 var(--red); margin-block: .35rem; max-height: 18rem;
-  }
-  option { display: block; padding: .55rem .8rem; border-radius: 6px; background: transparent; cursor: pointer; }
-  option::checkmark { display: none; }
-  option:hover, option:focus-visible { background: var(--black); color: var(--paper); outline: 0; }
-  option:checked { background: var(--red); color: #fff; font-weight: 600; }
-  option:disabled { color: var(--muted); cursor: default; }
-}
 fieldset { border: 0; padding: 0; margin: 0; }
 legend { padding: 0; margin-bottom: .5rem; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -293,6 +278,15 @@ legend { padding: 0; margin-bottom: .5rem; }
 .chip:focus-within { outline: 3px solid var(--red); outline-offset: 2px; }
 .hint { color: var(--muted); font-size: .88rem; margin: .5rem 0 0; }
 .counter { justify-self: end; font-size: .78rem; color: var(--muted); font-weight: 400; }
+
+.attach { display: grid; gap: .5rem; justify-items: start; }
+.attach-title { font-weight: 600; font-size: .92rem; }
+.attach .hint { margin: 0; }
+.attachments { list-style: none; display: flex; flex-wrap: wrap; gap: .6rem; margin: .4rem 0; padding: 0; }
+.attachments li { position: relative; }
+.attachments img { display: block; width: 96px; height: 96px; object-fit: cover; border: 2px solid var(--black); border-radius: 8px; background: #fff; }
+.attachments .remove { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--paper); background: var(--red); color: #fff; font-size: 1rem; line-height: 1; cursor: pointer; padding: 0; }
+.attachments .remove:hover { background: var(--black); }
 
 .image-field { display: grid; gap: .4rem; }
 .image-field img { max-height: 160px; width: auto; border-radius: 6px; }

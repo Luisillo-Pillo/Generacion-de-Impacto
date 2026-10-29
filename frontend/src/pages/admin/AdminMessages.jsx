@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { api, formatDate } from '../../api.js';
+import { api, fileUrl, formatDate } from '../../api.js';
 import { useDialog } from '../../components/Dialog.jsx';
+import { formatPhone } from '../../utils.js';
 import { useList } from './shared.jsx';
 
 const TYPES = [['', 'Todos'], ['queja', 'Quejas'], ['propuesta', 'Propuestas'], ['pregunta', 'Preguntas'], ['problema', 'Problemas']];
@@ -60,8 +61,19 @@ export default function AdminMessages() {
             </header>
             <h3>{m.subject}</h3>
             <p className="pre">{m.body}</p>
+            {m.images?.length > 0 && (
+              <ul className="attachments">
+                {m.images.map((id) => (
+                  <li key={id}>
+                    <a href={fileUrl(id)} target="_blank" rel="noreferrer" title="Abrir imagen">
+                      <img src={fileUrl(id)} alt="Imagen adjunta" loading="lazy" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
             <p className="muted">
-              {m.anonymous ? 'Anónimo' : `${m.name} · ${m.degree} · ${m.semester}° semestre · grupo ${m.group}`}
+              {m.anonymous ? 'Anónimo' : [m.name, m.degree, `${m.semester}° semestre`, m.group && `grupo ${m.group}`, `Tel. ${formatPhone(m.phone)}`].filter(Boolean).join(' · ')}
             </p>
             <div className="row msg-actions">
               <label className="inline-select">Revisión

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useFetch } from '../hooks.js';
+import { formatPhone } from '../utils.js';
 
 const TYPES = [
   ['queja', 'Queja'],
@@ -10,24 +11,73 @@ const TYPES = [
   ['problema', 'Problema'],
 ];
 
-const empty = { type: 'propuesta', anonymous: true, name: '', degree: '', semester: '', group: '', subject: '', body: '' };
+const empty = { type: 'propuesta', anonymous: true, name: '', degree: '', semester: '', group: '', phone: '', subject: '', body: '' };
+
+const MAX_IMAGES = 3;
+const MAX_MB = 5;
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export default function Mailbox() {
   const { data: settings } = useFetch('/settings');
   const [form, setForm] = useState(empty);
   const [status, setStatus] = useState({ sending: false, error: '', done: false });
+  const [attachments, setAttachments] = useState([]); // [{ file, url }] con vista previa local
+  const [attachError, setAttachError] = useState('');
+  const picker = useRef(null);
+  const latest = useRef(attachments);
+  useEffect(() => {
+    latest.current = attachments;
+  }, [attachments]);
+  // Libera las vistas previas al salir de la página
+  useEffect(() => () => latest.current.forEach((a) => URL.revokeObjectURL(a.url)), []);
+
+  // Solo algunas licenciaturas (p. ej. Telesecundaria) se dividen en grupos; en las demás el grupo no aplica
+  const hasGroups = !!settings?.groupDegrees?.includes(form.degree);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const setDegree = (e) => setForm({ ...form, degree: e.target.value, group: '' });
+
+  function addFiles(e) {
+    const added = [...e.target.files];
+    e.target.value = ''; // permite volver a elegir el mismo archivo
+    let problem = '';
+    const accepted = [];
+    for (const file of added) {
+      if (!IMAGE_TYPES.includes(file.type)) problem = 'Solo se permiten imágenes JPG, PNG, WEBP o GIF.';
+      else if (file.size > MAX_MB * 1024 * 1024) problem = `Cada imagen debe pesar máximo ${MAX_MB} MB.`;
+      else if (attachments.length + accepted.length >= MAX_IMAGES) problem = `Puedes adjuntar hasta ${MAX_IMAGES} imágenes.`;
+      else accepted.push({ file, url: URL.createObjectURL(file) });
+    }
+    setAttachError(problem);
+    if (accepted.length) setAttachments([...attachments, ...accepted]);
+  }
+
+  function removeFile(item) {
+    URL.revokeObjectURL(item.url);
+    setAttachments(attachments.filter((a) => a !== item));
+    setAttachError('');
+  }
+
+  function clearFiles() {
+    attachments.forEach((a) => URL.revokeObjectURL(a.url));
+    setAttachments([]);
+  }
 
   async function submit(e) {
     e.preventDefault();
     setStatus({ sending: true, error: '', done: false });
-    const payload = form.anonymous
-      ? { type: form.type, anonymous: true, subject: form.subject, body: form.body }
-      : { ...form };
+    const data = new FormData();
+    for (const key of ['type', 'subject', 'body']) data.append(key, form[key]);
+    data.append('anonymous', String(form.anonymous));
+    if (!form.anonymous) {
+      for (const key of ['name', 'degree', 'semester', 'phone']) data.append(key, form[key]);
+      if (hasGroups) data.append('group', form.group);
+    }
+    attachments.forEach((a) => data.append('images', a.file));
     try {
-      await api('/messages', { method: 'POST', body: payload });
+      await api('/messages', { method: 'POST', form: data });
       setForm(empty);
+      clearFiles();
       setStatus({ sending: false, error: '', done: true });
     } catch (err) {
       setStatus({ sending: false, error: err.message, done: false });
@@ -92,8 +142,15 @@ export default function Mailbox() {
               <label className="full">Nombre completo
                 <input required value={form.name} onChange={set('name')} maxLength={120} autoComplete="name" />
               </label>
+              <label className="full">Teléfono
+                <input
+                  required type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="000 000 0000"
+                  value={form.phone} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+                  pattern="\d{3} \d{3} \d{4}" maxLength={12} title="10 dígitos, en formato 000 000 0000"
+                />
+              </label>
               <label className="full">Licenciatura
-                <select required value={form.degree} onChange={set('degree')}>
+                <select required value={form.degree} onChange={setDegree}>
                   <option value="">Selecciona…</option>
                   {options(settings?.degrees)}
                 </select>
@@ -104,9 +161,9 @@ export default function Mailbox() {
                   {options(settings?.semesters)}
                 </select>
               </label>
-              <label>Grupo
-                <select required value={form.group} onChange={set('group')}>
-                  <option value="">Selecciona…</option>
+              <label>Grupo (Telesecundaria)
+                <select required={hasGroups} disabled={!hasGroups} value={form.group} onChange={set('group')}>
+                  <option value="">{hasGroups ? 'Selecciona…' : 'No aplica'}</option>
                   {options(settings?.groups)}
                 </select>
               </label>
@@ -120,6 +177,33 @@ export default function Mailbox() {
             <textarea required rows={7} value={form.body} onChange={set('body')} maxLength={4000} />
             <span className="counter">{form.body.length}/4000</span>
           </label>
+
+          <div className="attach">
+            <span className="attach-title">Imágenes relacionadas (opcional)</span>
+            <p className="hint">Hasta {MAX_IMAGES} imágenes JPG, PNG, WEBP o GIF de máximo {MAX_MB} MB cada una.</p>
+            {form.anonymous && attachments.length > 0 && (
+              <p className="hint">Revisa que tus imágenes no muestren datos que te identifiquen: tu mensaje es anónimo.</p>
+            )}
+            {attachments.length > 0 && (
+              <ul className="attachments">
+                {attachments.map((a) => (
+                  <li key={a.url}>
+                    <img src={a.url} alt={`Vista previa de ${a.file.name}`} />
+                    <button type="button" className="remove" onClick={() => removeFile(a)} aria-label={`Quitar ${a.file.name}`}>×</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {attachments.length < MAX_IMAGES && (
+              <>
+                <input ref={picker} type="file" accept={IMAGE_TYPES.join(',')} multiple hidden onChange={addFiles} />
+                <button type="button" className="btn btn-dark sm" onClick={() => picker.current.click()}>
+                  {attachments.length ? 'Agregar otra imagen' : 'Adjuntar imágenes'}
+                </button>
+              </>
+            )}
+            {attachError && <p className="error" role="alert">{attachError}</p>}
+          </div>
 
           {status.error && <p className="error" role="alert">{status.error}</p>}
           <button className="btn btn-red" disabled={status.sending}>

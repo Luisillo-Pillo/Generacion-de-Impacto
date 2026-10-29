@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { News, Proposal, Setting, DEFAULT_SETTINGS } from '../models.js';
+import { News, Proposal, Setting } from '../models.js';
 import { adminOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
+import { loadSettings } from '../settings.js';
 import { objectId } from '../validators.js';
 
 const router = Router();
@@ -127,6 +128,7 @@ const list = z.array(z.string().trim().min(1).max(120)).max(50);
 const settingSchemas = {
   degrees: list,
   groups: list,
+  groupDegrees: list,
   semesters: list,
   social: z.object({
     instagram: z.string().trim().max(200).default(''),
@@ -137,10 +139,7 @@ const settingSchemas = {
 };
 
 router.get('/settings', async (_req, res) => {
-  const rows = await Setting.find();
-  const out = { ...DEFAULT_SETTINGS };
-  for (const r of rows) if (r.key in settingSchemas) out[r.key] = r.value;
-  res.json(out);
+  res.json(await loadSettings());
 });
 
 router.put('/settings/:key', adminOnly, async (req, res) => {
