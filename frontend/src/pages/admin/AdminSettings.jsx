@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api.js';
+import Spinner from '../../components/Spinner.jsx';
 import { text } from './shared.jsx';
 
 export default function AdminSettings() {
@@ -7,7 +8,7 @@ export default function AdminSettings() {
   const [msg, setMsg] = useState('');
 
   useEffect(() => { api('/settings').then(setS).catch((e) => setMsg(e.message)); }, []);
-  if (!s) return <p className="muted">{msg || 'Cargando…'}</p>;
+  if (!s) return msg ? <p className="error">{msg}</p> : <Spinner />;
 
   const lines = (key, label) => (
     <label>{label} (uno por línea)

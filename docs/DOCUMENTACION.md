@@ -109,6 +109,11 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 
 ## 10. Registro de cambios
 
+### 2026-10-29 — Círculos de carga (0.5.0)
+- Nuevo componente `components/Spinner.jsx`: círculo giratorio (rojo sobre gris) con texto “Cargando…” para lectores de pantalla (`role="status"`), y variante `inline` (pequeña) para botones. Con movimiento reducido sigue girando, más lento.
+- Se muestra en toda sección que espera datos de la API: Inicio (noticias y propuestas), Noticias, detalle de noticia, Propuestas, Equipo, Perfil y panel (mientras se valida la sesión), y en Panel → Mensajes, Noticias, Propuestas, Equipo y Ajustes. En Mensajes, al cambiar un filtro la lista se vacía y muestra el círculo hasta que llegan los resultados (`useList` ahora devuelve `loading`; recargar la misma ruta tras una acción no parpadea).
+- Círculo pequeño dentro de los botones mientras trabajan: “Entrando…”, “Enviando…”, “Guardando…” (contraseña) y “Subiendo…” (imágenes del panel).
+
 ### 2026-10-29 — Hora de registro en las tarjetas de mensajes (0.4.2)
 - En Panel → Mensajes, la esquina superior de cada tarjeta muestra **fecha y hora de registro** (p. ej. “29 de octubre de 2026 · 2:35 p.m.”, en la hora local de quien consulta) en lugar del estado de bandeja. El estado sigue visible por el borde rojo de los mensajes nuevos y por el filtro Estado.
 

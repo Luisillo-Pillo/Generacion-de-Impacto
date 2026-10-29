@@ -1,4 +1,5 @@
 import { useFetch } from '../hooks.js';
+import Spinner from '../components/Spinner.jsx';
 import ProposalCard from '../components/ProposalCard.jsx';
 
 export default function Proposals() {
@@ -8,7 +9,7 @@ export default function Proposals() {
       <div className="container">
         <h1 className="title light">Nuestras <mark>propuestas</mark></h1>
         <p className="lead light">Acciones concretas para una ENSFA más unida, participativa y solidaria.</p>
-        {loading && <p className="muted">Cargando…</p>}
+        {loading && <Spinner />}
         {error && <p className="error">{error}</p>}
         <div className="grid">
           {data?.map((p) => <ProposalCard key={p._id} p={p} />)}

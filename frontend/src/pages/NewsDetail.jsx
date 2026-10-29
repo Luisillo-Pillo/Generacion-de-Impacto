@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { useFetch } from '../hooks.js';
+import Spinner from '../components/Spinner.jsx';
 import { fileUrl, formatDate } from '../api.js';
 
 export default function NewsDetail() {
@@ -10,7 +11,7 @@ export default function NewsDetail() {
     <section className="section paper page-min">
       <div className="container narrow">
         <Link to="/noticias" className="back">← Todas las noticias</Link>
-        {loading && <p className="muted">Cargando…</p>}
+        {loading && <Spinner />}
         {error && <p className="error">{error}</p>}
         {n && (
           <article className="article">

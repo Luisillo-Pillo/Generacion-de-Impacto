@@ -1,4 +1,5 @@
 import { useFetch } from '../hooks.js';
+import Spinner from '../components/Spinner.jsx';
 import { fileUrl } from '../api.js';
 import { initials } from '../utils.js';
 
@@ -16,7 +17,7 @@ export default function Team() {
     <section className="section paper page-min">
       <div className="container">
         <h1 className="title">Nuestro <mark>equipo</mark></h1>
-        {members.loading && <p className="muted">Cargando…</p>}
+        {members.loading && <Spinner />}
         {members.error && <p className="error">{members.error}</p>}
         {members.data?.length === 0 && <p className="muted">Pronto presentaremos a los integrantes de la planilla.</p>}
         <div className="grid members">

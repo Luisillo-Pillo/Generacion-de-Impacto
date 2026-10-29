@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useFetch } from '../hooks.js';
 import { formatPhone } from '../utils.js';
+import Spinner from '../components/Spinner.jsx';
 
 const TYPES = [
   ['queja', 'Queja'],
@@ -207,7 +208,7 @@ export default function Mailbox() {
 
           {status.error && <p className="error" role="alert">{status.error}</p>}
           <button className="btn btn-red" disabled={status.sending}>
-            {status.sending ? 'Enviando…' : 'Enviar mensaje'}
+            {status.sending ? <><Spinner inline /> Enviando…</> : 'Enviar mensaje'}
           </button>
         </form>
       </div>

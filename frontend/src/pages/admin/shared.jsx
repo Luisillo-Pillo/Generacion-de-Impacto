@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, fileUrl, uploadImage } from '../../api.js';
 import { useDialog } from '../../components/Dialog.jsx';
+import Spinner from '../../components/Spinner.jsx';
 
 export function useList(path) {
-  const [items, setItems] = useState(null);
+  // El resultado guarda la ruta que lo originó: si la ruta cambia (p. ej. otro filtro) la lista vuelve a estar
+  // "cargando" sin vaciar el estado dentro del efecto; recargar la misma ruta actualiza sin parpadeo.
+  const [result, setResult] = useState({ path: null, items: null });
   const [error, setError] = useState('');
   const latest = useRef({ path, request: 0 });
 
@@ -11,15 +14,18 @@ export function useList(path) {
   // un filtro mientras otra petición sigue en vuelo) se descarta para no mostrar resultados que ya no corresponden.
   const reload = useCallback(() => {
     const request = ++latest.current.request;
-    api(latest.current.path)
-      .then((data) => request === latest.current.request && setItems(data))
+    const requested = latest.current.path;
+    api(requested)
+      .then((items) => request === latest.current.request && setResult({ path: requested, items }))
       .catch((e) => request === latest.current.request && setError(e.message));
   }, []);
   useEffect(() => {
     latest.current.path = path;
     reload();
   }, [path, reload]);
-  return { items, error, reload, setError };
+
+  const ready = result.path === path;
+  return { items: ready ? result.items : null, loading: !ready && !error, error, reload, setError };
 }
 
 export function ImageField({ value, onChange, label = 'Imagen' }) {
@@ -47,7 +53,7 @@ export function ImageField({ value, onChange, label = 'Imagen' }) {
         <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={pick} disabled={busy} />
         {value && <button type="button" className="link-btn" onClick={() => onChange(null)}>Quitar</button>}
       </div>
-      {busy && <small>Subiendo…</small>}
+      {busy && <small><Spinner inline /> Subiendo…</small>}
       {error && <small className="error">{error}</small>}
     </div>
   );
@@ -56,7 +62,7 @@ export function ImageField({ value, onChange, label = 'Imagen' }) {
 // Editor genérico (noticias / propuestas / equipo)
 export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote }) {
   const { confirm, notify } = useDialog();
-  const { items, error, reload, setError } = useList(listPath);
+  const { items, loading, error, reload, setError } = useList(listPath);
   const [editing, setEditing] = useState(null);
 
   async function save(e) {
@@ -103,6 +109,7 @@ export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel
     <div>
       <button className="btn btn-red" onClick={() => setEditing(blank(items))}>{newLabel}</button>
       {error && <p className="error">{error}</p>}
+      {loading && <Spinner />}
       {items?.map((it) => (
         <article key={it._id} className="card row between">
           <div>{summary(it)}</div>

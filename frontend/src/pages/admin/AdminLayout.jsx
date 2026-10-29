@@ -1,5 +1,6 @@
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../auth.jsx';
+import Spinner from '../../components/Spinner.jsx';
 
 const TABS = [
   ['mensajes', 'Mensajes'],
@@ -13,7 +14,7 @@ const TABS = [
 export default function AdminLayout() {
   const { user, loading } = useAuth();
 
-  if (loading) return <section className="section paper page-min"><div className="container muted">Cargando…</div></section>;
+  if (loading) return <section className="section paper page-min"><div className="container"><Spinner /></div></section>;
   if (!user) return <Navigate to="/acceso" replace />;
   if (user.role !== 'admin') {
     return (

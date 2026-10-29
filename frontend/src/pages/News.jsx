@@ -1,4 +1,5 @@
 import { useFetch } from '../hooks.js';
+import Spinner from '../components/Spinner.jsx';
 import NewsCard from '../components/NewsCard.jsx';
 
 export default function News() {
@@ -7,7 +8,7 @@ export default function News() {
     <section className="section paper page-min">
       <div className="container">
         <h1 className="title">Noticias</h1>
-        {loading && <p className="muted">Cargando…</p>}
+        {loading && <Spinner />}
         {error && <p className="error">{error}</p>}
         {data?.length === 0 && <p className="muted">Aún no hay noticias publicadas.</p>}
         <div className="grid">

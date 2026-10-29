@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import PasswordInput from '../components/PasswordInput.jsx';
+import Spinner from '../components/Spinner.jsx';
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -41,7 +42,7 @@ export default function Login() {
             <PasswordInput required value={form.password} onChange={set('password')} autoComplete="current-password" />
           </label>
           {error && <p className="error" role="alert">{error}</p>}
-          <button className="btn btn-red" disabled={busy}>{busy ? 'Espera…' : 'Entrar'}</button>
+          <button className="btn btn-red" disabled={busy}>{busy ? <><Spinner inline /> Entrando…</> : 'Entrar'}</button>
         </form>
       </div>
     </section>

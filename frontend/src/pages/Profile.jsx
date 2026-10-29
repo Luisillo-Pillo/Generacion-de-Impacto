@@ -4,6 +4,7 @@ import { useAuth } from '../auth.jsx';
 import { api, fileUrl } from '../api.js';
 import { initials } from '../utils.js';
 import PasswordInput from '../components/PasswordInput.jsx';
+import Spinner from '../components/Spinner.jsx';
 
 const blank = { currentPassword: '', newPassword: '', confirm: '' };
 
@@ -12,7 +13,7 @@ export default function Profile() {
   const [form, setForm] = useState(blank);
   const [status, setStatus] = useState({ busy: false, error: '', ok: false });
 
-  if (loading) return <section className="section paper page-min"><div className="container muted">Cargando…</div></section>;
+  if (loading) return <section className="section paper page-min"><div className="container"><Spinner /></div></section>;
   if (!user) return <Navigate to="/acceso" replace />;
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -61,7 +62,7 @@ export default function Profile() {
           </label>
           {status.error && <p className="error" role="alert">{status.error}</p>}
           {status.ok && <p role="status"><strong>Contraseña actualizada ✔</strong></p>}
-          <button className="btn btn-red" disabled={status.busy}>{status.busy ? 'Guardando…' : 'Guardar contraseña'}</button>
+          <button className="btn btn-red" disabled={status.busy}>{status.busy ? <><Spinner inline /> Guardando…</> : 'Guardar contraseña'}</button>
         </form>
       </div>
     </section>

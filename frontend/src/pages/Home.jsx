@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useFetch } from '../hooks.js';
+import Spinner from '../components/Spinner.jsx';
 import ProposalCard from '../components/ProposalCard.jsx';
 import NewsCard from '../components/NewsCard.jsx';
 
@@ -25,7 +26,7 @@ export default function Home() {
       <section className="section paper">
         <div className="container">
           <h2 className="title">Últimas <mark>noticias</mark></h2>
-          {news.loading && <p className="muted">Cargando…</p>}
+          {news.loading && <Spinner />}
           {news.error && <p className="error">{news.error}</p>}
           {news.data?.length === 0 && <p className="muted">Pronto publicaremos novedades.</p>}
           <div className="grid">
@@ -59,7 +60,7 @@ export default function Home() {
       <section className="section paper">
         <div className="container">
           <h2 className="title">Nuestras <mark>propuestas</mark></h2>
-          {proposals.loading && <p className="muted">Cargando…</p>}
+          {proposals.loading && <Spinner />}
           {proposals.error && <p className="error">{proposals.error}</p>}
           <div className="grid">
             {proposals.data?.slice(0, 3).map((p) => <ProposalCard key={p._id} p={p} />)}

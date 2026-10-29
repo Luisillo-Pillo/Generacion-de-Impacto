@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api, fileUrl, formatDate, formatTime } from '../../api.js';
 import { useDialog } from '../../components/Dialog.jsx';
+import Spinner from '../../components/Spinner.jsx';
 import { formatPhone } from '../../utils.js';
 import { useList } from './shared.jsx';
 
@@ -24,7 +25,7 @@ export default function AdminMessages() {
   const { confirm, notify } = useDialog();
   const [filters, setFilters] = useState({ type: '', status: 'nuevo', review: '' });
   const query = new URLSearchParams(Object.entries(filters).filter(([, v]) => v)).toString();
-  const { items, error, reload, setError } = useList(`/messages${query ? `?${query}` : ''}`);
+  const { items, loading, error, reload, setError } = useList(`/messages${query ? `?${query}` : ''}`);
   const setFilter = (key) => (value) => setFilters((f) => ({ ...f, [key]: value }));
 
   const update = (id, changes) => api(`/messages/${id}`, { method: 'PATCH', body: changes }).then(reload).catch((e) => setError(e.message));
@@ -47,6 +48,7 @@ export default function AdminMessages() {
         <Filter label="Revisión" options={[['', 'Todas'], ...REVIEW]} value={filters.review} onChange={setFilter('review')} />
       </div>
       {error && <p className="error">{error}</p>}
+      {loading && <Spinner />}
       {items?.length === 0 && <p className="muted">No hay mensajes con estos filtros.</p>}
       {items?.map((m) => {
         const review = m.review || 'pendiente';
