@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useFetch } from '../hooks.js';
 import { formatPhone } from '../utils.js';
 import Spinner from '../components/Spinner.jsx';
+import { CheckStamp, EnvelopeSticker, IconClip, IconLock, IconSend } from '../components/MailboxIcons.jsx';
 
 const TYPES = [
   ['queja', 'Queja'],
@@ -89,6 +90,7 @@ export default function Mailbox() {
     return (
       <section className="section paper page-min">
         <div className="container narrow center">
+          <CheckStamp />
           <h1 className="title">¡Gracias por <mark>escribirnos</mark>!</h1>
           <p className="lead">Tu mensaje fue recibido. Lo revisaremos y le daremos seguimiento.</p>
           <div className="btn-row">
@@ -107,7 +109,10 @@ export default function Mailbox() {
   return (
     <section className="section paper page-min">
       <div className="container narrow">
-        <h1 className="title">Buzón <mark>digital</mark></h1>
+        <div className="mailbox-head">
+          <h1 className="title">Buzón <mark>digital</mark></h1>
+          <EnvelopeSticker />
+        </div>
         <p className="lead">Tu opinión cuenta. Cuéntanos tus quejas, propuestas, preguntas o problemas.</p>
         <p className="note" aria-hidden="true">¡Tu voz importa!</p>
 
@@ -136,7 +141,7 @@ export default function Mailbox() {
                 Con mis datos
               </label>
             </div>
-            {form.anonymous && <p className="hint">No guardamos ningún dato personal con tu mensaje.</p>}
+            {form.anonymous && <p className="hint hint-icon"><IconLock /> No guardamos ningún dato personal con tu mensaje.</p>}
           </fieldset>
 
           {!form.anonymous && (
@@ -181,7 +186,7 @@ export default function Mailbox() {
           </label>
 
           <div className="attach">
-            <span className="attach-title">Imágenes relacionadas (opcional)</span>
+            <span className="attach-title"><IconClip /> Imágenes relacionadas (opcional)</span>
             <p className="hint">Hasta {MAX_IMAGES} imágenes JPG, PNG, WEBP o GIF de máximo {MAX_MB} MB cada una.</p>
             {form.anonymous && attachments.length > 0 && (
               <p className="hint">Revisa que tus imágenes no muestren datos que te identifiquen: tu mensaje es anónimo.</p>
@@ -209,7 +214,7 @@ export default function Mailbox() {
 
           {status.error && <p className="error" role="alert">{status.error}</p>}
           <button className="btn btn-red" disabled={status.sending}>
-            {status.sending ? <><Spinner inline /> Enviando…</> : 'Enviar mensaje'}
+            {status.sending ? <><Spinner inline /> Enviando…</> : <><IconSend /> Enviar mensaje</>}
           </button>
         </form>
       </div>

@@ -43,6 +43,20 @@ p { margin: 0 0 1em; }
 .note { font-family: var(--font-hand); color: var(--red); font-size: 1.5rem; margin: -.3rem 0 .2rem; width: fit-content; transform: rotate(-2.5deg); }
 .note::after { content: ''; display: block; height: 7px; margin-top: 2px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 7'%3E%3Cpath d='M0 4 Q4.5 0 9 4 T18 4' fill='none' stroke='%23d4141c' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") left center / 18px 7px repeat-x; }
 
+/* ---------- Buzón: iconografía ---------- */
+.icon { width: 1.15em; height: 1.15em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hint-icon .icon, .attach-title .icon { color: var(--red); }
+.hint-icon { display: flex; align-items: center; gap: .4rem; }
+.attach-title { display: inline-flex; align-items: center; gap: .4rem; }
+.btn .icon { margin-right: .45rem; vertical-align: -.2em; }
+.mailbox-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.mailbox-head .title { margin: 0; }
+.sticker { display: block; height: auto; filter: drop-shadow(3px 4px 0 rgba(18, 18, 18, .18)); }
+.sticker.envelope { width: clamp(72px, 16vw, 112px); flex: none; transform: rotate(6deg); animation: float 7s ease-in-out infinite; }
+.sticker.check { width: 120px; margin: 0 auto 1rem; animation: pop .5s ease-out both; }
+@keyframes float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+@keyframes pop { from { transform: scale(.4) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
 /* ---------- Círculos de carga ---------- */
 .spinner {
   display: inline-block; flex: none; width: 2.4rem; height: 2.4rem; border-radius: 50%;
@@ -361,6 +375,7 @@ legend { padding: 0; margin-bottom: .5rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation-duration: 2s; } /* se mantiene girando (indica carga), pero más lento */
+  .sticker { animation: none; }
   html { scroll-behavior: auto; }
   .btn, .news-card { transition: none; }
 }

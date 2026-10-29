@@ -112,6 +112,13 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 
 ## 10. Registro de cambios
 
+### 2026-10-29 — Buzón sin adornos en los márgenes (0.5.3)
+- Se quitaron los iconos de las opciones de tipo de mensaje y de anonimato, y se probaron y descartaron pegatinas en los márgenes laterales: toda la decoración queda dentro de la columna del formulario. Se conservan el candado del aviso de anonimato, el clip de las imágenes, el avión del botón de enviar, el sobre junto al título, la nota “¡Tu voz importa!” y el sello de palomita del agradecimiento.
+
+### 2026-10-29 — Decoración del buzón con significado (0.5.2)
+- Se agregó decoración sobria al buzón, donde **cada elemento tiene un sentido** y ninguno es una forma suelta. Nuevo `components/MailboxIcons.jsx`: iconos de línea (rojos, que heredan el tamaño del texto) en cada opción de tipo —globo con “!” para queja, foco para propuesta, signo de interrogación para pregunta, triángulo de advertencia para problema—, candado en “De forma anónima” y en el aviso de que no se guardan datos, persona en “Con mis datos”, clip en “Imágenes relacionadas” y avión de papel en “Enviar mensaje”.
+- Pegatina del **sobre con flecha** junto al título (el mensaje que se deposita en el buzón; flota suavemente y se achica en móvil) y **sello de palomita** en la pantalla de agradecimiento (confirmación de recepción). Todo va `aria-hidden` porque el texto ya comunica lo mismo; con movimiento reducido no hay animación. Se conserva la nota “¡Tu voz importa!”. No hay adornos en los márgenes.
+
 ### 2026-10-29 — La documentación vive en el README (0.5.1)
 - Buzón: debajo del texto introductorio se conserva la nota a mano “¡Tu voz importa!” (Permanent Marker roja, inclinada, con subrayado ondulado), de la decoración que se retiró.
 - `docs/DOCUMENTACION.md` se fusionó en `README.md`, que ahora es el único archivo de documentación (arquitectura, desarrollo, variables, datos, cuentas, API, despliegue, calidad, pendientes y este registro). Se actualizaron `CLAUDE.md` (regla de documentación) y `docs/Prompt Inicial.md`. `docs/` conserva el Prompt Inicial y las referencias visuales.
