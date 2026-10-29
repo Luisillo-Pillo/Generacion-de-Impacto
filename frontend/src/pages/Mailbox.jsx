@@ -109,6 +109,7 @@ export default function Mailbox() {
       <div className="container narrow">
         <h1 className="title">Buzón <mark>digital</mark></h1>
         <p className="lead">Tu opinión cuenta. Cuéntanos tus quejas, propuestas, preguntas o problemas.</p>
+        <p className="note" aria-hidden="true">¡Tu voz importa!</p>
 
         <form className="form" onSubmit={submit}>
           <fieldset>

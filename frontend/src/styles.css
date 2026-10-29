@@ -39,6 +39,10 @@ p { margin: 0 0 1em; }
 .lead.light { color: #e9e0d3; }
 .pre { white-space: pre-wrap; }
 
+/* ---------- Buzón: nota a mano ---------- */
+.note { font-family: var(--font-hand); color: var(--red); font-size: 1.5rem; margin: -.3rem 0 .2rem; width: fit-content; transform: rotate(-2.5deg); }
+.note::after { content: ''; display: block; height: 7px; margin-top: 2px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 7'%3E%3Cpath d='M0 4 Q4.5 0 9 4 T18 4' fill='none' stroke='%23d4141c' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") left center / 18px 7px repeat-x; }
+
 /* ---------- Círculos de carga ---------- */
 .spinner {
   display: inline-block; flex: none; width: 2.4rem; height: 2.4rem; border-radius: 50%;
