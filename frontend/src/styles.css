@@ -373,26 +373,6 @@ legend { padding: 0; margin-bottom: .5rem; }
   .section { padding: 3.5rem 0; }
 }
 
-/* Teléfono: las tarjetas (noticias, propuestas y equipo) se acomodan en 2 columnas */
-@media (max-width: 600px) {
-  .grid, .members { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-  .news-card { box-shadow: 4px 4px 0 var(--black); overflow-wrap: anywhere; }
-  .proposal { padding: 1rem .7rem; box-shadow: 4px 4px 0 var(--red); overflow-wrap: break-word; }
-  .proposal .tag { white-space: nowrap; font-size: .66rem; padding: .15rem .6rem; }
-  .proposal-num { font-size: 3rem; }
-  .proposal h3 { font-size: 1.1rem; line-height: 1.2; }
-  .objective { padding: .6rem .55rem; font-size: .85rem; }
-  .news-card-body { padding: .7rem .75rem .9rem; }
-  .news-card-body h3 { font-size: 1.05rem; line-height: 1.2; }
-  .news-card-body p { font-size: .85rem; }
-  .news-card-body time { font-size: .78rem; }
-  .member { padding: .9rem .6rem; box-shadow: 4px 4px 0 var(--red); overflow-wrap: anywhere; }
-  .member img, .member .avatar { width: 88px; height: 88px; border-width: 3px; }
-  .member .avatar { font-size: 1.7rem; }
-  .member h3 { font-size: 1.05rem; line-height: 1.2; }
-  .member .role, .member .muted { font-size: .85rem; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation-duration: 2s; } /* se mantiene girando (indica carga), pero más lento */
   .sticker { animation: none; }
