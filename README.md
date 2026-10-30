@@ -112,6 +112,9 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 
 ## 10. Registro de cambios
 
+### 2026-10-29 — Tarjetas en 2 columnas en teléfono (0.5.4)
+- Con 600 px o menos, las tarjetas de **equipo, noticias y propuestas** (también las del inicio) se acomodan en **2 columnas** (antes una por fila): tarjetas más compactas (foto de 88 px en el equipo, títulos, textos y sombras menores, y ajuste de palabras largas) para que quepan hasta en 320 px sin desborde. En pantallas más anchas no cambia.
+
 ### 2026-10-29 — Buzón sin adornos en los márgenes (0.5.3)
 - Se quitaron los iconos de las opciones de tipo de mensaje y de anonimato, y se probaron y descartaron pegatinas en los márgenes laterales: toda la decoración queda dentro de la columna del formulario. Se conservan el candado del aviso de anonimato, el clip de las imágenes, el avión del botón de enviar, el sobre junto al título, la nota “¡Tu voz importa!” y el sello de palomita del agradecimiento.
 
