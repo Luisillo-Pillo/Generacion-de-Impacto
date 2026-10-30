@@ -112,6 +112,9 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 
 ## 10. Registro de cambios
 
+### 2026-10-29 — Pie de página ordenado en teléfono (0.5.5)
+- En pantallas de 600 px o menos el pie se veía deforme (logo, lema y logo de la ENSFA en una fila apretada, y el logo de la ENSFA suelto en otra). Ahora se apilan centrados —logo de la planilla, lema con líneas equilibradas y logo de la ENSFA un poco más pequeño— y la línea del © y “Acceso integrantes” también se centra. Escritorio no cambia.
+
 ### 2026-10-29 — Ajustes sin “Licenciaturas con varios grupos” (0.5.4)
 - Se quitó de Panel → Ajustes la sección “Licenciaturas con varios grupos” porque esa configuración nunca se cambiará. Ajustes ya no guarda `groupDegrees`; sigue deduciéndose en el servidor (licenciaturas con “telesecundaria” en el nombre), así que el selector de grupo del buzón funciona igual.
 
