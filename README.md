@@ -59,7 +59,7 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, m�
 - Un mensaje **anónimo** nunca almacena nombre, teléfono, licenciatura, semestre ni grupo. Un mensaje **con datos** guarda además el **teléfono** (10 dígitos sin espacios; se captura y muestra como `000 000 0000`). El **grupo** solo se pide y guarda si la licenciatura elegida tiene varios grupos (ver Ajustes más abajo); en las demás se descarta.
 - Un mensaje puede llevar hasta **3 imágenes** (`images`, ids de GridFS; JPG/PNG/WEBP/GIF, 5 MB cada una, sin SVG), anónimo o no. Se validan por tipo y por la **firma real del archivo**; se envían en la misma petición multipart que el mensaje (si algo falla no quedan archivos huérfanos) y se borran de GridFS al eliminar el mensaje. Las imágenes pueden contener metadatos (p. ej. ubicación del EXIF) que no se eliminan: el formulario avisa a quien escribe de forma anónima que revise lo que adjunta.
 - Cada **integrante** (`members`) apunta a su cuenta (`users`) mediante `member.user`. La API pública de integrantes nunca devuelve ese campo ni el correo.
-- Las listas de licenciaturas, semestres y grupos del formulario viven en `settings` y se editan desde el panel. `groupDegrees` es la lista de **licenciaturas con varios grupos** (casillas en Panel → Ajustes); mientras nadie la guarde, se deduce: toda licenciatura cuyo nombre contenga “telesecundaria”. El valor se calcula en `backend/src/settings.js` y se usa tanto en `GET /api/settings` como al validar un mensaje.
+- Las listas de licenciaturas, semestres y grupos del formulario viven en `settings` y se editan desde el panel. `groupDegrees` es la lista de **licenciaturas con varios grupos**; no se edita desde el panel (decisión del cliente: esa configuración no cambia) y se deduce: toda licenciatura cuyo nombre contenga “telesecundaria”. El valor se calcula en `backend/src/settings.js` y se usa tanto en `GET /api/settings` como al validar un mensaje.
 
 ## 5. Cuentas, integrantes y acceso
 
@@ -111,6 +111,9 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 - Rotar la contraseña de Atlas: la cadena de conexión se compartió en el chat durante el desarrollo.
 
 ## 10. Registro de cambios
+
+### 2026-10-29 — Ajustes sin “Licenciaturas con varios grupos” (0.5.4)
+- Se quitó de Panel → Ajustes la sección “Licenciaturas con varios grupos” porque esa configuración nunca se cambiará. Ajustes ya no guarda `groupDegrees`; sigue deduciéndose en el servidor (licenciaturas con “telesecundaria” en el nombre), así que el selector de grupo del buzón funciona igual.
 
 ### 2026-10-29 — Buzón sin adornos en los márgenes (0.5.3)
 - Se quitaron los iconos de las opciones de tipo de mensaje y de anonimato, y se probaron y descartaron pegatinas en los márgenes laterales: toda la decoración queda dentro de la columna del formulario. Se conservan el candado del aviso de anonimato, el clip de las imágenes, el avión del botón de enviar, el sobre junto al título, la nota “¡Tu voz importa!” y el sello de palomita del agradecimiento.
