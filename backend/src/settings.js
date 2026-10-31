@@ -1,6 +1,6 @@
 import { Setting, DEFAULT_SETTINGS } from './models.js';
 
-export const SETTING_KEYS = [...Object.keys(DEFAULT_SETTINGS), 'groupDegrees'];
+const SETTING_KEYS = [...Object.keys(DEFAULT_SETTINGS), 'groupDegrees'];
 
 // Ajustes con valores por defecto. `groupDegrees` (licenciaturas con varios grupos) se deduce de los nombres mientras
 // nadie lo haya guardado: cualquier licenciatura que mencione "telesecundaria".

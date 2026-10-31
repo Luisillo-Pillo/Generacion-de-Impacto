@@ -98,9 +98,13 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 - Sin errores, sin código muerto detectado y `npm audit` en 0 vulnerabilidades (se actualizaron `zod` 3→4 y `react-router-dom` 6→7).
 - El rol `user` de `User.role` ya no se asigna a nadie (todas las cuentas son de integrantes y por tanto `admin`). Se conserva el campo y la comprobación de rol como defensa si se edita la BD a mano.
 - **Imágenes huérfanas**: si en el panel subes una imagen y cancelas sin guardar, el archivo queda en GridFS. Se limpian solo al reemplazar o eliminar el registro que las usa.
-- **Login sin límite de intentos**: no hay rate limit en `/api/auth/login`; con cuentas de administrador conviene agregarlo antes de promocionar el sitio.
-- **Buzón sin anti-spam** (decisión del cliente).
+- **Login con freno de fuerza bruta** (2026-10-29): tras 10 intentos fallidos desde una IP en 15 minutos, `/api/auth/login` responde 429. El conteo va en memoria (la API corre en una sola instancia) y se reinicia al reiniciar el servidor. Un correo inexistente tarda lo mismo que uno existente (hash de relleno), para no delatar qué cuentas existen.
+- **Buzón sin anti-spam** (decisión del cliente): `POST /api/messages` es público y acepta hasta 3 × 5 MB por petición, sin límite de frecuencia.
+- **Imágenes de los mensajes**: `GET /api/files/:id` es público (el panel las muestra con un `<img>` normal). El id es largo y no se puede adivinar, pero quien tenga el enlace puede verla; no se les quitan los metadatos EXIF.
+- **Sesiones**: el token (JWT, 7 días) se guarda en `localStorage` y no se invalida al cambiar la contraseña; se invalida al eliminar al integrante.
 - Las páginas comparten un único `<title>` (“Generación de Impacto”).
+
+Segunda revisión (2026-10-29): ESLint sin avisos, `npm audit` en 0 vulnerabilidades, `vite build` correcto, búsqueda de CSS, exports y archivos públicos sin uso (sin código muerto), y 55 pruebas de API contra una base aparte (`gi_test`, eliminada al terminar) que cubren permisos, ids inválidos, redes/correo, imágenes (firma falsa, SVG, tamaño, cantidad), anonimato, grupo condicionado, equipo, CORS y el freno del login.
 
 ## 9. Pendientes y decisiones abiertas
 
@@ -111,6 +115,11 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 - Rotar la contraseña de Atlas: la cadena de conexión se compartió en el chat durante el desarrollo.
 
 ## 10. Registro de cambios
+
+### 2026-10-29 — Revisión general: seguridad y errores (0.5.6)
+- **Seguridad**: freno de fuerza bruta en el login (429 tras 10 fallos por IP en 15 min) y tiempo de respuesta igual con correos inexistentes; los enlaces de redes (`social`) solo aceptan `http(s)://` (y el correo de contacto debe ser válido), validado en la API y de nuevo al mostrarlos en `/equipo`, para impedir enlaces `javascript:`; el JWT se firma y verifica explícitamente con HS256; `vercel.json` agrega cabeceras (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`); `backend/.env.example` ya no lleva el usuario ni el host reales de Atlas (solo marcadores `<db_user>`, `<cluster>`).
+- **Errores**: un id con formato inválido en la URL (p. ej. `PUT /api/news/abc`) devolvía 500; ahora 404. `PUT /api/settings/:key` sin cuerpo devolvía 500; ahora 400. Descargar un archivo que se borra a media descarga podía tumbar el servidor (stream sin manejador de error). En el panel, un error pasajero de carga ya no se queda visible después de una carga correcta.
+- **Código muerto**: se quitó `export` a tres constantes/funciones que solo se usan dentro de su archivo (`SETTING_KEYS`, `MAX_IMAGE_BYTES`, `hasImageSignature`). No se encontró CSS, componentes ni archivos públicos sin uso.
 
 ### 2026-10-29 — Pie de página ordenado en teléfono (0.5.5)
 - En pantallas de 600 px o menos el pie se veía deforme (logo, lema y logo de la ENSFA en una fila apretada, y el logo de la ENSFA suelto en otra). Ahora se apilan centrados —logo de la planilla, lema con líneas equilibradas y logo de la ENSFA un poco más pequeño— y la línea del © y “Acceso integrantes” también se centra. Escritorio no cambia.

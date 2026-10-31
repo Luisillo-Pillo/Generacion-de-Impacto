@@ -81,7 +81,7 @@ Los errores devuelven `{ "error": "mensaje en español" }`; los de validación (
 | `GET /settings` | público | todos los ajustes (con valores por defecto) |
 | `PUT /settings/:key` | admin | `{value}` para `degrees`, `groups`, `semesters`, `groupDegrees`, `social` |
 
-Detalles de seguridad: `helmet` (con `Cross-Origin-Resource-Policy: cross-origin` para poder mostrar imágenes desde otro dominio), CORS restringido a `CORS_ORIGIN`, `trust proxy` activado (Render), manejador de errores central que no filtra trazas.
+Detalles de seguridad: `helmet` (con `Cross-Origin-Resource-Policy: cross-origin` para poder mostrar imágenes desde otro dominio), CORS restringido a `CORS_ORIGIN`, `trust proxy` activado (Render), manejador de errores central que no filtra trazas (un id inválido en la URL responde 404, no 500). **Login**: máximo 10 intentos fallidos por IP cada 15 minutos (429), en memoria, y comparación con un hash de relleno si el correo no existe para no delatar cuentas; el JWT se firma y verifica solo con HS256. **Redes sociales** (`social`): solo enlaces `http(s)://` (en la API y al mostrarlos) y correo de contacto válido, para impedir enlaces `javascript:`. `vercel.json` agrega las cabeceras `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy` y `Permissions-Policy`. Los `.env.example` nunca llevan usuarios ni hosts reales. La descarga de archivos maneja el error del stream (un archivo borrado a media descarga no debe tumbar el servidor).
 
 ### 6. Identidad visual (replicar las imágenes de `docs/referencias/`)
 
@@ -137,7 +137,7 @@ Header fijo negro con borde rojo inferior: logo de la planilla y navegación (In
 ### 9. Fuera de alcance por ahora
 
 - **Aviso por correo** de mensajes nuevos: el cliente pidió **no incluirlo de momento**. No agregar `nodemailer`, proveedores de correo ni variables relacionadas; los mensajes se consultan solo desde el panel.
-- Anti-spam del buzón, límite de intentos de login, registro público y gestión de roles (ver secciones 4 y 5).
+- Anti-spam del buzón, registro público y gestión de roles (ver secciones 4 y 5). El login **sí** lleva freno de fuerza bruta (ver «Detalles de seguridad»).
 
 ### 10. Despliegue (documentar paso a paso en `README.md`)
 

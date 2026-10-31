@@ -24,7 +24,8 @@ router.get('/:id', async (req, res) => {
     'Cache-Control': 'public, max-age=31536000, immutable',
     'Cross-Origin-Resource-Policy': 'cross-origin',
   });
-  getBucket().openDownloadStream(_id).pipe(res);
+  // Si el archivo se borra a media descarga el stream falla: sin este manejador el proceso se caería.
+  getBucket().openDownloadStream(_id).on('error', () => res.destroy()).pipe(res);
 });
 
 router.delete('/:id', adminOnly, async (req, res) => {

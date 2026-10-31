@@ -4,7 +4,7 @@ import { getBucket } from './db.js';
 
 // SVG se excluye a propósito: puede contener scripts.
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export const imageUpload = multer({
   storage: multer.memoryStorage(),
@@ -14,7 +14,7 @@ export const imageUpload = multer({
 });
 
 // El tipo que declara el navegador es manipulable: se comprueba también la firma real del archivo.
-export function hasImageSignature(buf) {
+function hasImageSignature(buf) {
   const starts = (...bytes) => bytes.every((b, i) => buf[i] === b);
   return (
     starts(0xff, 0xd8, 0xff) || // JPEG

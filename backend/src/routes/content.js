@@ -125,16 +125,23 @@ router.delete('/proposals/:id', adminOnly, async (req, res) => {
 
 // ---------------- Ajustes (licenciaturas, grupos, redes) ----------------
 const list = z.array(z.string().trim().min(1).max(120)).max(50);
+// Las redes se muestran como enlaces: solo http(s), nunca `javascript:` u otros esquemas.
+const url = z
+  .string()
+  .trim()
+  .max(200)
+  .refine((v) => v === '' || /^https?:\/\/[^\s]+$/i.test(v), 'Las redes deben ser un enlace que empiece con http:// o https://')
+  .default('');
 const settingSchemas = {
   degrees: list,
   groups: list,
   groupDegrees: list,
   semesters: list,
   social: z.object({
-    instagram: z.string().trim().max(200).default(''),
-    facebook: z.string().trim().max(200).default(''),
-    tiktok: z.string().trim().max(200).default(''),
-    email: z.string().trim().max(200).default(''),
+    instagram: url,
+    facebook: url,
+    tiktok: url,
+    email: z.union([z.literal(''), z.string().trim().toLowerCase().max(200).email('Correo de contacto no válido')]).default(''),
   }),
 };
 
@@ -145,7 +152,7 @@ router.get('/settings', async (_req, res) => {
 router.put('/settings/:key', adminOnly, async (req, res) => {
   const schema = settingSchemas[req.params.key];
   if (!schema) return res.status(404).json({ error: 'Ajuste desconocido' });
-  const value = schema.parse(req.body.value);
+  const value = schema.parse(req.body?.value);
   await Setting.findOneAndUpdate({ key: req.params.key }, { value }, { upsert: true });
   res.json({ key: req.params.key, value });
 });

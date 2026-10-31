@@ -16,7 +16,11 @@ export function useList(path) {
     const request = ++latest.current.request;
     const requested = latest.current.path;
     api(requested)
-      .then((items) => request === latest.current.request && setResult({ path: requested, items }))
+      .then((items) => {
+        if (request !== latest.current.request) return;
+        setResult({ path: requested, items });
+        setError(''); // un fallo anterior ya no aplica si esta carga salió bien
+      })
       .catch((e) => request === latest.current.request && setError(e.message));
   }, []);
   useEffect(() => {

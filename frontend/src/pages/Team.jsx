@@ -11,7 +11,7 @@ export default function Team() {
     ['Instagram', social.instagram],
     ['Facebook', social.facebook],
     ['TikTok', social.tiktok],
-  ].filter(([, url]) => url);
+  ].filter(([, url]) => /^https?:\/\//i.test(url || '')); // solo enlaces http(s)
 
   return (
     <section className="section paper page-min">

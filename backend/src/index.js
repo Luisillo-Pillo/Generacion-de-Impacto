@@ -44,6 +44,10 @@ app.use((err, _req, res, _next) => {
     return res.status(400).json({ error: known[err.code] || err.message });
   }
   if (err?.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON inválido' });
+  // Un id con formato inválido en la URL (p. ej. /api/news/abc) no es un fallo del servidor
+  if (err?.name === 'CastError') {
+    return err.path === '_id' ? res.status(404).json({ error: 'No encontrado' }) : res.status(400).json({ error: 'Datos inválidos' });
+  }
   console.error(err);
   res.status(500).json({ error: 'Error interno del servidor' });
 });
