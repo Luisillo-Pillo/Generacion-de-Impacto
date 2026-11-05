@@ -16,6 +16,7 @@ import AdminNews from './pages/admin/AdminNews.jsx';
 import AdminProposals from './pages/admin/AdminProposals.jsx';
 import AdminTeam from './pages/admin/AdminTeam.jsx';
 import AdminSettings from './pages/admin/AdminSettings.jsx';
+import './App.css';
 
 function ScrollToTop() {
   const { pathname } = useLocation();

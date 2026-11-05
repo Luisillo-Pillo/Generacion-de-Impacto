@@ -20,6 +20,7 @@ Cada vez que hagas una **actualización importante** (nueva funcionalidad, cambi
 - Las pruebas se hacen contra una base aparte (p. ej. `gi_test`), confirmando el URI por código antes de ejecutar, y se elimina al terminar. Nunca crear usuarios ni mensajes de prueba en la base real.
 - Al detener servidores de desarrollo, cerrar el árbol completo: `node --watch` revive el proceso hijo.
 - Las imágenes se guardan en MongoDB (GridFS) y se sirven desde `/api/files/:id`. No se aceptan SVG.
+- CSS: un archivo por componente. Cada `.jsx` con estilos importa su `.css` del mismo nombre (junto a él); `frontend/src/index.css` solo lleva lo global/compartido y se importa primero en `main.jsx`. No volver a centralizar todo en una sola hoja.
 - Estilo visual: papel rasgado crema (`#f1e8db`), rojo (`#d4141c`) y negro (`#121212`); tipografías Anton, Poppins y Permanent Marker.
 
 ## Comandos

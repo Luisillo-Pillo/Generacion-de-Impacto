@@ -4,6 +4,7 @@ import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { formatPhone } from '../../utils.js';
 import { useList } from './shared.jsx';
+import './AdminMessages.css';
 
 const TYPES = [['', 'Todos'], ['queja', 'Quejas'], ['propuesta', 'Propuestas'], ['pregunta', 'Preguntas'], ['problema', 'Problemas']];
 const STATUS = [['nuevo', 'Nuevos'], ['leido', 'Leídos'], ['archivado', 'Archivados'], ['', 'Todos']];

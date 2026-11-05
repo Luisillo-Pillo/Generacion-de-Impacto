@@ -5,6 +5,7 @@ import { api, fileUrl } from '../api.js';
 import { initials } from '../utils.js';
 import PasswordInput from '../components/PasswordInput.jsx';
 import Spinner from '../components/Spinner.jsx';
+import './Profile.css';
 
 const blank = { currentPassword: '', newPassword: '', confirm: '' };
 

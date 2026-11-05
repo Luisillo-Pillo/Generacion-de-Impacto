@@ -1,3 +1,5 @@
+import './Spinner.css';
+
 // Círculo de carga. Por defecto ocupa el bloque de la sección que espera datos (con texto para lectores de pantalla);
 // con `inline` es un círculo pequeño para botones y avisos.
 export default function Spinner({ inline = false, label = 'Cargando…' }) {

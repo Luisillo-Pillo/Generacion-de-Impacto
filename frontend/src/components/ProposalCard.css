@@ -1,0 +1,15 @@
+.proposal {
+  background: var(--paper);
+  color: var(--ink);
+  padding: 1.5rem 1.4rem;
+  border-radius: 4px 14px 4px 14px;
+  position: relative;
+  box-shadow: 6px 6px 0 var(--red);
+}
+.section.paper .proposal { background: #fff; }
+.section.paper .objective { background: var(--paper); }
+.proposal-num { font-family: var(--font-display); font-size: 4.5rem; line-height: .9; color: var(--red); display: block; }
+.proposal h3 { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: 1.4rem; }
+.proposal-img { border-radius: 6px; margin-bottom: 1rem; }
+.objective { background: #fff; border-radius: 10px; padding: .9rem 1rem; margin-top: 1rem; }
+.objective p { margin: .5rem 0 0; }

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { fileUrl, formatDate } from '../api.js';
+import './NewsCard.css';
 
 export default function NewsCard({ n }) {
   return (

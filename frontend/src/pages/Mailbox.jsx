@@ -5,6 +5,7 @@ import { useFetch } from '../hooks.js';
 import { formatPhone } from '../utils.js';
 import Spinner from '../components/Spinner.jsx';
 import { CheckStamp, EnvelopeSticker, IconClip, IconLock, IconSend } from '../components/MailboxIcons.jsx';
+import './Mailbox.css';
 
 const TYPES = [
   ['queja', 'Queja'],

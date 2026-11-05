@@ -12,7 +12,7 @@ Para regenerar el proyecto desde cero con una IA, ver [`docs/Prompt Inicial.md`]
 Generacion-de-Impacto/
 ├── frontend/            React 18 + Vite + React Router 7 → Vercel
 │   ├── public/brand/    logo-planilla.svg, logo-ensfa.png   (favicon.png = emblema de la planilla)
-│   └── src/             App, auth, api, hooks, utils, pages/ (admin/: una página por sección del panel), components/, styles.css
+│   └── src/             App, auth, api, hooks, utils, pages/ (admin/: una página por sección del panel), components/; cada .jsx con estilos lleva su .css (mismo nombre) y `index.css` guarda solo lo global
 ├── backend/             Express 5 + Mongoose + Zod 4 → Render
 │   ├── src/             index, db (GridFS), uploads (multer + firma de imágenes), settings, auth, models, validators,
 │   │                    seed, create-admin, routes/ (auth, messages, members, files, content)
@@ -106,6 +106,8 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 
 Segunda revisión (2026-10-29): ESLint sin avisos, `npm audit` en 0 vulnerabilidades, `vite build` correcto, búsqueda de CSS, exports y archivos públicos sin uso (sin código muerto), y 55 pruebas de API contra una base aparte (`gi_test`, eliminada al terminar) que cubren permisos, ids inválidos, redes/correo, imágenes (firma falsa, SVG, tamaño, cantidad), anonimato, grupo condicionado, equipo, CORS y el freno del login.
 
+Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite build` correcto, 55 pruebas de API (base aparte, eliminada), búsqueda de CSS/exports/archivos sin uso y 62 capturas idénticas a la versión anterior. Único hallazgo: el sobre del buzón ignoraba “reducir movimiento” (corregido).
+
 ## 9. Pendientes y decisiones abiertas
 
 - Propuesta **#7**: aún no definida; agregarla desde Panel → Propuestas.
@@ -115,6 +117,12 @@ Segunda revisión (2026-10-29): ESLint sin avisos, `npm audit` en 0 vulnerabilid
 - Rotar la contraseña de Atlas: la cadena de conexión se compartió en el chat durante el desarrollo.
 
 ## 10. Registro de cambios
+
+### 2026-11-04 — Un CSS por componente (0.6.0)
+- El antiguo `frontend/src/styles.css` (390 líneas) se dividió: cada `.jsx` con estilos propios importa su `.css` del mismo nombre (`Header.css`, `Footer.css`, `UserMenu.css`, `Dialog.css`, `PasswordInput.css`, `Spinner.css`, `MailboxIcons.css`, `NewsCard.css`, `ProposalCard.css`, `App.css`, `pages/Home.css`, `Mailbox.css`, `Team.css`, `NewsDetail.css`, `Profile.css`, `pages/admin/AdminLayout.css`, `AdminMessages.css` y `shared.css` para `shared.jsx`). `index.css` conserva solo lo global y compartido (variables, reinicio, tipografía, botones, formularios, tarjetas, secciones, `.grid`, `.tag`, `.avatar`, `.role`, miniaturas de adjuntos) y se importa primero en `main.jsx` para que las hojas de los componentes puedan sobrescribirlo. Las páginas sin estilos propios (Login, Noticias, Propuestas, AdminNoticias/Propuestas/Equipo/Ajustes) no tienen `.css`. Los puntos de quiebre responsive viven junto a los estilos que ajustan.
+- Verificado con 62 capturas (21 pantallas y estados × 3 anchos, con API simulada) comparadas píxel a píxel contra la versión anterior: 0 diferencias.
+- Corregido un error previo: con “reducir movimiento” activado el sobre del buzón seguía flotando, porque `.sticker.envelope` ganaba en especificidad a la regla que apagaba la animación.
+- `.hero-cta` se unificó con la clase global `.btn-row` (eran la misma regla).
 
 ### 2026-10-29 — Revisión general: seguridad y errores (0.5.6)
 - **Seguridad**: freno de fuerza bruta en el login (429 tras 10 fallos por IP en 15 min) y tiempo de respuesta igual con correos inexistentes; los enlaces de redes (`social`) solo aceptan `http(s)://` (y el correo de contacto debe ser válido), validado en la API y de nuevo al mostrarlos en `/equipo`, para impedir enlaces `javascript:`; el JWT se firma y verifica explícitamente con HS256; `vercel.json` agrega cabeceras (`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`); `backend/.env.example` ya no lleva el usuario ni el host reales de Atlas (solo marcadores `<db_user>`, `<cluster>`).

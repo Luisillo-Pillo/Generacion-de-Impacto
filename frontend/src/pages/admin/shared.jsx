@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, fileUrl, uploadImage } from '../../api.js';
 import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
+import './shared.css';
 
 export function useList(path) {
   // El resultado guarda la ruta que lo originó: si la ruta cambia (p. ej. otro filtro) la lista vuelve a estar

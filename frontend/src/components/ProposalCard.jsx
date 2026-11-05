@@ -1,4 +1,5 @@
 import { fileUrl } from '../api.js';
+import './ProposalCard.css';
 
 export default function ProposalCard({ p }) {
   return (

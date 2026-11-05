@@ -3,6 +3,7 @@ import { useFetch } from '../hooks.js';
 import Spinner from '../components/Spinner.jsx';
 import ProposalCard from '../components/ProposalCard.jsx';
 import NewsCard from '../components/NewsCard.jsx';
+import './Home.css';
 
 export default function Home() {
   const proposals = useFetch('/proposals');
@@ -16,7 +17,7 @@ export default function Home() {
             <img className="hero-logo" src="/brand/logo-planilla.svg" alt="Generación de Impacto" />
           </h1>
           <p className="hero-sub">Planilla del Consejo Estudiantil de la ENSFA</p>
-          <div className="hero-cta">
+          <div className="btn-row">
             <Link to="/buzon" className="btn btn-red">Escríbenos en el buzón</Link>
             <Link to="/propuestas" className="btn btn-light">Conoce nuestras propuestas</Link>
           </div>

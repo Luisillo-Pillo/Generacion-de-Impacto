@@ -1,6 +1,7 @@
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../auth.jsx';
 import Spinner from '../../components/Spinner.jsx';
+import './AdminLayout.css';
 
 const TABS = [
   ['mensajes', 'Mensajes'],

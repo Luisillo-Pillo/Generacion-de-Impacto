@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useFetch } from '../hooks.js';
 import Spinner from '../components/Spinner.jsx';
 import { fileUrl, formatDate } from '../api.js';
+import './NewsDetail.css';
 
 export default function NewsDetail() {
   const { slug } = useParams();

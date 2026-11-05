@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import './Dialog.css';
 
 const DialogContext = createContext(null);
 

@@ -1,0 +1,5 @@
+.back { display: inline-block; margin-bottom: 1rem; font-weight: 600; text-decoration: none; color: var(--red-dark); }
+.article h1 { margin-top: .3rem; }
+.article-cover { width: 100%; border-radius: 8px; margin: 1rem 0 1.5rem; }
+.article p { font-size: 1.05rem; }
+.article time { color: var(--muted); font-size: .85rem; }

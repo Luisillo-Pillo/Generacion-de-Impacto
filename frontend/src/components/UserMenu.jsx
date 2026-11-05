@@ -4,6 +4,7 @@ import { useAuth } from '../auth.jsx';
 import { fileUrl } from '../api.js';
 import { initials } from '../utils.js';
 import { useDialog } from './Dialog.jsx';
+import './UserMenu.css';
 
 // Menú desplegable del perfil (solo con sesión iniciada): ver perfil y cerrar sesión con confirmación.
 export default function UserMenu() {

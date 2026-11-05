@@ -1,0 +1,27 @@
+/* ---------- Menú de usuario ---------- */
+.user-menu { position: relative; }
+.user-btn {
+  display: flex; align-items: center; gap: .5rem;
+  background: none; border: 2px solid #444; border-radius: 999px;
+  padding: .2rem .8rem .2rem .25rem; color: var(--paper); font: inherit; font-weight: 600; cursor: pointer;
+}
+.user-btn:hover, .user-btn[aria-expanded='true'] { border-color: var(--red); }
+.user-btn img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid var(--red); }
+.caret { font-size: .75rem; }
+.user-dropdown {
+  position: absolute; right: 0; top: calc(100% + .6rem); min-width: 230px; z-index: 30;
+  background: var(--paper); color: var(--ink); border-radius: 4px 14px 4px 14px;
+  box-shadow: 5px 5px 0 var(--red); padding: .4rem; display: grid;
+}
+.user-info { padding: .6rem .8rem; border-bottom: 2px solid var(--black); margin-bottom: .3rem; display: grid; }
+.user-info small { color: var(--muted); overflow-wrap: anywhere; }
+.user-dropdown a, .user-dropdown button {
+  font: inherit; font-weight: 600; text-align: left; text-decoration: none; color: inherit;
+  background: none; border: 0; border-radius: 8px; padding: .6rem .8rem; cursor: pointer;
+}
+.user-dropdown a:hover, .user-dropdown button:hover { background: var(--black); color: var(--paper); }
+.avatar.sm { width: 34px; height: 34px; margin: 0; border-width: 2px; font-size: .95rem; }
+@media (max-width: 820px) {
+  .user-menu { margin-left: auto; }
+  .user-name { display: none; }
+}

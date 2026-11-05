@@ -2,6 +2,7 @@ import { useFetch } from '../hooks.js';
 import Spinner from '../components/Spinner.jsx';
 import { fileUrl } from '../api.js';
 import { initials } from '../utils.js';
+import './Team.css';
 
 export default function Team() {
   const members = useFetch('/members');

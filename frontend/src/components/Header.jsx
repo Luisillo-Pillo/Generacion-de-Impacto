@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import UserMenu from './UserMenu.jsx';
+import './Header.css';
 
 const links = [
   ['/', 'Inicio'],

@@ -1,3 +1,5 @@
+import './MailboxIcons.css';
+
 // Iconografía del buzón. Cada pieza tiene un significado en la página:
 //  - iconos de línea: anonimato (candado), adjuntar imágenes (clip) y enviar (avión de papel)
 //  - pegatina del sobre: el mensaje que se deposita en el buzón (junto al título)
