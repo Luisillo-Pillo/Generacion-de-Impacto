@@ -92,7 +92,7 @@ test('los mensajes sin campo de revisión cuentan como pendientes', async () => 
   assert.ok(res.some((m) => m._id === String(antiguo.insertedId)));
 });
 
-test('adjuntos: una imagen PNG real se guarda, se sirve con su tipo y se borra con el mensaje', async () => {
+test('adjuntos: una imagen PNG real se guarda, se sirve con su tipo y se borra con el mensaje definitivo', async () => {
   const form = t.messageForm(anonimo(), [{ data: PNG, type: 'image/png', name: 'a.png' }]);
   assert.equal((await t.call('POST', '/messages', { form })).status, 201);
   const [m] = await lista();
@@ -103,7 +103,10 @@ test('adjuntos: una imagen PNG real se guarda, se sirve con su tipo y se borra c
   assert.equal(img.headers.get('content-type'), 'image/png');
   assert.equal(img.headers.get('x-content-type-options'), 'nosniff');
 
+  // Eliminar manda a la papelera (la imagen se conserva); solo el borrado definitivo la elimina
   assert.equal((await t.call('DELETE', `/messages/${m._id}`, { token })).status, 204);
+  assert.equal((await t.call('GET', `/files/${m.images[0]}`)).status, 200);
+  assert.equal((await t.call('DELETE', `/messages/${m._id}/permanent`, { token })).status, 204);
   assert.equal((await t.call('GET', `/files/${m.images[0]}`)).status, 404);
 });
 

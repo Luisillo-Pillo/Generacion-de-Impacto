@@ -5,7 +5,7 @@ import PasswordInput from '../components/PasswordInput.jsx';
 import Spinner from '../components/Spinner.jsx';
 
 export default function Login() {
-  const { user, login } = useAuth();
+  const { user, login, expired } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
@@ -34,6 +34,7 @@ export default function Login() {
       <div className="container narrow">
         <h1 className="title">Acceso <mark>integrantes</mark></h1>
         <p className="lead">Solo para integrantes de la planilla</p>
+        {expired && <p role="status"><strong>Tu sesión terminó (venció o se cerró desde otro dispositivo). Inicia sesión de nuevo.</strong></p>}
         <form className="form" onSubmit={submit}>
           <label>Correo
             <input required type="email" value={form.email} onChange={set('email')} autoComplete="email" />

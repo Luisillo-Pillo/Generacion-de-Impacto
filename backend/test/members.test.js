@@ -13,7 +13,7 @@ before(async () => {
 });
 after(() => t.stop());
 
-const integrante = (extra = {}) => ({ name: 'Beto Prueba', role: 'Tesorería', email: 'beto@test.com', password: 'password123', ...extra });
+const integrante = (extra = {}) => ({ name: 'Beto Prueba', role: 'Tesorería', email: 'beto@test.com', password: 'clave-de-integrante-1', ...extra });
 
 test('dar de alta a un integrante crea su cuenta de administrador', async () => {
   assert.equal((await t.call('POST', '/members', { body: integrante() })).status, 401);
@@ -22,15 +22,22 @@ test('dar de alta a un integrante crea su cuenta de administrador', async () => 
   assert.equal(res.json.email, 'beto@test.com');
   assert.equal(res.json.user, undefined);
 
-  const login = await t.call('POST', '/auth/login', { body: { email: 'beto@test.com', password: 'password123' } });
+  const login = await t.call('POST', '/auth/login', { body: { email: 'beto@test.com', password: 'clave-de-integrante-1' } });
   assert.equal(login.status, 200);
   assert.equal(login.json.user.role, 'admin');
 });
 
-test('correo y contraseña son obligatorios, con mínimo de 8 caracteres y correo único sin importar mayúsculas', async () => {
+test('correo y contraseña son obligatorios, con mínimo de 10 caracteres, sin contraseñas comunes y correo único sin importar mayúsculas', async () => {
   assert.equal((await t.call('POST', '/members', { token, body: integrante({ email: undefined }) })).status, 400);
   assert.equal((await t.call('POST', '/members', { token, body: integrante({ password: undefined }) })).status, 400);
   assert.equal((await t.call('POST', '/members', { token, body: integrante({ email: 'otro@test.com', password: 'corta' }) })).status, 400);
+  const ocho = await t.call('POST', '/members', { token, body: integrante({ email: 'otro@test.com', password: '12345678' }) });
+  assert.equal(ocho.status, 400);
+  assert.match(ocho.json.error, /al menos 10 caracteres/);
+  const comun = await t.call('POST', '/members', { token, body: integrante({ email: 'otro@test.com', password: 'Contraseña123' }) });
+  assert.equal(comun.status, 400);
+  assert.match(comun.json.error, /muy común/);
+  assert.equal((await t.call('POST', '/members', { token, body: integrante({ email: 'otro@test.com', password: 'aaaaaaaaaaaa' }) })).status, 400);
   assert.equal((await t.call('POST', '/members', { token, body: integrante({ email: 'no-es-correo' }) })).status, 400);
   assert.equal((await t.call('POST', '/members', { token, body: integrante({ email: 'BETO@test.com', name: 'Otro Beto' }) })).status, 409);
   assert.equal((await t.models.User.countDocuments({ email: 'otro@test.com' })), 0, 'no deben quedar cuentas huérfanas');
@@ -55,17 +62,17 @@ test('editar: cambiar correo y contraseña, y rechazar un correo repetido', asyn
   const sinCambiarClave = await put({ name: 'Beto Editado', role: 'Presidencia', email: '', password: '' });
   assert.equal(sinCambiarClave.status, 200);
   assert.equal(sinCambiarClave.json.email, 'beto@test.com');
-  assert.equal((await t.call('POST', '/auth/login', { body: { email: 'beto@test.com', password: 'password123' } })).status, 200);
+  assert.equal((await t.call('POST', '/auth/login', { body: { email: 'beto@test.com', password: 'clave-de-integrante-1' } })).status, 200);
 
   assert.equal((await put({ name: 'Beto Editado', email: 'beto2@test.com', password: 'nueva-clave-1' })).status, 200);
   assert.equal((await t.call('POST', '/auth/login', { body: { email: 'beto2@test.com', password: 'nueva-clave-1' } })).status, 200);
-  assert.equal((await t.call('POST', '/auth/login', { body: { email: 'beto@test.com', password: 'password123' } })).status, 401);
+  assert.equal((await t.call('POST', '/auth/login', { body: { email: 'beto@test.com', password: 'clave-de-integrante-1' } })).status, 401);
   assert.equal((await put({ name: 'Beto Editado', password: 'corta' })).status, 400);
 });
 
 test('eliminar a un integrante le retira el acceso al instante', async () => {
   const creado = await t.call('POST', '/members', { token, body: integrante({ name: 'Para Borrar', email: 'borrar@test.com' }) });
-  const suToken = await t.login('borrar@test.com', 'password123');
+  const suToken = await t.login('borrar@test.com', 'clave-de-integrante-1');
   assert.equal((await t.call('GET', '/auth/me', { token: suToken })).status, 200);
 
   assert.equal((await t.call('DELETE', `/members/${creado.json._id}`, { token })).status, 204);

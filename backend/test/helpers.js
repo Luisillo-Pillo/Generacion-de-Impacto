@@ -19,14 +19,16 @@ export async function startServer(env = {}) {
   // Estas variables se leen al cargar app.js, por eso se fijan antes de importarlo.
   process.env.JWT_SECRET = 'secreto-solo-para-pruebas-'.repeat(3);
   delete process.env.CORS_ORIGIN_PATTERN;
-  Object.assign(process.env, { CORS_ORIGIN: 'http://localhost:5173', ...env });
+  // El límite de envíos del buzón se sube para que las pruebas normales no lo topen; sus pruebas lo fijan en `env`.
+  Object.assign(process.env, { CORS_ORIGIN: 'http://localhost:5173', MESSAGE_RATE_LIMIT: '1000', ...env });
 
   const external = process.env.TEST_MONGODB_URI;
   let mongod = null;
   let uri = external;
   if (!external) {
     const { MongoMemoryServer } = await import('mongodb-memory-server');
-    mongod = await MongoMemoryServer.create();
+    // Cada archivo de prueba levanta su propio mongod y corren en paralelo: el plazo por defecto (10 s) se queda corto en equipos lentos o con antivirus
+    mongod = await MongoMemoryServer.create({ instance: { launchTimeout: 60000 } });
     uri = mongod.getUri('gi_test');
   }
   const { hostname, pathname } = new URL(uri);

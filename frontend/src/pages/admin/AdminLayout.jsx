@@ -9,6 +9,7 @@ const TABS = [
   ['propuestas', 'Propuestas'],
   ['equipo', 'Equipo'],
   ['ajustes', 'Ajustes'],
+  ['actividad', 'Actividad'],
 ];
 
 // Estructura común del panel: título, navegación por secciones (cada una con su URL) y la página activa

@@ -16,6 +16,7 @@ import AdminNews from './pages/admin/AdminNews.jsx';
 import AdminProposals from './pages/admin/AdminProposals.jsx';
 import AdminTeam from './pages/admin/AdminTeam.jsx';
 import AdminSettings from './pages/admin/AdminSettings.jsx';
+import AdminActivity from './pages/admin/AdminActivity.jsx';
 import './App.css';
 
 function ScrollToTop() {
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="propuestas" element={<AdminProposals />} />
             <Route path="equipo" element={<AdminTeam />} />
             <Route path="ajustes" element={<AdminSettings />} />
+            <Route path="actividad" element={<AdminActivity />} />
           </Route>
           <Route path="*" element={<div className="container section"><h1 className="title">Página no encontrada</h1></div>} />
         </Routes>

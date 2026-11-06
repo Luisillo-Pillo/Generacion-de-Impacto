@@ -5,10 +5,19 @@ import { adminOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { imageUpload, saveImage } from '../uploads.js';
 import { loadSettings } from '../settings.js';
+import { hit, peek, retryAfter } from '../rateLimit.js';
+import { audit } from '../audit.js';
 
 const router = Router();
 
 const MAX_IMAGES = 3;
+const MAX_TOTAL_BYTES = 12 * 1024 * 1024; // tope de todas las imágenes juntas en un envío
+const HOUR_MS = 60 * 60 * 1000;
+const MIN_FILL_MS = 3000; // una persona no escribe asunto y mensaje en menos de 3 segundos
+// Tope de envíos por hora de TODO el buzón, no por IP: la comunidad estudiantil comparte la misma red (misma IP), así
+// que limitar por IP bloquearía a todos por culpa de uno. Es solo un freno de emergencia contra una inundación; el
+// valor normal queda muy por debajo. Se ajusta con la variable de entorno MESSAGE_RATE_LIMIT.
+const sendLimit = () => Number(process.env.MESSAGE_RATE_LIMIT) || 100;
 
 const base = {
   type: z.enum(MESSAGE_TYPES),
@@ -35,9 +44,28 @@ const createSchema = z.discriminatedUnion('anonymous', [
   }),
 ]);
 
+// Corta antes de procesar nada (y antes de que multer cargue archivos en memoria) si el buzón ya recibió demasiados envíos.
+async function mailboxGuard(req, res, next) {
+  const { count, resetAt } = await peek('buzon', 'global');
+  if (count >= sendLimit()) {
+    res.set('Retry-After', String(retryAfter(resetAt)));
+    return res.status(429).json({ error: 'El buzón recibió demasiados mensajes en poco tiempo. Inténtalo de nuevo en unos minutos.' });
+  }
+  next();
+}
+
 // Multipart: los campos de texto y hasta 3 imágenes (campo "images") llegan en una sola petición, así no quedan
 // archivos huérfanos si el mensaje no es válido. También se acepta JSON sin imágenes.
-router.post('/', imageUpload.array('images', MAX_IMAGES), async (req, res) => {
+router.post('/', mailboxGuard, imageUpload.array('images', MAX_IMAGES), async (req, res) => {
+  // Señales de bot: un campo oculto que las personas no ven (`website`) y un formulario enviado demasiado rápido
+  // (`fillMs`: milisegundos desde que se mostró). Se responde "éxito" y se descarta, para no darle pistas al bot.
+  const fillMs = Number(req.body?.fillMs);
+  if ((typeof req.body?.website === 'string' && req.body.website.trim() !== '') || (Number.isFinite(fillMs) && fillMs < MIN_FILL_MS)) {
+    await hit('buzon', 'global', HOUR_MS);
+    return res.status(201).json({ ok: true });
+  }
+  const totalBytes = (req.files ?? []).reduce((sum, f) => sum + f.size, 0);
+  if (totalBytes > MAX_TOTAL_BYTES) return res.status(413).json({ error: 'Las imágenes juntas deben pesar máximo 12 MB' });
   const body = { ...req.body, anonymous: req.body?.anonymous === true || req.body?.anonymous === 'true' };
   const data = createSchema.parse(body);
   if (!data.anonymous) {
@@ -53,18 +81,21 @@ router.post('/', imageUpload.array('images', MAX_IMAGES), async (req, res) => {
     await Promise.all(images.map(deleteFile));
     throw err;
   }
+  await hit('buzon', 'global', HOUR_MS); // solo cuentan los envíos que sí se guardaron: los errores de captura no gastan el límite
   res.status(201).json({ ok: true });
 });
 
 router.get('/', adminOnly, async (req, res) => {
   const { status, type, review } = req.query;
-  const filter = {};
+  const trash = req.query.trash === '1';
+  // `deletedAt: null` también cubre los mensajes anteriores a la papelera, que no tienen el campo
+  const filter = { deletedAt: trash ? { $ne: null } : null };
   if (MESSAGE_STATUS.includes(status)) filter.status = status;
   if (MESSAGE_TYPES.includes(type)) filter.type = type;
   // Los mensajes anteriores a este campo no lo tienen: cuentan como pendientes
   if (review === 'pendiente') filter.review = { $in: ['pendiente', null] };
   else if (MESSAGE_REVIEW.includes(review)) filter.review = review;
-  res.json(await Message.find(filter).sort({ createdAt: -1 }).limit(500));
+  res.json(await Message.find(filter).sort(trash ? { deletedAt: -1 } : { createdAt: -1 }).limit(500));
 });
 
 router.patch('/:id', adminOnly, async (req, res) => {
@@ -73,14 +104,33 @@ router.patch('/:id', adminOnly, async (req, res) => {
     .partial()
     .refine((c) => Object.keys(c).length > 0, 'Indica el estado o la revisión')
     .parse(req.body);
-  const msg = await Message.findByIdAndUpdate(req.params.id, changes, { new: true });
+  const msg = await Message.findOneAndUpdate({ _id: req.params.id, deletedAt: null }, changes, { new: true });
   if (!msg) return res.status(404).json({ error: 'Mensaje no encontrado' });
+  const detail = Object.entries(changes).map(([k, v]) => `${k === 'status' ? 'estado' : 'revisión'}: ${v}`).join(', ');
+  await audit(req, 'mensaje.actualizar', 'mensaje', msg._id, `Cambió ${detail}`);
   res.json(msg);
 });
 
+// Eliminar manda el mensaje a la papelera; a los 30 días se borra de verdad (ver maintenance.js).
 router.delete('/:id', adminOnly, async (req, res) => {
-  const msg = await Message.findByIdAndDelete(req.params.id);
-  await Promise.all((msg?.images ?? []).map(deleteFile));
+  const msg = await Message.findOneAndUpdate({ _id: req.params.id, deletedAt: null }, { deletedAt: new Date() });
+  if (msg) await audit(req, 'mensaje.papelera', 'mensaje', msg._id, 'Envió un mensaje a la papelera');
+  res.status(204).end();
+});
+
+router.post('/:id/restore', adminOnly, async (req, res) => {
+  const msg = await Message.findOneAndUpdate({ _id: req.params.id, deletedAt: { $ne: null } }, { $unset: { deletedAt: 1 } }, { new: true });
+  if (!msg) return res.status(404).json({ error: 'El mensaje no está en la papelera' });
+  await audit(req, 'mensaje.restaurar', 'mensaje', msg._id, 'Restauró un mensaje de la papelera');
+  res.json(msg);
+});
+
+// Borrado definitivo: solo desde la papelera.
+router.delete('/:id/permanent', adminOnly, async (req, res) => {
+  const msg = await Message.findOneAndDelete({ _id: req.params.id, deletedAt: { $ne: null } });
+  if (!msg) return res.status(404).json({ error: 'El mensaje no está en la papelera' });
+  await Promise.all(msg.images.map(deleteFile));
+  await audit(req, 'mensaje.eliminar', 'mensaje', msg._id, 'Eliminó definitivamente un mensaje');
   res.status(204).end();
 });
 

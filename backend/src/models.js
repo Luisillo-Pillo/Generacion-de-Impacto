@@ -8,6 +8,8 @@ const userSchema = new Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['admin', 'user'], default: 'user' },
+    // Se suma al cambiar la contraseña o al cerrar sesión en todos los dispositivos: los tokens con otra versión dejan de valer.
+    tokenVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -32,6 +34,7 @@ const messageSchema = new Schema(
     body: { type: String, required: true, trim: true, maxlength: 4000 },
     status: { type: String, enum: MESSAGE_STATUS, default: 'nuevo' },
     review: { type: String, enum: MESSAGE_REVIEW, default: 'pendiente' },
+    deletedAt: { type: Date }, // papelera: se marca al eliminar y se borra de verdad a los 30 días
   },
   { timestamps: true }
 );
@@ -80,12 +83,24 @@ const settingSchema = new Schema({
   value: Schema.Types.Mixed,
 });
 
+// Bitácora de acciones del panel. Solo ids y tipo de acción: nunca el contenido de los mensajes. Se conserva un año.
+const auditSchema = new Schema({
+  at: { type: Date, default: Date.now, index: { expireAfterSeconds: 365 * 24 * 60 * 60 } },
+  userId: { type: Schema.Types.ObjectId },
+  userName: { type: String, maxlength: 80 },
+  action: { type: String, required: true, maxlength: 60 },
+  entity: { type: String, maxlength: 40 },
+  entityId: { type: String, maxlength: 60 },
+  summary: { type: String, maxlength: 300 },
+});
+
 export const User = model('User', userSchema);
 export const Message = model('Message', messageSchema);
 export const News = model('News', newsSchema);
 export const Proposal = model('Proposal', proposalSchema);
 export const Member = model('Member', memberSchema);
 export const Setting = model('Setting', settingSchema);
+export const AuditLog = model('AuditLog', auditSchema);
 
 export const DEFAULT_SETTINGS = {
   degrees: [

@@ -3,10 +3,10 @@
 // Uso interactivo:  npm run create-admin
 // Sin preguntas:    ADMIN_NAME="..." ADMIN_EMAIL="..." ADMIN_PASSWORD="..." npm run create-admin
 import readline from 'node:readline/promises';
-import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import { connectDb } from './db.js';
 import { User, Member } from './models.js';
+import { MIN_PASSWORD, hashPassword, isCommonPassword } from './passwords.js';
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -42,11 +42,12 @@ if (existing) {
   console.log(`Cuenta existente vinculada como integrante: ${existing.name} <${email}> (la contraseña no se modificó)`);
 } else {
   const name = (process.env.ADMIN_NAME ?? (await rl.question('Nombre completo: '))).trim();
-  const password = process.env.ADMIN_PASSWORD ?? (await askHidden('Contraseña (mín. 8 caracteres): '));
+  const password = process.env.ADMIN_PASSWORD ?? (await askHidden(`Contraseña (mín. ${MIN_PASSWORD} caracteres): `));
   rl.close();
   if (name.length < 2) fail('El nombre es muy corto.');
-  if (password.length < 8) fail('La contraseña debe tener al menos 8 caracteres.');
-  const user = await User.create({ name, email, passwordHash: await bcrypt.hash(password, 10), role: 'admin' });
+  if (password.length < MIN_PASSWORD) fail(`La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.`);
+  if (isCommonPassword(password)) fail('Esa contraseña es muy común. Elige otra más difícil de adivinar.');
+  const user = await User.create({ name, email, passwordHash: await hashPassword(password), role: 'admin' });
   await Member.create({ name, user: user._id, order: await Member.estimatedDocumentCount() });
   console.log(`Administrador creado: ${name} <${email}>`);
 }

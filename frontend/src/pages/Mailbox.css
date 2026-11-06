@@ -19,3 +19,5 @@
 @media (max-width: 820px) {
   .form-grid { grid-template-columns: 1fr; }
 }
+/* Campo trampa contra bots: fuera de la pantalla (no display:none, que algunos bots detectan) */
+.trap { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }

@@ -18,6 +18,7 @@ const empty = { type: 'propuesta', anonymous: true, name: '', degree: '', semest
 
 const MAX_IMAGES = 3;
 const MAX_MB = 5;
+const MAX_TOTAL_MB = 12; // todas las imágenes juntas
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export default function Mailbox() {
@@ -27,6 +28,13 @@ export default function Mailbox() {
   const [attachments, setAttachments] = useState([]); // [{ file, url }] con vista previa local
   const [attachError, setAttachError] = useState('');
   const picker = useRef(null);
+  // Protecciones contra bots, invisibles para quien escribe: un campo oculto que una persona no llena y el tiempo que
+  // tardó en llenar el formulario (nadie escribe un mensaje en menos de 3 segundos).
+  const [trap, setTrap] = useState('');
+  const shownAt = useRef(0);
+  useEffect(() => {
+    shownAt.current = Date.now();
+  }, []);
   const latest = useRef(attachments);
   useEffect(() => {
     latest.current = attachments;
@@ -45,11 +53,16 @@ export default function Mailbox() {
     e.target.value = ''; // permite volver a elegir el mismo archivo
     let problem = '';
     const accepted = [];
+    let total = attachments.reduce((sum, a) => sum + a.file.size, 0);
     for (const file of added) {
       if (!IMAGE_TYPES.includes(file.type)) problem = 'Solo se permiten imágenes JPG, PNG, WEBP o GIF.';
       else if (file.size > MAX_MB * 1024 * 1024) problem = `Cada imagen debe pesar máximo ${MAX_MB} MB.`;
       else if (attachments.length + accepted.length >= MAX_IMAGES) problem = `Puedes adjuntar hasta ${MAX_IMAGES} imágenes.`;
-      else accepted.push({ file, url: URL.createObjectURL(file) });
+      else if (total + file.size > MAX_TOTAL_MB * 1024 * 1024) problem = `Las imágenes juntas deben pesar máximo ${MAX_TOTAL_MB} MB.`;
+      else {
+        accepted.push({ file, url: URL.createObjectURL(file) });
+        total += file.size;
+      }
     }
     setAttachError(problem);
     if (accepted.length) setAttachments([...attachments, ...accepted]);
@@ -77,9 +90,13 @@ export default function Mailbox() {
       if (hasGroups) data.append('group', form.group);
     }
     attachments.forEach((a) => data.append('images', a.file));
+    data.append('website', trap);
+    data.append('fillMs', String(Date.now() - shownAt.current));
     try {
       await api('/messages', { method: 'POST', form: data });
       setForm(empty);
+      setTrap('');
+      shownAt.current = Date.now();
       clearFiles();
       setStatus({ sending: false, error: '', done: true });
     } catch (err) {
@@ -118,6 +135,11 @@ export default function Mailbox() {
         <p className="note" aria-hidden="true">¡Tu voz importa!</p>
 
         <form className="form" onSubmit={submit}>
+          <div className="trap" aria-hidden="true">
+            <label>No llenes este campo
+              <input name="website" tabIndex={-1} autoComplete="off" value={trap} onChange={(e) => setTrap(e.target.value)} />
+            </label>
+          </div>
           <fieldset>
             <legend>¿Qué quieres enviarnos?</legend>
             <div className="chips">
@@ -188,7 +210,7 @@ export default function Mailbox() {
 
           <div className="attach">
             <span className="attach-title"><IconClip /> Imágenes relacionadas (opcional)</span>
-            <p className="hint">Hasta {MAX_IMAGES} imágenes JPG, PNG, WEBP o GIF de máximo {MAX_MB} MB cada una.</p>
+            <p className="hint">Hasta {MAX_IMAGES} imágenes JPG, PNG, WEBP o GIF de máximo {MAX_MB} MB cada una ({MAX_TOTAL_MB} MB en total).</p>
             {form.anonymous && attachments.length > 0 && (
               <p className="hint">Revisa que tus imágenes no muestren datos que te identifiquen: tu mensaje es anónimo.</p>
             )}

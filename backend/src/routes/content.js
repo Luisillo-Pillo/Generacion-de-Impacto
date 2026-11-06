@@ -5,6 +5,7 @@ import { adminOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { loadSettings } from '../settings.js';
 import { objectId } from '../validators.js';
+import { audit } from '../audit.js';
 
 const router = Router();
 
@@ -56,6 +57,7 @@ router.post('/news', adminOnly, async (req, res) => {
     publishedAt: data.published ? new Date() : undefined,
     author: req.user.name,
   });
+  await audit(req, 'noticia.crear', 'noticia', item._id, `Creó la noticia «${item.title}»`);
   res.status(201).json(item);
 });
 
@@ -69,12 +71,16 @@ router.put('/news/:id', adminOnly, async (req, res) => {
   if (data.published && !item.published) item.publishedAt = new Date();
   Object.assign(item, { ...data, coverImage: newCover });
   await item.save();
+  await audit(req, 'noticia.editar', 'noticia', item._id, `Editó la noticia «${item.title}»`);
   res.json(item);
 });
 
 router.delete('/news/:id', adminOnly, async (req, res) => {
   const item = await News.findByIdAndDelete(req.params.id);
-  if (item) await deleteFile(item.coverImage);
+  if (item) {
+    await deleteFile(item.coverImage);
+    await audit(req, 'noticia.eliminar', 'noticia', item._id, `Eliminó la noticia «${item.title}»`);
+  }
   res.status(204).end();
 });
 
@@ -100,7 +106,9 @@ router.post('/proposals', adminOnly, async (req, res) => {
   if (await Proposal.exists({ number: data.number })) {
     return res.status(409).json({ error: `Ya existe la propuesta #${data.number}` });
   }
-  res.status(201).json(await Proposal.create({ ...data, image: data.image || undefined }));
+  const item = await Proposal.create({ ...data, image: data.image || undefined });
+  await audit(req, 'propuesta.crear', 'propuesta', item._id, `Creó la propuesta #${item.number}`);
+  res.status(201).json(item);
 });
 
 router.put('/proposals/:id', adminOnly, async (req, res) => {
@@ -114,12 +122,16 @@ router.put('/proposals/:id', adminOnly, async (req, res) => {
   if (item.image && String(item.image) !== String(newImage)) await deleteFile(item.image);
   Object.assign(item, { ...data, image: newImage });
   await item.save();
+  await audit(req, 'propuesta.editar', 'propuesta', item._id, `Editó la propuesta #${item.number}`);
   res.json(item);
 });
 
 router.delete('/proposals/:id', adminOnly, async (req, res) => {
   const item = await Proposal.findByIdAndDelete(req.params.id);
-  if (item) await deleteFile(item.image);
+  if (item) {
+    await deleteFile(item.image);
+    await audit(req, 'propuesta.eliminar', 'propuesta', item._id, `Eliminó la propuesta #${item.number}`);
+  }
   res.status(204).end();
 });
 
@@ -154,6 +166,7 @@ router.put('/settings/:key', adminOnly, async (req, res) => {
   if (!schema) return res.status(404).json({ error: 'Ajuste desconocido' });
   const value = schema.parse(req.body?.value);
   await Setting.findOneAndUpdate({ key: req.params.key }, { value }, { upsert: true });
+  await audit(req, 'ajustes.editar', 'ajuste', req.params.key, `Cambió el ajuste «${req.params.key}»`);
   res.json({ key: req.params.key, value });
 });
 

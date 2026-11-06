@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
-import { api, fileUrl } from '../api.js';
+import { api, fileUrl, setToken } from '../api.js';
+import { useDialog } from '../components/Dialog.jsx';
 import { initials } from '../utils.js';
 import PasswordInput from '../components/PasswordInput.jsx';
 import Spinner from '../components/Spinner.jsx';
@@ -11,6 +12,7 @@ const blank = { currentPassword: '', newPassword: '', confirm: '' };
 
 export default function Profile() {
   const { user, member, loading } = useAuth();
+  const { confirm, notify } = useDialog();
   const [form, setForm] = useState(blank);
   const [status, setStatus] = useState({ busy: false, error: '', ok: false });
 
@@ -26,11 +28,28 @@ export default function Profile() {
     }
     setStatus({ busy: true, error: '', ok: false });
     try {
-      await api('/auth/password', { method: 'PATCH', body: { currentPassword: form.currentPassword, newPassword: form.newPassword } });
+      const d = await api('/auth/password', { method: 'PATCH', body: { currentPassword: form.currentPassword, newPassword: form.newPassword } });
+      setToken(d.token); // cambiar la contraseña cierra las demás sesiones; esta sigue con un token nuevo
       setForm(blank);
       setStatus({ busy: false, error: '', ok: true });
     } catch (err) {
       setStatus({ busy: false, error: err.message, ok: false });
+    }
+  }
+
+  async function logoutEverywhere() {
+    const ok = await confirm({
+      title: '¿Cerrar sesión en todos los dispositivos?',
+      message: 'Se cerrará tu sesión en tus demás computadoras y teléfonos. En este dispositivo seguirás con sesión.',
+      confirmLabel: 'Cerrar en los demás',
+    });
+    if (!ok) return;
+    try {
+      const d = await api('/auth/logout-all', { method: 'POST' });
+      setToken(d.token);
+      await notify({ title: 'Listo', message: 'Se cerró la sesión en tus demás dispositivos.' });
+    } catch (err) {
+      await notify({ title: 'No se pudo cerrar las sesiones', message: err.message });
     }
   }
 
@@ -55,16 +74,22 @@ export default function Profile() {
           <label>Contraseña actual
             <PasswordInput required value={form.currentPassword} onChange={set('currentPassword')} autoComplete="current-password" />
           </label>
-          <label>Contraseña nueva
-            <PasswordInput required minLength={8} value={form.newPassword} onChange={set('newPassword')} autoComplete="new-password" />
+          <label>Contraseña nueva (mínimo 10 caracteres)
+            <PasswordInput required minLength={10} value={form.newPassword} onChange={set('newPassword')} autoComplete="new-password" />
           </label>
           <label>Confirmar contraseña nueva
-            <PasswordInput required minLength={8} value={form.confirm} onChange={set('confirm')} autoComplete="new-password" />
+            <PasswordInput required minLength={10} value={form.confirm} onChange={set('confirm')} autoComplete="new-password" />
           </label>
           {status.error && <p className="error" role="alert">{status.error}</p>}
           {status.ok && <p role="status"><strong>Contraseña actualizada ✔</strong></p>}
           <button className="btn btn-red" disabled={status.busy}>{status.busy ? <><Spinner inline /> Guardando…</> : 'Guardar contraseña'}</button>
         </form>
+
+        <h2 className="title small">Mis <mark>sesiones</mark></h2>
+        <div className="card">
+          <p>Tu sesión se renueva sola mientras usas el panel y termina tras 12 horas sin actividad. Si usaste tu cuenta en una computadora ajena, ciérrala en todos lados.</p>
+          <button type="button" className="btn btn-dark" onClick={logoutEverywhere}>Cerrar sesión en todos los dispositivos</button>
+        </div>
       </div>
     </section>
   );

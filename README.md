@@ -16,7 +16,8 @@ Generacion-de-Impacto/
 │   └── src/             App, auth, api, hooks, utils, pages/ (admin/: una página por sección del panel), components/; cada .jsx con estilos lleva su .css (mismo nombre) y `index.css` guarda solo lo global
 ├── backend/             Express 5 + Mongoose + Zod 4 → Render
 │   ├── src/             app (Express sin arrancar), index (conecta y escucha), db (GridFS), uploads (multer + firma de imágenes),
-│   │                    settings, auth, models, validators, seed, create-admin, routes/ (auth, messages, members, files, content)
+│   │                    settings, auth, passwords (política), rateLimit (limitador en MongoDB), audit (bitácora), maintenance (papelera),
+│   │                    models, validators, seed, create-admin, routes/ (auth, messages, members, files, content, audit)
 │   ├── test/            pruebas de la API (node:test + MongoDB en memoria)
 │   └── seed/            reto-impacto.jpg (portada de la primera noticia)
 ├── .github/             CI (workflows/ci.yml) y Dependabot
@@ -46,8 +47,8 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 | Comando | Qué hace |
 |---|---|
 | `npm run lint` | ESLint sobre todo el proyecto (variables sin uso, reglas de React y hooks). |
-| `npm test` | Pruebas de la API (`backend/test`, `node:test`): permisos, validaciones, imágenes, anonimato, equipo, ajustes, CORS y cabeceras, freno del login. Cada archivo levanta su **propia MongoDB en memoria**, así que nunca toca Atlas. |
-| `npm run e2e` | Pruebas de humo en el navegador (`frontend/e2e`, Playwright con el Chrome instalado): inicio, enviar un mensaje anónimo, iniciar y cerrar sesión, crear una noticia, página 404. La API se simula, no necesitan backend. |
+| `npm test` | Pruebas de la API (`backend/test`, `node:test`): permisos, validaciones, imágenes, anonimato, equipo, ajustes, CORS y cabeceras, freno del login, política de contraseñas, sesiones, protecciones del buzón, papelera y bitácora. Cada archivo levanta su **propia MongoDB en memoria**, así que nunca toca Atlas. |
+| `npm run e2e` | Pruebas de humo en el navegador (`frontend/e2e`, Playwright con el Chrome instalado): inicio, enviar un mensaje anónimo (y el campo trampa), iniciar y cerrar sesión, sesión vencida, crear una noticia, papelera, pestaña Actividad, página 404. La API se simula, no necesitan backend. |
 | `npm run check` | `lint` + `build` + `test`. Córrelo antes de subir cambios. |
 
 - Las pruebas **se niegan a correr** si la base no es local y llamada `gi_test`. Si no puedes descargar el binario de MongoDB que usa `mongodb-memory-server`, define `TEST_MONGODB_URI` con una base llamada exactamente `gi_test` (nunca la real) y ejecuta `node --test --test-concurrency=1` dentro de `backend/`: se vacía al empezar y se elimina al terminar.
@@ -63,6 +64,7 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 | `JWT_SECRET` | backend | Cadena aleatoria larga para firmar sesiones. **Secreto.** |
 | `CORS_ORIGIN` | backend | Orígenes permitidos, separados por coma (URL de Vercel). |
 | `CORS_ORIGIN_PATTERN` | backend | **Solo staging.** Acepta las previews de Vercel, p. ej. `https://generacion-impacto-*.vercel.app` (el `*` es un tramo de letras, números y guiones; no admite expresiones regulares). No se define en producción. |
+| `MESSAGE_RATE_LIMIT` | backend | Opcional. Tope de envíos por hora de **todo el buzón** (no por IP); por defecto 100. Es un freno de emergencia ante una inundación. |
 | `TEST_MONGODB_URI` | pruebas | Opcional: base `gi_test` para correr las pruebas sin MongoDB en memoria (ver sección 2). |
 | `PORT` | backend | Puerto (Render lo define solo). |
 | `VITE_API_URL` | frontend | URL pública del backend sin barra final (vacía en desarrollo). |
@@ -71,11 +73,13 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 
 ## 4. Datos (MongoDB)
 
-Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, más `files.files` / `files.chunks` (GridFS). Detalle de campos en `backend/src/models.js`.
+Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, `auditlogs` (bitácora), `ratelimits` (intentos de login y envíos del buzón, con índice TTL), más `files.files` / `files.chunks` (GridFS). Detalle de campos en `backend/src/models.js`.
 
 - Cada mensaje tiene un **tipo** (`queja`, `propuesta`, `pregunta`, `problema`), un **estado de bandeja** (`status`: `nuevo`, `leido`, `archivado`) y un **estado de revisión** (`review`: `pendiente` por defecto, `en_proceso`, `completado`, `rechazado`). Son independientes: un mensaje puede estar leído y a la vez en proceso. Los mensajes anteriores a `review` se tratan como pendientes.
 - Un mensaje **anónimo** nunca almacena nombre, teléfono, licenciatura, semestre ni grupo. Un mensaje **con datos** guarda además el **teléfono** (10 dígitos sin espacios; se captura y muestra como `000 000 0000`). El **grupo** solo se pide y guarda si la licenciatura elegida tiene varios grupos (ver Ajustes más abajo); en las demás se descarta.
 - Un mensaje puede llevar hasta **3 imágenes** (`images`, ids de GridFS; JPG/PNG/WEBP/GIF, 5 MB cada una, sin SVG), anónimo o no. Se validan por tipo y por la **firma real del archivo**; se envían en la misma petición multipart que el mensaje (si algo falla no quedan archivos huérfanos) y se borran de GridFS al eliminar el mensaje. Las imágenes pueden contener metadatos (p. ej. ubicación del EXIF) que no se eliminan: el formulario avisa a quien escribe de forma anónima que revise lo que adjunta.
+- **Papelera**: eliminar un mensaje solo le pone `deletedAt`; desaparece del listado y queda en Panel → Mensajes → Papelera, donde se puede **restaurar** o **eliminar definitivamente** (con sus imágenes). A los 30 días se borra solo (`backend/src/maintenance.js`, al arrancar la API y cada 6 horas).
+- **Bitácora** (`auditlogs`, Panel → Actividad): quién creó, editó o eliminó noticias, propuestas, integrantes y ajustes; cambios de estado y papelera de mensajes; cambios de contraseña, cierre de sesión en todos los dispositivos y bloqueos de cuenta por intentos fallidos. **Nunca guarda el contenido de los mensajes** (ni asunto ni texto), solo ids y el tipo de acción; tampoco contraseñas ni IPs. Se conserva un año (índice TTL).
 - Cada **integrante** (`members`) apunta a su cuenta (`users`) mediante `member.user`. La API pública de integrantes nunca devuelve ese campo ni el correo.
 - Las listas de licenciaturas, semestres y grupos del formulario viven en `settings` y se editan desde el panel. `groupDegrees` es la lista de **licenciaturas con varios grupos**; no se edita desde el panel (decisión del cliente: esa configuración no cambia) y se deduce: toda licenciatura cuyo nombre contenga “telesecundaria”. El valor se calcula en `backend/src/settings.js` y se usa tanto en `GET /api/settings` como al validar un mensaje.
 
@@ -84,19 +88,22 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, m�
 **No hay registro público.** Solo las personas dadas de alta como integrantes de la planilla tienen cuenta:
 
 - **Alta de integrante** (Panel → Equipo → Nuevo integrante): se capturan nombre, cargo, licenciatura, orden, foto, **correo y contraseña**. La API crea el usuario y la ficha juntos, y **todo integrante es administrador**. Si falla la creación de la ficha, se revierte la cuenta.
-- **Edición**: se puede cambiar el correo y restablecer la contraseña (campo vacío = no cambiar). El nombre se sincroniza con la cuenta.
+- **Contraseñas**: mínimo **10 caracteres** y no pueden ser de las más comunes (`1234567890`, `password123`, el nombre del sitio, un solo carácter repetido…) en el alta, el cambio de contraseña y `npm run create-admin`. Se guardan con bcrypt costo 12; las cuentas con contraseñas anteriores (costo 10, incluso de 8 caracteres) siguen entrando y su hash se **actualiza solo** al iniciar sesión.
+- **Edición**: se puede cambiar el correo y restablecer la contraseña (campo vacío = no cambiar; al restablecerla se cierran las sesiones de esa persona). El nombre se sincroniza con la cuenta.
 - **Baja**: eliminar al integrante elimina también su cuenta (su sesión deja de funcionar al instante). Nadie puede eliminar su propia ficha, así que siempre queda al menos un administrador.
 - **Primer administrador**: `npm run create-admin` (interactivo; o con `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`). Crea cuenta + ficha. Si el correo ya tiene cuenta sin ficha de integrante, solo crea la ficha y la vincula sin tocar la contraseña. Para producción, ejecútalo en tu equipo con `MONGODB_URI` de Atlas.
-- **Sesión**: correo + contraseña (bcrypt), JWT de 7 días. El rol se consulta en la BD en cada petición.
-- **Perfil** (`/perfil`): datos del usuario y cambio de contraseña (pide la actual). Las sesiones ya emitidas siguen válidas hasta expirar tras cambiar la contraseña.
+- **Sesión**: correo + contraseña (bcrypt), JWT de **12 horas** que se **renueva solo** mientras se usa el panel (cuando ya pasó la mitad de su vida, la API manda uno nuevo en la cabecera `X-Renewed-Token`). El token lleva la **versión de sesión** de la cuenta (`users.tokenVersion`): cambiar la contraseña o usar «Cerrar sesión en todos los dispositivos» la sube y deja de valer cualquier otro token. Si la API rechaza la sesión (401), el sitio la cierra y manda a `/acceso` con un aviso. El rol se consulta en la BD en cada petición.
+- **Freno de intentos**: 5 intentos fallidos **por correo** en 15 minutos bloquean esa cuenta (429 con `Retry-After`, incluso con la contraseña correcta). **No se limita por IP**: la comunidad estudiantil comparte red (misma IP) y un límite por IP bloquearía a todos por culpa de uno. El conteo vive en MongoDB (sobrevive a reinicios), con la llave en hash.
+- **Perfil** (`/perfil`): datos del usuario, cambio de contraseña (pide la actual; cierra las demás sesiones y deja esta con un token nuevo) y «Cerrar sesión en todos los dispositivos».
 - El header muestra, con sesión iniciada, un menú con **Ver perfil** y **Cerrar sesión** (con confirmación). Los campos de contraseña tienen botón de “ojo” para mostrarla.
 
 ## 6. API
 
 Resumen (detalle de validaciones en `backend/src/routes/`):
 
-- Auth: `POST /api/auth/login`, `GET /api/auth/me`, `PATCH /api/auth/password`.
-- Buzón: `POST /api/messages` (público; multipart con los campos y hasta 3 archivos `images`, o JSON sin imágenes); admin: `GET /api/messages?status=&type=&review=` (filtros opcionales y combinables), `PATCH /:id` (`{status?, review?}`, al menos uno) y `DELETE /:id`.
+- Auth: `POST /api/auth/login`, `GET /api/auth/me`, `PATCH /api/auth/password` y `POST /api/auth/logout-all` (ambos devuelven un `token` nuevo para el dispositivo actual).
+- Buzón: `POST /api/messages` (público; multipart con los campos y hasta 3 archivos `images`, o JSON sin imágenes); admin: `GET /api/messages?status=&type=&review=` (filtros opcionales y combinables), `GET ?trash=1` (papelera), `PATCH /:id` (`{status?, review?}`, al menos uno), `DELETE /:id` (a la papelera), `POST /:id/restore` y `DELETE /:id/permanent` (solo desde la papelera). El buzón descarta en silencio (respondiendo 201) los envíos con el campo trampa `website` lleno o enviados en menos de 3 s (`fillMs`), rechaza con 413 las imágenes que juntas pasen de 12 MB y responde 429 si todo el buzón superó `MESSAGE_RATE_LIMIT` envíos en una hora.
+- Bitácora: `GET /api/audit?page=` (admin; 50 por página, la más reciente primero).
 - Integrantes: `GET /api/members` (público, sin correo); `GET /api/members/all`, `POST`, `PUT /:id`, `DELETE /:id` (admin).
 - Archivos: `POST /api/files` (admin, JPG/PNG/WEBP/GIF ≤ 5 MB, sin SVG), `GET /api/files/:id`, `DELETE /api/files/:id` (admin).
 - Contenido: `/api/news`, `/api/proposals` (lectura pública; escritura admin; `/news/all` y `/proposals/all` incluyen no publicados), `GET /api/settings`, `PUT /api/settings/:key` (admin; claves `degrees`, `groups`, `semesters`, `groupDegrees`, `social`).
@@ -108,6 +115,12 @@ Resumen (detalle de validaciones en `backend/src/routes/`):
 2. **Render** → New → Blueprint con `render.yaml`. Define `MONGODB_URI` y `CORS_ORIGIN`. Plan gratuito: se duerme por inactividad (primera carga lenta).
 3. **Vercel** → importar repo, *Root Directory* `frontend`, variable `VITE_API_URL`.
 4. Ejecuta `npm run seed` y `npm run create-admin` una vez contra la base de producción (desde tu equipo, con el `MONGODB_URI` de Atlas). Luego inicia sesión en `/acceso` y da de alta al resto del equipo en Panel → Equipo.
+
+### Cabeceras de seguridad y CSP
+
+`frontend/vercel.json` agrega `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` y una **Content-Security-Policy en modo «solo reporte»** (`Content-Security-Policy-Report-Only`): el navegador avisa en la consola de lo que bloquearía, pero todavía no bloquea nada. La política permite lo propio (`'self'`), imágenes y conexiones a `https://*.onrender.com` (la API), estilos en línea (React los usa) y, **mientras las fuentes sigan en Google Fonts**, `fonts.googleapis.com` y `fonts.gstatic.com`.
+
+Para activarla: navega unos días por el sitio publicado (incluido el panel) con la consola abierta; si no aparecen avisos de «Content Security Policy», cambia en `vercel.json` la clave a `Content-Security-Policy`. Si algún día la API deja de estar en `onrender.com` (dominio propio), actualiza `img-src` y `connect-src`. Se comprobó en local con la política **activa** sobre el build: 12 páginas (públicas y del panel) sin una sola violación.
 
 ### Entorno de pruebas (staging)
 
@@ -132,10 +145,10 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 - Sin errores, sin código muerto detectado y `npm audit` en 0 vulnerabilidades (se actualizaron `zod` 3→4 y `react-router-dom` 6→7).
 - El rol `user` de `User.role` ya no se asigna a nadie (todas las cuentas son de integrantes y por tanto `admin`). Se conserva el campo y la comprobación de rol como defensa si se edita la BD a mano.
 - **Imágenes huérfanas**: si en el panel subes una imagen y cancelas sin guardar, el archivo queda en GridFS. Se limpian solo al reemplazar o eliminar el registro que las usa.
-- **Login con freno de fuerza bruta** (2026-10-29): tras 10 intentos fallidos desde una IP en 15 minutos, `/api/auth/login` responde 429. El conteo va en memoria (la API corre en una sola instancia) y se reinicia al reiniciar el servidor. Un correo inexistente tarda lo mismo que uno existente (hash de relleno), para no delatar qué cuentas existen.
-- **Buzón sin anti-spam** (decisión del cliente): `POST /api/messages` es público y acepta hasta 3 × 5 MB por petición, sin límite de frecuencia.
+- **Login con freno de fuerza bruta** (2026-10-29; reemplazado el 2026-11-06, ver sección 5): 5 intentos fallidos por correo en 15 minutos, guardados en MongoDB. Un correo inexistente tarda lo mismo que uno existente (hash de relleno), para no delatar qué cuentas existen.
+- **Buzón sin captcha** (decisión del cliente): `POST /api/messages` es público. Desde el 2026-11-06 lleva protecciones invisibles (campo trampa, tiempo mínimo de llenado, tope de 12 MB por envío y un freno de emergencia global); **no hay límite por IP** porque toda la comunidad comparte red.
 - **Imágenes de los mensajes**: `GET /api/files/:id` es público (el panel las muestra con un `<img>` normal). El id es largo y no se puede adivinar, pero quien tenga el enlace puede verla; no se les quitan los metadatos EXIF.
-- **Sesiones**: el token (JWT, 7 días) se guarda en `localStorage` y no se invalida al cambiar la contraseña; se invalida al eliminar al integrante.
+- **Sesiones**: el token (JWT, 12 horas con renovación) se guarda en `localStorage`; se invalida al cambiar la contraseña, al cerrar sesión en todos los dispositivos y al eliminar al integrante. Seguir en `localStorage` significa que un script malicioso en el sitio podría leerlo; la CSP (abajo) reduce ese riesgo. Pasar a una cookie `httpOnly` queda como mejora opcional (requiere dominio propio o un proxy).
 - Las páginas comparten un único `<title>` (“Generación de Impacto”).
 
 Segunda revisión (2026-10-29): ESLint sin avisos, `npm audit` en 0 vulnerabilidades, `vite build` correcto, búsqueda de CSS, exports y archivos públicos sin uso (sin código muerto), y 55 pruebas de API contra una base aparte (`gi_test`, eliminada al terminar) que cubren permisos, ids inválidos, redes/correo, imágenes (firma falsa, SVG, tamaño, cantidad), anonimato, grupo condicionado, equipo, CORS y el freno del login.
@@ -151,6 +164,15 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - Rotar la contraseña de Atlas: la cadena de conexión se compartió en el chat durante el desarrollo.
 
 ## 10. Registro de cambios
+
+### 2026-11-06 — Fase 1 de mejoras: seguridad rápida (0.8.0)
+- **Contraseñas (S9):** mínimo de 10 caracteres y lista de contraseñas comunes (alta de integrantes, cambio de contraseña y `create-admin`); bcrypt costo 12 y re-hash automático de las cuentas anteriores al iniciar sesión. Las contraseñas existentes siguen funcionando.
+- **Sesiones (S5, nivel A):** el token dura 12 horas y se renueva solo mientras se usa el panel; cambiar la contraseña, restablecerla desde Equipo o usar el nuevo botón «Cerrar sesión en todos los dispositivos» (Perfil) anula los demás tokens (`users.tokenVersion`); un 401 cierra la sesión en el sitio y avisa en `/acceso`. CSP en modo solo reporte en `vercel.json`.
+- **Sin límites por IP (decisión del cliente, 2026-11-06):** la comunidad estudiantil comparte una sola red/IP, así que un límite por IP bloquearía a todos por culpa de uno. Por eso el buzón **no** lleva el «10 envíos por hora por IP» del plan original, y el freno del login pasó de «10 fallos por IP» a **5 fallos por correo** (se retiró el límite por IP que existía desde el 2026-10-29).
+- **Buzón (S8):** protecciones invisibles para quien escribe: campo trampa `website`, tiempo mínimo de 3 s (`fillMs`), tope de 12 MB entre todas las imágenes de un envío y un freno de emergencia global (`MESSAGE_RATE_LIMIT`, 100 por hora en todo el buzón). El limitador es una colección de MongoDB con TTL (`ratelimits`), compartida con el login, y sobrevive a reinicios.
+- **Bitácora y papelera (S7):** nueva pestaña Actividad (quién hizo qué, sin contenido de mensajes ni contraseñas, un año) y papelera de mensajes con restauración y borrado definitivo; a los 30 días se vacía sola. Eliminar un mensaje ya no lo borra al instante.
+- **Pendiente de la fase:** F7a (tipografías propias en lugar de Google Fonts): no se pudo instalar `@fontsource/*` porque la red desde la que se trabajó interceptaba el certificado de npm. Al hacerlo, quitar los dos hosts de Google de la CSP.
+- Pruebas: 74 de API y 11 de humo en el navegador.
 
 ### 2026-11-05 — Fase 0 de mejoras: cimientos (0.7.0)
 - **Pruebas en el repo:** 42 pruebas de la API (`backend/test`, `node:test` + `mongodb-memory-server`) que cubren permisos, ids inválidos, imágenes (firma falsa, SVG, tamaño, cantidad), anonimato, grupo condicionado, equipo, ajustes, CORS, cabeceras y freno del login; y 7 pruebas de humo en el navegador (`frontend/e2e`, Playwright con la API simulada). Las pruebas se niegan a correr contra una base que no sea local y llamada `gi_test`.

@@ -12,3 +12,4 @@
 .msg-actions { margin-top: .8rem; }
 .inline-select { display: flex; flex-direction: row; align-items: center; gap: .5rem; font-weight: 600; font-size: .9rem; }
 .inline-select select { width: auto; padding-top: .35rem; padding-bottom: .35rem; }
+.trash-toggle { align-self: end; margin-left: auto; }

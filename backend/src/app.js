@@ -7,6 +7,7 @@ import fileRoutes from './routes/files.js';
 import messageRoutes from './routes/messages.js';
 import memberRoutes from './routes/members.js';
 import contentRoutes from './routes/content.js';
+import auditRoutes from './routes/audit.js';
 
 // La aplicación Express sin arrancar (ni base de datos ni puerto): así las pruebas pueden montarla por su cuenta.
 // `index.js` es quien conecta con MongoDB y la pone a escuchar.
@@ -32,7 +33,12 @@ const originAllowed = (origin) => origins.includes(origin) || !!originPattern?.t
 app.set('trust proxy', 1); // Render está detrás de un proxy
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 // Sin cabecera Origin (curl, health checks) no hay nada que restringir; con ella, solo los orígenes permitidos.
-app.use(cors({ origin: (origin, callback) => callback(null, !origin || originAllowed(origin)) }));
+app.use(
+  cors({
+    origin: (origin, callback) => callback(null, !origin || originAllowed(origin)),
+    exposedHeaders: ['X-Renewed-Token', 'Retry-After'], // el frontend necesita leerlas
+  })
+);
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -40,6 +46,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/members', memberRoutes);
+app.use('/api/audit', auditRoutes);
 app.use('/api', contentRoutes);
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));

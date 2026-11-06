@@ -1,0 +1,3 @@
+.activity-row { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem 1rem; flex-wrap: wrap; }
+.activity-when { white-space: nowrap; font-size: .85rem; }
+.activity-pager { justify-content: center; align-items: center; margin-top: 1rem; }

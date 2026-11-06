@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
 import { Member, User } from '../models.js';
 import { adminOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { objectId } from '../validators.js';
+import { hashPassword, passwordSchema } from '../passwords.js';
+import { audit } from '../audit.js';
 
 // Cada integrante de la planilla tiene una cuenta de acceso y, por serlo, es administrador.
 const router = Router();
@@ -20,10 +21,7 @@ const base = {
 const missing = (message) => ({ error: (issue) => (issue.input === undefined ? message : undefined) });
 
 const email = z.string(missing('Captura el correo del integrante')).trim().toLowerCase().email('Correo no válido');
-const password = z
-  .string(missing('Captura una contraseña para el integrante'))
-  .min(8, 'La contraseña debe tener al menos 8 caracteres')
-  .max(100);
+const password = passwordSchema('Captura una contraseña para el integrante');
 const blankToUndefined = (schema) => z.preprocess((v) => (v === '' ? undefined : v), schema.optional());
 
 const createSchema = z.object({ ...base, email, password });
@@ -49,11 +47,12 @@ router.post('/', adminOnly, async (req, res) => {
   const user = await User.create({
     name: data.name,
     email: mail,
-    passwordHash: await bcrypt.hash(pass, 10),
+    passwordHash: await hashPassword(pass),
     role: 'admin',
   });
   try {
     const member = await Member.create({ ...data, photo: data.photo || undefined, user: user._id });
+    await audit(req, 'integrante.crear', 'integrante', member._id, `Dio de alta a ${data.name}`);
     res.status(201).json(toAdminJson(member, user));
   } catch (err) {
     await User.findByIdAndDelete(user._id); // no dejar una cuenta huérfana
@@ -73,10 +72,13 @@ router.put('/:id', adminOnly, async (req, res) => {
   if (user) {
     user.name = data.name;
     if (mail) user.email = mail;
-    if (pass) user.passwordHash = await bcrypt.hash(pass, 10);
+    if (pass) {
+      user.passwordHash = await hashPassword(pass);
+      user.tokenVersion = (user.tokenVersion ?? 0) + 1; // la persona tendrá que entrar de nuevo con la contraseña nueva
+    }
   } else {
     if (!mail || !pass) return res.status(400).json({ error: 'Captura correo y contraseña para darle acceso' });
-    user = new User({ name: data.name, email: mail, passwordHash: await bcrypt.hash(pass, 10) });
+    user = new User({ name: data.name, email: mail, passwordHash: await hashPassword(pass) });
   }
   user.role = 'admin';
   await user.save();
@@ -85,6 +87,7 @@ router.put('/:id', adminOnly, async (req, res) => {
   if (member.photo && String(member.photo) !== String(newPhoto)) await deleteFile(member.photo);
   Object.assign(member, { ...data, photo: newPhoto, user: user._id });
   await member.save();
+  await audit(req, 'integrante.editar', 'integrante', member._id, `Editó a ${data.name}${pass ? ' (cambió su contraseña)' : ''}`);
   res.json(toAdminJson(member, user));
 });
 
@@ -101,6 +104,7 @@ router.delete('/:id', adminOnly, async (req, res) => {
   }
   await member.deleteOne();
   await deleteFile(member.photo);
+  await audit(req, 'integrante.eliminar', 'integrante', member._id, `Eliminó a ${member.name} y su cuenta`);
   res.status(204).end();
 });
 

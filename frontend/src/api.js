@@ -18,6 +18,9 @@ export const setToken = (t) => {
   }
 };
 
+// Se emite cuando el servidor rechaza la sesión (token vencido, contraseña cambiada o sesión cerrada en otro dispositivo).
+export const SESSION_EXPIRED = 'gi:session-expired';
+
 export async function api(path, { method = 'GET', body, form } = {}) {
   const headers = {};
   const token = getToken();
@@ -33,6 +36,15 @@ export async function api(path, { method = 'GET', body, form } = {}) {
     res = await fetch(`${BASE}/api${path}`, { method, headers, body: payload });
   } catch {
     throw new Error('No se pudo conectar con el servidor. Inténtalo de nuevo.');
+  }
+  // El servidor renueva el token mientras se usa el panel y lo manda en una cabecera
+  const renewed = res.headers.get('X-Renewed-Token');
+  if (renewed && getToken() === token) setToken(renewed);
+  // Un 401 con sesión iniciada (y que no sea el propio intento de login) significa que la sesión ya no vale. Solo si el
+  // token sigue siendo el mismo con el que se hizo la petición: otra petición pudo haberlo cambiado entre tanto.
+  if (res.status === 401 && token && path !== '/auth/login' && getToken() === token) {
+    setToken(null);
+    window.dispatchEvent(new Event(SESSION_EXPIRED));
   }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));

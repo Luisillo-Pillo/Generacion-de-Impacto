@@ -15,8 +15,8 @@ export default function AdminTeam() {
           {text('Licenciatura', m.degree, set('degree'), { maxLength: 120 })}
           {text('Orden', m.order, (v) => set('order')(Number(v)), { type: 'number' })}
           {text('Correo de acceso', m.email, set('email'), { type: 'email', required: true, autoComplete: 'off' })}
-          <label>{m._id ? 'Nueva contraseña (déjala vacía para no cambiarla)' : 'Contraseña (mínimo 8 caracteres)'}
-            <PasswordInput required={!m._id} minLength={8} value={m.password ?? ''} onChange={(e) => set('password')(e.target.value)} autoComplete="new-password" />
+          <label>{m._id ? 'Nueva contraseña (déjala vacía para no cambiarla)' : 'Contraseña (mínimo 10 caracteres)'}
+            <PasswordInput required={!m._id} minLength={10} value={m.password ?? ''} onChange={(e) => set('password')(e.target.value)} autoComplete="new-password" />
           </label>
           <ImageField label="Foto" value={m.photo} onChange={set('photo')} />
         </>
