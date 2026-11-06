@@ -17,7 +17,7 @@ Cada vez que hagas una **actualización importante** (nueva funcionalidad, cambi
 - No hay registro público. Las cuentas nacen al dar de alta a un integrante de la planilla (correo + contraseña obligatorios) y todo integrante es administrador; el primer admin se crea con `npm run create-admin`. Nadie puede eliminar su propia ficha, así que siempre queda un administrador.
 - Mensajes anónimos del buzón: nunca guardar datos personales (la API descarta nombre, teléfono, licenciatura, semestre y grupo). Las imágenes adjuntas se validan por tipo y firma real, máximo 3 de 5 MB.
 - El aviso por correo de mensajes nuevos está **aplazado por decisión del cliente**: no incluirlo hasta que lo pida (ver “Pendientes” en `README.md`).
-- Las pruebas se hacen contra una base aparte (p. ej. `gi_test`), confirmando el URI por código antes de ejecutar, y se elimina al terminar. Nunca crear usuarios ni mensajes de prueba en la base real.
+- Las pruebas se hacen contra una base aparte, nunca la real: `npm test` usa una MongoDB en memoria y su ayudante (`backend/test/helpers.js`) se niega a correr si la base no es local y llamada `gi_test` (alternativa: `TEST_MONGODB_URI` con una base `gi_test`, que se elimina al terminar). Nunca crear usuarios ni mensajes de prueba en la base real. Toda funcionalidad o corrección de la API lleva su prueba en `backend/test`.
 - Al detener servidores de desarrollo, cerrar el árbol completo: `node --watch` revive el proceso hijo.
 - Las imágenes se guardan en MongoDB (GridFS) y se sirven desde `/api/files/:id`. No se aceptan SVG.
 - CSS: un archivo por componente. Cada `.jsx` con estilos importa su `.css` del mismo nombre (junto a él); `frontend/src/index.css` solo lleva lo global/compartido y se importa primero en `main.jsx`. No volver a centralizar todo en una sola hoja.
@@ -25,4 +25,4 @@ Cada vez que hagas una **actualización importante** (nueva funcionalidad, cambi
 
 ## Comandos
 
-- `npm install` (raíz) · `npm run dev` (backend en :4000 y frontend en :5173) · `npm run build` · `npm run seed` · `npm run create-admin`.
+- `npm install` (raíz) · `npm run dev` (backend en :4000 y frontend en :5173) · `npm run build` · `npm run seed` · `npm run create-admin` · `npm run lint` · `npm test` (API) · `npm run e2e` (humo en el navegador) · `npm run check` (lint + build + test, antes de subir cambios).

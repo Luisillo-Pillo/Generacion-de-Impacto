@@ -147,3 +147,11 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Programa de trabajo temporal (se borra al terminar las mejoras)
+docs/programa-de-trabajo.md
+
+# Binario de MongoDB descargado por las pruebas (CI) y resultados de Playwright
+.mongodb-binaries/
+frontend/playwright-report/
+frontend/test-results/

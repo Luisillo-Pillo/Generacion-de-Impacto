@@ -1,0 +1,19 @@
+# Dependabot abre solo un PR por semana con las actualizaciones menores y de parche agrupadas, y uno aparte por cada
+# actualización mayor (esas pueden romper cosas y conviene revisarlas con calma). Las alertas de seguridad llegan
+# aparte, sin esperar al lunes.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      menores-y-parches:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

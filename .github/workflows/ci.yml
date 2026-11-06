@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Lint, build, pruebas y auditoría
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      # Las pruebas del backend levantan una MongoDB en memoria: se fija la versión y se guarda el binario en caché
+      MONGOMS_VERSION: '7.0.14'
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - uses: actions/cache@v4
+        with:
+          path: .mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-7.0.14
+      - run: npm test
+      # Solo dependencias de producción y severidad alta o crítica: lo demás se atiende con Dependabot
+      - run: npm audit --omit=dev --audit-level=high
+
+  humo:
+    name: Pruebas de humo del sitio
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Usa el Google Chrome que ya trae el ejecutor; no se descargan navegadores
+      - run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-trazas
+          path: frontend/test-results
+          if-no-files-found: ignore
+
+  secretos:
+    name: Búsqueda de secretos
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # historial completo: también revisa commits anteriores
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

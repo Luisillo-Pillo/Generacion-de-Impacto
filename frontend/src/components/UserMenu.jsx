@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import { fileUrl } from '../api.js';
@@ -34,8 +34,12 @@ export default function UserMenu() {
       confirmLabel: 'Cerrar sesión',
     });
     if (!ok) return;
-    logout();
-    navigate('/');
+    // Ambas actualizaciones van juntas: React Router navega en una transición y, si la sesión se cerrara antes,
+    // el panel redirigiría a /acceso y esa redirección ganaría.
+    startTransition(() => {
+      navigate('/');
+      logout();
+    });
   }
 
   return (

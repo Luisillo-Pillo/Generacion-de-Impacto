@@ -18,3 +18,26 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         sync: false # URL(s) de Vercel separadas por coma, ej. https://generacion-impacto.vercel.app
+
+  # Entorno de pruebas (staging): misma API pero con su propia base de datos (`gi_staging`) y su propio usuario de Atlas,
+  # para probar cambios reales sin tocar los datos de producción. Se enciende solo cuando se necesita: Render gratuito
+  # da 750 horas al mes en total y dos servicios encendidos todo el mes las exceden.
+  - type: web
+    name: generacion-impacto-api-staging
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: MONGODB_URI
+        sync: false # base `gi_staging` con un usuario de Atlas distinto al de producción
+      - key: JWT_SECRET
+        generateValue: true # distinto al de producción: una sesión de staging no sirve en producción
+      - key: CORS_ORIGIN
+        sync: false # URL fija del frontend de staging, si la hay
+      - key: CORS_ORIGIN_PATTERN
+        value: https://generacion-impacto-*.vercel.app # previews de Vercel (ajustar al nombre real del proyecto)

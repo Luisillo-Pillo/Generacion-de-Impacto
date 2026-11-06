@@ -12,12 +12,16 @@ Para regenerar el proyecto desde cero con una IA, ver [`docs/Prompt Inicial.md`]
 Generacion-de-Impacto/
 ├── frontend/            React 18 + Vite + React Router 7 → Vercel
 │   ├── public/brand/    logo-planilla.svg, logo-ensfa.png   (favicon.png = emblema de la planilla)
+│   ├── e2e/             pruebas de humo con Playwright (API simulada)
 │   └── src/             App, auth, api, hooks, utils, pages/ (admin/: una página por sección del panel), components/; cada .jsx con estilos lleva su .css (mismo nombre) y `index.css` guarda solo lo global
 ├── backend/             Express 5 + Mongoose + Zod 4 → Render
-│   ├── src/             index, db (GridFS), uploads (multer + firma de imágenes), settings, auth, models, validators,
-│   │                    seed, create-admin, routes/ (auth, messages, members, files, content)
+│   ├── src/             app (Express sin arrancar), index (conecta y escucha), db (GridFS), uploads (multer + firma de imágenes),
+│   │                    settings, auth, models, validators, seed, create-admin, routes/ (auth, messages, members, files, content)
+│   ├── test/            pruebas de la API (node:test + MongoDB en memoria)
 │   └── seed/            reto-impacto.jpg (portada de la primera noticia)
+├── .github/             CI (workflows/ci.yml) y Dependabot
 ├── docs/                Prompt Inicial y referencias visuales
+├── eslint.config.mjs    reglas de lint (frontend, backend y pruebas)
 ├── README.md            esta documentación
 ├── render.yaml          Blueprint de Render (rootDir: backend)
 └── package.json         workspaces: frontend, backend
@@ -37,6 +41,18 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 
 `npm run build` genera `frontend/dist`. En desarrollo Vite redirige `/api` a `localhost:4000`.
 
+### Calidad: lint, pruebas y CI
+
+| Comando | Qué hace |
+|---|---|
+| `npm run lint` | ESLint sobre todo el proyecto (variables sin uso, reglas de React y hooks). |
+| `npm test` | Pruebas de la API (`backend/test`, `node:test`): permisos, validaciones, imágenes, anonimato, equipo, ajustes, CORS y cabeceras, freno del login. Cada archivo levanta su **propia MongoDB en memoria**, así que nunca toca Atlas. |
+| `npm run e2e` | Pruebas de humo en el navegador (`frontend/e2e`, Playwright con el Chrome instalado): inicio, enviar un mensaje anónimo, iniciar y cerrar sesión, crear una noticia, página 404. La API se simula, no necesitan backend. |
+| `npm run check` | `lint` + `build` + `test`. Córrelo antes de subir cambios. |
+
+- Las pruebas **se niegan a correr** si la base no es local y llamada `gi_test`. Si no puedes descargar el binario de MongoDB que usa `mongodb-memory-server`, define `TEST_MONGODB_URI` con una base llamada exactamente `gi_test` (nunca la real) y ejecuta `node --test --test-concurrency=1` dentro de `backend/`: se vacía al empezar y se elimina al terminar.
+- **CI** (`.github/workflows/ci.yml`, en cada push a `main` y en cada PR): `lint` + `build` + `test` + `npm audit --omit=dev --audit-level=high`; las pruebas de humo; y una búsqueda de secretos con gitleaks sobre todo el historial. **Dependabot** (`.github/dependabot.yml`) abre cada lunes un PR con las actualizaciones menores agrupadas (y uno por cada actualización mayor).
+
 > `npm run dev` usa `node --watch`: si cierras solo el proceso hijo del servidor, el vigilante lo reinicia. Cierra la terminal (o el árbol completo de procesos) para detenerlo.
 
 ## 3. Variables de entorno
@@ -46,6 +62,8 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 | `MONGODB_URI` | backend | Cadena de Atlas con la base `generacion_impacto`. **Secreto.** |
 | `JWT_SECRET` | backend | Cadena aleatoria larga para firmar sesiones. **Secreto.** |
 | `CORS_ORIGIN` | backend | Orígenes permitidos, separados por coma (URL de Vercel). |
+| `CORS_ORIGIN_PATTERN` | backend | **Solo staging.** Acepta las previews de Vercel, p. ej. `https://generacion-impacto-*.vercel.app` (el `*` es un tramo de letras, números y guiones; no admite expresiones regulares). No se define en producción. |
+| `TEST_MONGODB_URI` | pruebas | Opcional: base `gi_test` para correr las pruebas sin MongoDB en memoria (ver sección 2). |
 | `PORT` | backend | Puerto (Render lo define solo). |
 | `VITE_API_URL` | frontend | URL pública del backend sin barra final (vacía en desarrollo). |
 
@@ -91,6 +109,22 @@ Resumen (detalle de validaciones en `backend/src/routes/`):
 3. **Vercel** → importar repo, *Root Directory* `frontend`, variable `VITE_API_URL`.
 4. Ejecuta `npm run seed` y `npm run create-admin` una vez contra la base de producción (desde tu equipo, con el `MONGODB_URI` de Atlas). Luego inicia sesión en `/acceso` y da de alta al resto del equipo en Panel → Equipo.
 
+### Entorno de pruebas (staging)
+
+Copia del sitio con su propia API y base de datos, para probar cambios reales (subidas de imágenes, migraciones) sin arriesgar producción.
+
+1. **Atlas:** crea un usuario `readWrite` **solo** sobre la base `gi_staging` (distinto al de producción).
+2. **Render:** el Blueprint ya define `generacion-impacto-api-staging`. Al sincronizarlo te pide `MONGODB_URI` (la base `gi_staging`) y, si quieres, `CORS_ORIGIN`; `CORS_ORIGIN_PATTERN` viene preconfigurado (ajústalo al nombre real del proyecto de Vercel) y `JWT_SECRET` se genera distinto al de producción.
+3. **Vercel:** define `VITE_API_URL` **solo en el entorno Preview** con la URL del staging; la variable de Production no cambia.
+4. Ejecuta `npm run seed` y `npm run create-admin` con el `MONGODB_URI` de `gi_staging`.
+5. Render gratuito da 750 horas al mes en total: deja dormir el staging (no lo incluyas en un ping de monitoreo).
+
+### Rotar la contraseña de Atlas
+
+1. En Atlas → *Database Access*: crea un usuario nuevo con rol `readWrite` solo sobre `generacion_impacto`, con contraseña larga y aleatoria; elimina el anterior.
+2. Actualiza `MONGODB_URI` en `backend/.env` y en las variables de Render (y reinicia el servicio).
+3. Comprueba `/api/health` y entra al panel. Revisa también *Network Access* y cierra lo que no se use.
+
 ## 8. Revisión de calidad (2026-10-26)
 
 Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS y exports sin uso, `npm audit`, 59 pruebas de API y 43 comprobaciones en navegador contra una base de pruebas aparte (eliminada después). Resultado y limitaciones conocidas:
@@ -117,6 +151,15 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - Rotar la contraseña de Atlas: la cadena de conexión se compartió en el chat durante el desarrollo.
 
 ## 10. Registro de cambios
+
+### 2026-11-05 — Fase 0 de mejoras: cimientos (0.7.0)
+- **Pruebas en el repo:** 42 pruebas de la API (`backend/test`, `node:test` + `mongodb-memory-server`) que cubren permisos, ids inválidos, imágenes (firma falsa, SVG, tamaño, cantidad), anonimato, grupo condicionado, equipo, ajustes, CORS, cabeceras y freno del login; y 7 pruebas de humo en el navegador (`frontend/e2e`, Playwright con la API simulada). Las pruebas se niegan a correr contra una base que no sea local y llamada `gi_test`.
+- **Lint en el repo:** `eslint.config.mjs` y `npm run lint`; `npm run check` = lint + build + test.
+- **CI** (GitHub Actions): lint, build, pruebas, `npm audit` (producción, severidad alta), pruebas de humo y búsqueda de secretos (gitleaks, historial completo). **Dependabot** semanal para npm y para las acciones.
+- **Backend:** la aplicación se separó en `app.js` (sin base de datos ni puerto) e `index.js` (arranque), para poder probarla. Un cuerpo JSON mayor al límite (100 kb) respondía 500; ahora 413. CORS acepta opcionalmente `CORS_ORIGIN_PATTERN` (solo staging).
+- **Staging:** segundo servicio en `render.yaml` con su propia base (`gi_staging`); pasos en la sección 7. También se documenta cómo rotar la contraseña de Atlas.
+- **Frontend:** la primera ejecución de las pruebas de humo encontró un error real: al cerrar sesión desde el panel, el usuario terminaba en la pantalla de acceso en vez del inicio (el panel redirigía a `/acceso` antes de que se aplicara la navegación). `UserMenu` ahora navega y cierra la sesión en la misma transición.
+- La comparación visual de 62 capturas no se llevó a CI (era una verificación puntual del cambio de CSS).
 
 ### 2026-11-04 — Un CSS por componente (0.6.0)
 - El antiguo `frontend/src/styles.css` (390 líneas) se dividió: cada `.jsx` con estilos propios importa su `.css` del mismo nombre (`Header.css`, `Footer.css`, `UserMenu.css`, `Dialog.css`, `PasswordInput.css`, `Spinner.css`, `MailboxIcons.css`, `NewsCard.css`, `ProposalCard.css`, `App.css`, `pages/Home.css`, `Mailbox.css`, `Team.css`, `NewsDetail.css`, `Profile.css`, `pages/admin/AdminLayout.css`, `AdminMessages.css` y `shared.css` para `shared.jsx`). `index.css` conserva solo lo global y compartido (variables, reinicio, tipografía, botones, formularios, tarjetas, secciones, `.grid`, `.tag`, `.avatar`, `.role`, miniaturas de adjuntos) y se importa primero en `main.jsx` para que las hojas de los componentes puedan sobrescribirlo. Las páginas sin estilos propios (Login, Noticias, Propuestas, AdminNoticias/Propuestas/Equipo/Ajustes) no tienen `.css`. Los puntos de quiebre responsive viven junto a los estilos que ajustan.
