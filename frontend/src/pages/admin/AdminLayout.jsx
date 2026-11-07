@@ -1,4 +1,6 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { api } from '../../api.js';
 import { useAuth } from '../../auth.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import './AdminLayout.css';
@@ -16,6 +18,12 @@ const TABS = [
 export default function AdminLayout() {
   const { user, loading } = useAuth();
   const { pathname } = useLocation();
+  const [stats, setStats] = useState(null); // contadores de mensajes (insignia de la pestaña y resumen de la lista)
+  const staff = ['admin', 'moderador'].includes(user?.role);
+  const refreshStats = useCallback(() => api('/messages/stats').then(setStats).catch(() => {}), []);
+  useEffect(() => {
+    if (staff) refreshStats();
+  }, [staff, refreshStats, pathname]);
 
   if (loading) return <section className="section paper page-min"><div className="container"><Spinner /></div></section>;
   if (!user) return <Navigate to="/acceso" replace />;
@@ -40,9 +48,14 @@ export default function AdminLayout() {
       <div className="container">
         <h1 className="title">Panel de <mark>administración</mark></h1>
         <nav className="tabs" aria-label="Secciones del panel">
-          {tabs.map(([path, label]) => <NavLink key={path} to={`/admin/${path}`}>{label}</NavLink>)}
+          {tabs.map(([path, label]) => (
+            <NavLink key={path} to={`/admin/${path}`}>
+              {label}
+              {path === 'mensajes' && stats?.nuevos > 0 && <span className="count" aria-label={`${stats.nuevos} nuevos`}>{stats.nuevos}</span>}
+            </NavLink>
+          ))}
         </nav>
-        <Outlet />
+        <Outlet context={{ stats, refreshStats }} />
       </div>
     </section>
   );

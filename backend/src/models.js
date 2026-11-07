@@ -35,6 +35,12 @@ const messageSchema = new Schema(
     body: { type: String, required: true, trim: true, maxlength: 4000 },
     status: { type: String, enum: MESSAGE_STATUS, default: 'nuevo' },
     review: { type: String, enum: MESSAGE_REVIEW, default: 'pendiente' },
+    // SHA-256 del código de seguimiento (el código en claro nunca se guarda; ver tracking.js). No sale en las consultas.
+    codeHash: { type: String, select: false, index: { unique: true, sparse: true } },
+    publicReply: { type: String, trim: true, maxlength: 1000 }, // respuesta del equipo que ve quien escribe con su código
+    publicReplyAt: { type: Date },
+    // Notas internas del equipo: nunca las ve quien escribió
+    notes: [{ authorName: { type: String, maxlength: 80 }, text: { type: String, required: true, maxlength: 1000 }, at: { type: Date, default: Date.now } }],
     consentAt: { type: Date }, // cuándo aceptó el aviso de privacidad (solo mensajes con datos personales)
     deletedAt: { type: Date }, // papelera: se marca al eliminar y se borra de verdad a los 30 días
   },
@@ -95,6 +101,8 @@ const auditSchema = new Schema({
   entityId: { type: String, maxlength: 60 },
   summary: { type: String, maxlength: 300 },
 });
+
+messageSchema.index({ deletedAt: 1, createdAt: -1 });
 
 export const User = model('User', userSchema);
 export const Message = model('Message', messageSchema);

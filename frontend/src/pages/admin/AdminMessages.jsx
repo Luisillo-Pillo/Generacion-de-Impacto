@@ -1,18 +1,15 @@
 import { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import { api } from '../../api.js';
 import { useAuth } from '../../auth.jsx';
-import { api, formatDate, formatTime } from '../../api.js';
-import AuthImage from '../../components/AuthImage.jsx';
 import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
-import { formatPhone } from '../../utils.js';
 import { useList } from './shared.jsx';
+import MessageCard from './MessageCard.jsx';
+import { TYPES, STATUS, REVIEW, TYPE_LABEL } from './messageLabels.js';
 import './AdminMessages.css';
 
-const TYPES = [['', 'Todos'], ['queja', 'Quejas'], ['propuesta', 'Propuestas'], ['pregunta', 'Preguntas'], ['problema', 'Problemas']];
-const STATUS = [['nuevo', 'Nuevos'], ['leido', 'Leídos'], ['archivado', 'Archivados'], ['', 'Todos']];
-const REVIEW = [['pendiente', 'Pendiente'], ['en_proceso', 'En proceso'], ['completado', 'Completado'], ['rechazado', 'Rechazado']];
-const REVIEW_LABEL = Object.fromEntries(REVIEW);
-const TYPE_LABEL = { queja: 'Queja', propuesta: 'Propuesta', pregunta: 'Pregunta', problema: 'Problema' };
+const PAGE_SIZE = 20;
 
 function Filter({ label, options, value, onChange }) {
   return (
@@ -27,109 +24,109 @@ function Filter({ label, options, value, onChange }) {
 export default function AdminMessages() {
   const { confirm, notify } = useDialog();
   const { user } = useAuth();
+  const { stats, refreshStats } = useOutletContext();
   const moderator = user?.role === 'moderador'; // no ve datos de contacto ni la papelera, y no elimina
   const [filters, setFilters] = useState({ type: '', status: 'nuevo', review: '' });
+  const [typed, setTyped] = useState(''); // lo que se escribe en el buscador
+  const [search, setSearch] = useState(''); // la búsqueda aplicada
+  const [page, setPage] = useState(1);
   const [trash, setTrash] = useState(false); // papelera: mensajes eliminados, se borran solos a los 30 días
-  const query = trash ? 'trash=1' : new URLSearchParams(Object.entries(filters).filter(([, v]) => v)).toString();
-  const { items, loading, error, reload, setError } = useList(`/messages${query ? `?${query}` : ''}`);
-  const setFilter = (key) => (value) => setFilters((f) => ({ ...f, [key]: value }));
+  const [exporting, setExporting] = useState(false);
 
-  const update = (id, changes) => api(`/messages/${id}`, { method: 'PATCH', body: changes }).then(reload).catch((e) => setError(e.message));
-  async function remove(id) {
-    const ok = await confirm({ title: '¿Enviar a la papelera?', message: 'Podrás restaurarlo durante 30 días; después se eliminará definitivamente.', confirmLabel: 'Enviar a la papelera' });
-    if (!ok) return;
+  const filterQuery = new URLSearchParams(Object.entries({ ...filters, q: search }).filter(([, v]) => v)).toString();
+  const query = trash ? `trash=1&page=${page}` : `${filterQuery}${filterQuery ? '&' : ''}page=${page}`;
+  const { items: data, loading, error, reload, setError } = useList(`/messages?${query}&limit=${PAGE_SIZE}`);
+  const items = data?.items;
+
+  const setFilter = (key) => (value) => {
+    setFilters((f) => ({ ...f, [key]: value }));
+    setPage(1);
+  };
+  const applySearch = (value) => {
+    setSearch(value);
+    setPage(1);
+  };
+  const refresh = () => {
+    reload();
+    refreshStats();
+  };
+  const fail = (title) => (err) => notify({ title, message: err.message });
+
+  const actions = {
+    // Devuelven true si salió bien (las tarjetas lo usan para confirmar o limpiar sus campos) y false si falló
+    update: (id, changes) => api(`/messages/${id}`, { method: 'PATCH', body: changes }).then(() => { refresh(); return true; }).catch((e) => { setError(e.message); return false; }),
+    addNote: (id, text) => api(`/messages/${id}/notes`, { method: 'POST', body: { text } }).then(() => { reload(); return true; }).catch(async (e) => { await notify({ title: 'No se pudo agregar la nota', message: e.message }); return false; }),
+    async remove(id) {
+      const ok = await confirm({ title: '¿Enviar a la papelera?', message: 'Podrás restaurarlo durante 30 días; después se eliminará definitivamente.', confirmLabel: 'Enviar a la papelera' });
+      if (ok) await api(`/messages/${id}`, { method: 'DELETE' }).then(refresh).catch(fail('No se pudo eliminar'));
+    },
+    restore: (id) => api(`/messages/${id}/restore`, { method: 'POST' }).then(refresh).catch(fail('No se pudo restaurar')),
+    async removeForever(id) {
+      const ok = await confirm({ title: '¿Eliminar definitivamente?', message: 'Se eliminará el mensaje con sus imágenes. Esta acción no se puede deshacer.', confirmLabel: 'Eliminar definitivamente' });
+      if (ok) await api(`/messages/${id}/permanent`, { method: 'DELETE' }).then(refresh).catch(fail('No se pudo eliminar'));
+    },
+  };
+
+  // El archivo lleva datos personales: se descarga con la sesión (un enlace normal no puede enviar el token) y queda en la bitácora
+  async function exportCsv() {
+    setExporting(true);
     try {
-      await api(`/messages/${id}`, { method: 'DELETE' });
-      reload();
+      const blob = await api(`/messages/export${filterQuery ? `?${filterQuery}` : ''}`, { blob: true });
+      const url = URL.createObjectURL(blob);
+      const link = Object.assign(document.createElement('a'), { href: url, download: `mensajes-${new Date().toISOString().slice(0, 10)}.csv` });
+      link.click();
+      URL.revokeObjectURL(url);
     } catch (err) {
-      await notify({ title: 'No se pudo eliminar', message: err.message });
-    }
-  }
-  async function restore(id) {
-    try {
-      await api(`/messages/${id}/restore`, { method: 'POST' });
-      reload();
-    } catch (err) {
-      await notify({ title: 'No se pudo restaurar', message: err.message });
-    }
-  }
-  async function removeForever(id) {
-    const ok = await confirm({ title: '¿Eliminar definitivamente?', message: 'Se eliminará el mensaje con sus imágenes. Esta acción no se puede deshacer.', confirmLabel: 'Eliminar definitivamente' });
-    if (!ok) return;
-    try {
-      await api(`/messages/${id}/permanent`, { method: 'DELETE' });
-      reload();
-    } catch (err) {
-      await notify({ title: 'No se pudo eliminar', message: err.message });
+      await notify({ title: 'No se pudo exportar', message: err.message });
+    } finally {
+      setExporting(false);
     }
   }
 
   return (
     <div>
+      {stats && !trash && (
+        <p className="stats" aria-label="Resumen de mensajes">
+          <strong>{stats.nuevos}</strong> nuevos · <strong>{stats.pendientes}</strong> pendientes · {stats.total} en total
+          <span className="muted"> ({Object.entries(stats.porTipo).map(([t, n]) => `${n} ${TYPE_LABEL[t].toLowerCase()}s`).join(', ')})</span>
+        </p>
+      )}
       <div className="filters">
         {!trash && (
           <>
             <Filter label="Tipo" options={TYPES} value={filters.type} onChange={setFilter('type')} />
             <Filter label="Estado" options={STATUS} value={filters.status} onChange={setFilter('status')} />
             <Filter label="Revisión" options={[['', 'Todas'], ...REVIEW]} value={filters.review} onChange={setFilter('review')} />
+            <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); applySearch(typed.trim()); }}>
+              <label>Buscar
+                <input type="search" value={typed} maxLength={100} placeholder="En el asunto o el mensaje" onChange={(e) => setTyped(e.target.value)} />
+              </label>
+              <button className="btn btn-dark sm">Buscar</button>
+              {search && <button type="button" className="btn btn-dark sm" onClick={() => { setTyped(''); applySearch(''); }}>Limpiar</button>}
+            </form>
           </>
         )}
-        {!moderator && <button type="button" className="btn btn-dark sm trash-toggle" aria-pressed={trash} onClick={() => setTrash(!trash)}>
-          {trash ? '← Volver a los mensajes' : 'Papelera'}
-        </button>}
+        <span className="filters-end">
+          {!moderator && !trash && <button type="button" className="btn btn-dark sm" disabled={exporting} onClick={exportCsv}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>}
+          {!moderator && (
+            <button type="button" className="btn btn-dark sm" aria-pressed={trash} onClick={() => { setTrash(!trash); setPage(1); }}>
+              {trash ? '← Volver a los mensajes' : 'Papelera'}
+            </button>
+          )}
+        </span>
       </div>
       {trash && <p className="muted">Los mensajes eliminados se quedan aquí 30 días y después se borran solos.</p>}
       {error && <p className="error">{error}</p>}
       {loading && <Spinner />}
       {items?.length === 0 && <p className="muted">{trash ? 'La papelera está vacía.' : 'No hay mensajes con estos filtros.'}</p>}
-      {items?.map((m) => {
-        const review = m.review || 'pendiente';
-        return (
-          <article key={m._id} className={`card msg ${m.status}`}>
-            <header>
-              <span className="row">
-                <span className="tag">{TYPE_LABEL[m.type]}</span>
-                <span className={`badge review-${review}`}>{REVIEW_LABEL[review]}</span>
-              </span>
-              <span className="muted">{formatDate(m.createdAt)} · {formatTime(m.createdAt)}</span>
-            </header>
-            <h3>{m.subject}</h3>
-            <p className="pre">{m.body}</p>
-            {m.images?.length > 0 && (
-              <ul className="attachments">
-                {m.images.map((id) => (
-                  <li key={id}>
-                    <AuthImage id={id} alt="Imagen adjunta" />
-                  </li>
-                ))}
-              </ul>
-            )}
-            {!m.anonymous && !moderator && <p className="muted privacy-note">Contiene datos personales: úsalos solo para atender este mensaje y no los copies fuera del panel.</p>}
-            <p className="muted">
-              {m.anonymous ? 'Anónimo' : moderator ? 'Con datos de contacto (solo los ve un administrador)' : [m.name, m.degree, `${m.semester}° semestre`, m.group && `grupo ${m.group}`, `Tel. ${formatPhone(m.phone)}`].filter(Boolean).join(' · ')}
-            </p>
-            {trash ? (
-              <div className="row msg-actions">
-                <span className="muted">Eliminado el {formatDate(m.deletedAt)}</span>
-                <button className="btn btn-dark sm" onClick={() => restore(m._id)}>Restaurar</button>
-                <button className="btn btn-red sm" onClick={() => removeForever(m._id)}>Eliminar definitivamente</button>
-              </div>
-            ) : (
-            <div className="row msg-actions">
-              <label className="inline-select">Revisión
-                <select value={review} onChange={(e) => update(m._id, { review: e.target.value })}>
-                  {REVIEW.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-              </label>
-              {m.status !== 'leido' && <button className="btn btn-dark sm" onClick={() => update(m._id, { status: 'leido' })}>Marcar leído</button>}
-              {m.status !== 'archivado' && <button className="btn btn-dark sm" onClick={() => update(m._id, { status: 'archivado' })}>Archivar</button>}
-              {m.status !== 'nuevo' && <button className="btn btn-dark sm" onClick={() => update(m._id, { status: 'nuevo' })}>Marcar nuevo</button>}
-              {!moderator && <button className="btn btn-red sm" onClick={() => remove(m._id)}>Eliminar</button>}
-            </div>
-            )}
-          </article>
-        );
-      })}
+      {items?.map((m) => <MessageCard key={m._id} m={m} trash={trash} moderator={moderator} actions={actions} />)}
+      {data?.pages > 1 && (
+        <nav className="pager" aria-label="Páginas de mensajes">
+          <button className="btn btn-dark sm" disabled={data.page <= 1} onClick={() => setPage(data.page - 1)}>← Anterior</button>
+          <span>Página {data.page} de {data.pages} · {data.total} mensajes</span>
+          <button className="btn btn-dark sm" disabled={data.page >= data.pages} onClick={() => setPage(data.page + 1)}>Siguiente →</button>
+        </nav>
+      )}
     </div>
   );
 }

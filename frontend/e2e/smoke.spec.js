@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 
 const PNG_1X1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC', 'base64');
+const CODE = 'GI-ABCDE-FGHJK';
 const ADMIN = { id: 'u1', name: 'Ana Prueba', email: 'ana@test.com', role: 'admin' };
 const MEMBER = { _id: 'm1', name: 'Ana Prueba', role: 'Presidencia' };
 
@@ -13,7 +14,7 @@ async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
     proposals: [{ _id: 'p1', number: 1, title: 'Propuesta uno', objective: 'Objetivo uno', published: true }],
     messages: [{ _id: 'g1', type: 'queja', anonymous: true, subject: 'Un asunto', body: 'Un mensaje', status: 'nuevo', review: 'pendiente', images: [], createdAt: '2026-10-28T20:35:00Z' }],
     trash: [],
-    sent: { message: null, news: null },
+    sent: { message: null, news: null, patch: null, note: null, track: null, query: null },
     fileRequests: [],
     loggedIn,
   };
@@ -46,9 +47,33 @@ async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
     if (path === '/members') return json(route, [MEMBER]);
     if (path === '/messages' && method === 'POST') {
       state.sent.message = req.postData() || '';
-      return json(route, { ok: true }, 201);
+      return json(route, { ok: true, code: CODE }, 201);
     }
-    if (path === '/messages') return json(route, searchParams.get('trash') === '1' ? state.trash : state.messages);
+    if (path === '/messages/track') {
+      state.sent.track = req.postDataJSON();
+      return state.sent.track.code.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === CODE.replace(/-/g, '')
+        ? json(route, { type: 'queja', subject: 'Baños sin agua', status: 'leido', review: 'en_proceso', createdAt: '2026-10-28T20:35:00Z', updatedAt: '2026-10-30T09:00:00Z', publicReply: 'Ya mandamos arreglarlos.', publicReplyAt: '2026-10-30T09:00:00Z' })
+        : json(route, { error: 'No encontramos un mensaje con ese código. Revisa que esté completo.' }, 404);
+    }
+    if (path === '/messages/stats') return json(route, { nuevos: state.messages.length, pendientes: state.messages.length, total: state.messages.length, porTipo: { queja: state.messages.length, propuesta: 0, pregunta: 0, problema: 0 } });
+    if (path === '/messages/export') return route.fulfill({ status: 200, contentType: 'text/csv', body: '\ufeff"Asunto"\r\n"Un asunto"' });
+    if (path === '/messages/g1/notes') {
+      state.sent.note = req.postDataJSON();
+      state.messages[0].notes = [...(state.messages[0].notes ?? []), { authorName: 'Ana Prueba', text: state.sent.note.text, at: '2026-11-02T12:00:00Z' }];
+      return json(route, state.messages[0], 201);
+    }
+    if (path === '/messages/g1' && method === 'PATCH') {
+      state.sent.patch = req.postDataJSON();
+      Object.assign(state.messages[0], state.sent.patch);
+      return json(route, state.messages[0]);
+    }
+    if (path === '/messages') {
+      state.sent.query = Object.fromEntries(searchParams);
+      const list = searchParams.get('trash') === '1' ? state.trash : state.messages;
+      const q = (searchParams.get('q') || '').toLowerCase();
+      const items = q ? list.filter((m) => `${m.subject} ${m.body}`.toLowerCase().includes(q)) : list;
+      return searchParams.has('page') ? json(route, { items, total: items.length, page: 1, pages: 1 }) : json(route, items);
+    }
     if (path === '/messages/g1' && method === 'DELETE') {
       state.trash = state.messages.map((m) => ({ ...m, deletedAt: '2026-11-02T12:00:00Z' }));
       state.messages = [];
@@ -93,6 +118,8 @@ test('se puede enviar un mensaje anónimo y no viaja ningún dato personal', asy
   await page.getByRole('button', { name: /Enviar mensaje/ }).click();
 
   await expect(page.getByRole('heading', { name: /Gracias por/ })).toBeVisible();
+  await expect(page.getByText(CODE)).toBeVisible(); // el código de seguimiento se muestra al terminar
+  await expect(page.getByText(/no se vuelve a mostrar/)).toBeVisible();
   const enviado = state.sent.message;
   expect(enviado).toContain('name="anonymous"');
   expect(enviado).toMatch(/name="anonymous"\r\n\r\ntrue/);
@@ -259,11 +286,65 @@ test('un moderador solo ve los mensajes, sin eliminar ni papelera, y no puede ab
   await expect(page.getByText('Un asunto')).toBeVisible();
   await expect(page.getByText(/solo los ve un administrador/)).toBeVisible();
   const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
-  await expect(pestañas.getByRole('link')).toHaveText(['Mensajes']);
+  await expect(pestañas.getByRole('link')).toHaveText([/^Mensajes/]);
   await expect(page.getByRole('button', { name: 'Papelera' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Eliminar', exact: true })).toHaveCount(0);
 
   await page.goto('/admin/noticias');
   await expect(page).toHaveURL(/\/admin\/mensajes$/);
+});
+
+test('con el código de seguimiento se consulta el estado y la respuesta del equipo', async ({ page }) => {
+  const state = await mockApi(page);
+  await page.goto('/seguimiento');
+  await page.getByLabel('Código de seguimiento').fill('gi abcde fghjk');
+  await page.getByRole('button', { name: 'Consultar' }).click();
+  await expect(page.getByRole('heading', { name: 'Baños sin agua' })).toBeVisible();
+  await expect(page.getByText('En proceso')).toBeVisible();
+  await expect(page.getByText('Ya mandamos arreglarlos.')).toBeVisible();
+  expect(state.sent.track).toEqual({ code: 'gi abcde fghjk' });
+
+  await page.getByLabel('Código de seguimiento').fill('GI-00000-00000');
+  await page.getByRole('button', { name: 'Consultar' }).click();
+  await expect(page.getByRole('alert')).toContainText('No encontramos un mensaje con ese código');
+  await expect(page.getByRole('heading', { name: 'Baños sin agua' })).toHaveCount(0);
+});
+
+test('el panel pagina, busca, muestra contadores y exporta a CSV', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  await expect(page.getByLabel('Resumen de mensajes')).toContainText('1 nuevos');
+  await expect(page.getByRole('link', { name: /Mensajes/ })).toContainText('1'); // insignia de la pestaña
+  expect(state.sent.query).toMatchObject({ page: '1', limit: '20', status: 'nuevo' });
+
+  await page.getByLabel('Buscar').fill('no-existe');
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await expect(page.getByText('No hay mensajes con estos filtros.')).toBeVisible();
+  expect(state.sent.query).toMatchObject({ q: 'no-existe', page: '1' });
+  await page.getByRole('button', { name: 'Limpiar' }).click();
+  await expect(page.getByText('Un asunto')).toBeVisible();
+
+  const descarga = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar CSV' }).click();
+  expect((await descarga).suggestedFilename()).toMatch(/^mensajes-\d{4}-\d{2}-\d{2}\.csv$/);
+});
+
+test('en el panel se escribe la respuesta pública y se agregan notas internas', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+
+  await page.getByText('Respuesta para quien escribió').click();
+  await page.getByLabel(/La verá quien consulte el código/).fill('Gracias, ya lo estamos viendo.');
+  await page.getByRole('button', { name: 'Guardar respuesta' }).click();
+  await expect(page.getByText('Respuesta guardada ✔')).toBeVisible();
+  expect(state.sent.patch).toEqual({ publicReply: 'Gracias, ya lo estamos viendo.' });
+
+  await page.getByText(/Notas internas/).click();
+  await page.getByLabel(/Nueva nota/).fill('Hablar con intendencia');
+  await page.getByRole('button', { name: 'Agregar nota' }).click();
+  await expect(page.getByText('Hablar con intendencia')).toBeVisible();
+  expect(state.sent.note).toEqual({ text: 'Hablar con intendencia' });
 });
 

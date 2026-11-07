@@ -1,0 +1,6 @@
+// Etiquetas compartidas por la lista de mensajes del panel y sus tarjetas.
+export const TYPES = [['', 'Todos'], ['queja', 'Quejas'], ['propuesta', 'Propuestas'], ['pregunta', 'Preguntas'], ['problema', 'Problemas']];
+export const STATUS = [['nuevo', 'Nuevos'], ['leido', 'Leídos'], ['archivado', 'Archivados'], ['', 'Todos']];
+export const REVIEW = [['pendiente', 'Pendiente'], ['en_proceso', 'En proceso'], ['completado', 'Completado'], ['rechazado', 'Rechazado']];
+export const REVIEW_LABEL = Object.fromEntries(REVIEW);
+export const TYPE_LABEL = { queja: 'Queja', propuesta: 'Propuesta', pregunta: 'Pregunta', problema: 'Problema' };

@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useFetch } from '../hooks.js';
 import { formatPhone } from '../utils.js';
 import Spinner from '../components/Spinner.jsx';
+import TrackingCode from '../components/TrackingCode.jsx';
 import { CheckStamp, EnvelopeSticker, IconClip, IconLock, IconSend } from '../components/MailboxIcons.jsx';
 import './Mailbox.css';
 
@@ -24,7 +25,7 @@ const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 export default function Mailbox() {
   const { data: settings } = useFetch('/settings');
   const [form, setForm] = useState(empty);
-  const [status, setStatus] = useState({ sending: false, error: '', done: false });
+  const [status, setStatus] = useState({ sending: false, error: '', done: false, code: '' });
   const [attachments, setAttachments] = useState([]); // [{ file, url }] con vista previa local
   const [attachError, setAttachError] = useState('');
   const picker = useRef(null);
@@ -94,12 +95,12 @@ export default function Mailbox() {
     data.append('website', trap);
     data.append('fillMs', String(Date.now() - shownAt.current));
     try {
-      await api('/messages', { method: 'POST', form: data });
+      const res = await api('/messages', { method: 'POST', form: data });
       setForm(empty);
       setTrap('');
       shownAt.current = Date.now();
       clearFiles();
-      setStatus({ sending: false, error: '', done: true });
+      setStatus({ sending: false, error: '', done: true, code: res?.code ?? '' });
     } catch (err) {
       setStatus({ sending: false, error: err.message, done: false });
     }
@@ -112,6 +113,7 @@ export default function Mailbox() {
           <CheckStamp />
           <h1 className="title">¡Gracias por <mark>escribirnos</mark>!</h1>
           <p className="lead">Tu mensaje fue recibido. Lo revisaremos y le daremos seguimiento.</p>
+          {status.code && <TrackingCode code={status.code} />}
           <div className="btn-row">
             <Link to="/" className="btn btn-red">Inicio</Link>
             <button className="btn btn-dark" onClick={() => setStatus({ sending: false, error: '', done: false })}>

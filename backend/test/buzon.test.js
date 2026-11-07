@@ -22,7 +22,8 @@ beforeEach(() => t.models.Message.deleteMany({}));
 test('el campo trampa lleno descarta el envío en silencio, respondiendo "éxito"', async () => {
   const res = await enviar(anonimo({ website: 'http://spam.example' }));
   assert.equal(res.status, 201);
-  assert.deepEqual(res.json, { ok: true });
+  assert.equal(res.json.ok, true);
+  assert.match(res.json.code, /^GI-/, 'devuelve un código de apariencia normal para no dar pistas');
   assert.deepEqual(await lista(), []);
 
   // Con el campo vacío (como lo manda un navegador normal) se guarda

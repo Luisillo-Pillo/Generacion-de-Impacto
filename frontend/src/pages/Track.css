@@ -1,0 +1,10 @@
+.track-form input { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.track-result { margin-top: 1.5rem; }
+.track-result header { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.track-result h2 { margin: .5rem 0; }
+.track-result dl { display: grid; gap: .4rem; margin: .8rem 0; }
+.track-result dl div { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px dashed #bdb2a3; padding-bottom: .3rem; }
+.track-result dt { font-weight: 600; }
+.track-result dd { margin: 0; text-align: right; }
+.track-reply { background: #ebe1d2; border-left: 6px solid var(--red); padding: .6rem 1rem; margin-top: 1rem; }
+.track-reply h3 { margin: 0 0 .3rem; }

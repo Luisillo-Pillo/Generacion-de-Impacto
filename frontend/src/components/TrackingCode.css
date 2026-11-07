@@ -1,0 +1,5 @@
+.tracking-code { background: var(--black); color: var(--paper); border-radius: 6px; padding: 1.2rem 1rem; margin: 1.5rem auto; max-width: 30rem; }
+.tracking-title { margin: 0 0 .3rem; font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; }
+.tracking-value { font-family: var(--font-display); font-size: clamp(1.6rem, 7vw, 2.4rem); letter-spacing: .08em; margin: .2rem 0 .8rem; user-select: all; word-break: break-all; }
+.tracking-warning { font-size: .85rem; margin: .9rem 0 0; line-height: 1.5; }
+.tracking-warning a { color: #fff; font-weight: 700; }
