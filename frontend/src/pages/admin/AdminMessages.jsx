@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { api, fileUrl, formatDate, formatTime } from '../../api.js';
+import { api, formatDate, formatTime } from '../../api.js';
+import AuthImage from '../../components/AuthImage.jsx';
 import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { formatPhone } from '../../utils.js';
@@ -95,9 +96,7 @@ export default function AdminMessages() {
               <ul className="attachments">
                 {m.images.map((id) => (
                   <li key={id}>
-                    <a href={fileUrl(id)} target="_blank" rel="noreferrer" title="Abrir imagen">
-                      <img src={fileUrl(id)} alt="Imagen adjunta" loading="lazy" />
-                    </a>
+                    <AuthImage id={id} alt="Imagen adjunta" />
                   </li>
                 ))}
               </ul>

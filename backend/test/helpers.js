@@ -9,9 +9,9 @@
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 
-// PNG válido de 1×1 píxel
+// PNG de 1×1 píxel que se decodifica por completo (el servidor lo vuelve a codificar al recibirlo)
 export const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC',
   'base64'
 );
 
@@ -50,20 +50,21 @@ export async function startServer(env = {}) {
   });
   const base = `http://127.0.0.1:${server.address().port}/api`;
 
-  // Llama a la API y devuelve { status, json, headers, text }.
+  // Llama a la API y devuelve { status, json, headers, text, buffer }.
   async function call(method, path, { token, body, form, headers: extra = {} } = {}) {
     const headers = { ...extra };
     if (token) headers.Authorization = `Bearer ${token}`;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     const res = await fetch(base + path, { method, headers, body: form ?? (body !== undefined ? JSON.stringify(body) : undefined) });
-    const text = await res.text();
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const text = buffer.toString('utf8');
     let json = null;
     try {
       json = JSON.parse(text);
     } catch {
       /* no era JSON */
     }
-    return { status: res.status, json, headers: res.headers, text };
+    return { status: res.status, json, headers: res.headers, text, buffer };
   }
 
   // Crea una cuenta de administrador con su ficha de integrante, igual que `npm run create-admin`.

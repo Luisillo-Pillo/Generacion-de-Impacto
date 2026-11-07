@@ -53,7 +53,7 @@ export function ImageField({ value, onChange, label = 'Imagen' }) {
   return (
     <div className="image-field">
       <span>{label}</span>
-      {value && <img src={fileUrl(value)} alt="" />}
+      {value && <img src={fileUrl(value, 640)} alt="" />}
       <div className="row">
         <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={pick} disabled={busy} />
         {value && <button type="button" className="link-btn" onClick={() => onChange(null)}>Quitar</button>}

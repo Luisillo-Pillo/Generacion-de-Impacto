@@ -59,7 +59,7 @@ export default function Profile() {
         <h1 className="title">Mi <mark>perfil</mark></h1>
 
         <article className="card profile">
-          {member?.photo ? <img className="profile-photo" src={fileUrl(member.photo)} alt="" /> : <div className="avatar big">{initials(user.name)}</div>}
+          {member?.photo ? <img className="profile-photo" src={fileUrl(member.photo, 640)} alt="" /> : <div className="avatar big">{initials(user.name)}</div>}
           <div>
             <h2>{user.name}</h2>
             <p className="muted">{user.email}</p>

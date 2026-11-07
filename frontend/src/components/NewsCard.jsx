@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { fileUrl, formatDate } from '../api.js';
+import { imgSet, formatDate } from '../api.js';
 import './NewsCard.css';
 
 export default function NewsCard({ n }) {
@@ -7,7 +7,7 @@ export default function NewsCard({ n }) {
     <Link to={`/noticias/${n.slug}`} className="news-card">
       <div className="news-cover">
         {n.coverImage ? (
-          <img src={fileUrl(n.coverImage)} alt="" loading="lazy" />
+          <img {...imgSet(n.coverImage, '(max-width: 700px) 100vw, 400px')} alt="" loading="lazy" />
         ) : (
           <img className="news-placeholder" src="/brand/logo-planilla.svg" alt="" />
         )}

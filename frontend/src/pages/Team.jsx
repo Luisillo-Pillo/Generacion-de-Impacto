@@ -24,7 +24,7 @@ export default function Team() {
         <div className="grid members">
           {members.data?.map((m) => (
             <article key={m._id} className="member">
-              {m.photo ? <img src={fileUrl(m.photo)} alt={m.name} loading="lazy" /> : <div className="avatar">{initials(m.name)}</div>}
+              {m.photo ? <img src={fileUrl(m.photo, 640)} alt={m.name} loading="lazy" /> : <div className="avatar">{initials(m.name)}</div>}
               <h3>{m.name}</h3>
               {m.role && <p className="role">{m.role}</p>}
               {m.degree && <p className="muted">{m.degree}</p>}

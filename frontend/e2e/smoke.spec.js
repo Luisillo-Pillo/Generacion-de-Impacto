@@ -1,6 +1,7 @@
 // Recorridos de humo: lo mínimo que no debe romperse nunca. La API se simula en el navegador (no hay backend).
 import { test, expect } from '@playwright/test';
 
+const PNG_1X1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC', 'base64');
 const ADMIN = { id: 'u1', name: 'Ana Prueba', email: 'ana@test.com', role: 'admin' };
 const MEMBER = { _id: 'm1', name: 'Ana Prueba', role: 'Presidencia' };
 
@@ -12,6 +13,7 @@ async function mockApi(page, { loggedIn = false } = {}) {
     messages: [{ _id: 'g1', type: 'queja', anonymous: true, subject: 'Un asunto', body: 'Un mensaje', status: 'nuevo', review: 'pendiente', images: [], createdAt: '2026-10-28T20:35:00Z' }],
     trash: [],
     sent: { message: null, news: null },
+    fileRequests: [],
     loggedIn,
   };
   const json = (route, body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -55,6 +57,12 @@ async function mockApi(page, { loggedIn = false } = {}) {
       state.messages = state.trash.map(({ deletedAt: _, ...m }) => m);
       state.trash = [];
       return json(route, state.messages[0]);
+    }
+    // Las imágenes de los mensajes son privadas: solo se entregan con la cabecera de sesión
+    if (path.startsWith('/files/')) {
+      state.fileRequests.push({ path: path + (searchParams.has('w') ? `?w=${searchParams.get('w')}` : ''), auth: req.headers()['authorization'] ?? null });
+      if (!req.headers()['authorization']) return json(route, { error: 'No autenticado' }, 401);
+      return route.fulfill({ status: 200, contentType: 'image/png', body: PNG_1X1 });
     }
     if (path === '/audit') {
       return json(route, { items: [{ _id: 'a1', at: '2026-11-02T12:00:00Z', userName: 'Ana Prueba', action: 'noticia.crear', summary: 'Creó la noticia «Una noticia»' }], total: 1, page: 1, pages: 1 });
@@ -196,3 +204,16 @@ test('la pestaña Actividad muestra quién hizo qué', async ({ page }) => {
   await expect(page.getByText('Creó la noticia «Una noticia»')).toBeVisible();
   await expect(page.getByText('Ana Prueba', { exact: true }).last()).toBeVisible();
 });
+
+test('las imágenes adjuntas de los mensajes se piden con la sesión y se muestran reducidas', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.messages[0].images = ['img1'];
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+
+  const imagen = page.getByRole('img', { name: 'Imagen adjunta' });
+  await expect(imagen).toBeVisible();
+  expect(await imagen.getAttribute('src')).toMatch(/^blob:/); // no es una URL pública que se pueda abrir sin sesión
+  expect(state.fileRequests).toEqual([{ path: '/files/img1?w=640', auth: 'Bearer token-de-prueba' }]);
+});
+

@@ -45,7 +45,7 @@ export default function UserMenu() {
   return (
     <div className="user-menu" ref={ref}>
       <button className="user-btn" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {member?.photo ? <img src={fileUrl(member.photo)} alt="" /> : <span className="avatar sm">{initials(user.name)}</span>}
+        {member?.photo ? <img src={fileUrl(member.photo, 640)} alt="" /> : <span className="avatar sm">{initials(user.name)}</span>}
         <span className="user-name">{user.name.split(' ')[0]}</span>
         <span className="caret" aria-hidden="true">▾</span>
       </button>

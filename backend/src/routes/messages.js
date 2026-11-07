@@ -59,7 +59,7 @@ router.post('/', imageUpload.array('images', MAX_IMAGES), async (req, res) => {
   }
   const images = [];
   try {
-    for (const file of req.files ?? []) images.push(await saveImage(file));
+    for (const file of req.files ?? []) images.push(await saveImage(file, { isPrivate: true }));
     await Message.create({ ...data, images });
   } catch (err) {
     await Promise.all(images.map(deleteFile));

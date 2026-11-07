@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useFetch } from '../hooks.js';
 import Spinner from '../components/Spinner.jsx';
-import { fileUrl, formatDate } from '../api.js';
+import { imgSet, formatDate } from '../api.js';
 import './NewsDetail.css';
 
 export default function NewsDetail() {
@@ -18,7 +18,7 @@ export default function NewsDetail() {
           <article className="article">
             <time>{formatDate(n.publishedAt || n.createdAt)}{n.author ? ` · ${n.author}` : ''}</time>
             <h1 className="title">{n.title}</h1>
-            {n.coverImage && <img className="article-cover" src={fileUrl(n.coverImage)} alt="" />}
+            {n.coverImage && <img className="article-cover" {...imgSet(n.coverImage, '(max-width: 800px) 100vw, 800px')} alt="" />}
             {n.body.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
           </article>
         )}

@@ -1,6 +1,12 @@
 const BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
-export const fileUrl = (id) => (id ? `${BASE}/api/files/${id}` : null);
+// `w` pide la versión reducida (640 o 1280 px, en WebP); sin él, la imagen original.
+export const fileUrl = (id, w) => (id ? `${BASE}/api/files/${id}${w ? `?w=${w}` : ''}` : null);
+
+// Atributos de <img> para las imágenes públicas: el navegador elige la versión de 640 o de 1280 px según el espacio
+// que ocupa (`sizes`) y la densidad de la pantalla, en vez de bajar siempre la original (de hasta 5 MB).
+export const imgSet = (id, sizes) =>
+  id ? { src: fileUrl(id, 1280), srcSet: `${fileUrl(id, 640)} 640w, ${fileUrl(id, 1280)} 1280w`, sizes } : {};
 
 const TOKEN_KEY = 'gi_token';
 export const getToken = () => {
@@ -21,7 +27,8 @@ export const setToken = (t) => {
 // Se emite cuando el servidor rechaza la sesión (token vencido, contraseña cambiada o sesión cerrada en otro dispositivo).
 export const SESSION_EXPIRED = 'gi:session-expired';
 
-export async function api(path, { method = 'GET', body, form } = {}) {
+// `blob: true` devuelve el archivo (para imágenes privadas, que exigen la cabecera de sesión y no pueden ir en un <img src>).
+export async function api(path, { method = 'GET', body, form, blob = false } = {}) {
   const headers = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -47,6 +54,7 @@ export async function api(path, { method = 'GET', body, form } = {}) {
     window.dispatchEvent(new Event(SESSION_EXPIRED));
   }
   if (res.status === 204) return null;
+  if (blob && res.ok) return res.blob();
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Ocurrió un error');
   return data;

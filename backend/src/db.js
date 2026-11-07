@@ -15,11 +15,14 @@ export function getBucket() {
   return bucket;
 }
 
-// Borra un archivo de GridFS; si ya no existe, no pasa nada.
+// Borra un archivo de GridFS junto con sus versiones reducidas; si ya no existe, no pasa nada.
 export async function deleteFile(id) {
   if (!id) return;
   try {
-    await getBucket().delete(new mongoose.Types.ObjectId(String(id)));
+    const _id = new mongoose.Types.ObjectId(String(id));
+    const [file] = await getBucket().find({ _id }).toArray();
+    for (const variant of Object.values(file?.metadata?.variants ?? {})) await getBucket().delete(variant).catch(() => {});
+    await getBucket().delete(_id);
   } catch {
     /* ya no existía */
   }

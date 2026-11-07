@@ -15,7 +15,7 @@ Generacion-de-Impacto/
 │   ├── e2e/             pruebas de humo con Playwright (API simulada)
 │   └── src/             App, auth, api, hooks, utils, pages/ (admin/: una página por sección del panel), components/; cada .jsx con estilos lleva su .css (mismo nombre) y `index.css` guarda solo lo global
 ├── backend/             Express 5 + Mongoose + Zod 4 → Render
-│   ├── src/             app (Express sin arrancar), index (conecta y escucha), db (GridFS), uploads (multer + firma de imágenes),
+│   ├── src/             app (Express sin arrancar), index (conecta y escucha), db (GridFS), uploads (multer + sharp: limpieza y versiones reducidas), migrate + migrations/ (migraciones de datos),
 │   │                    settings, auth, passwords (política), rateLimit (limitador en MongoDB), audit (bitácora), maintenance (papelera),
 │   │                    models, validators, seed, create-admin, routes/ (auth, messages, members, files, content, audit)
 │   ├── test/            pruebas de la API (node:test + MongoDB en memoria)
@@ -28,7 +28,7 @@ Generacion-de-Impacto/
 └── package.json         workspaces: frontend, backend
 ```
 
-Flujo: el navegador (Vercel) llama a la API (Render) con `VITE_API_URL`; la API guarda todo en MongoDB Atlas. Las imágenes subidas desde el panel se almacenan en **GridFS** (bucket `files`) y se sirven por `GET /api/files/:id` con caché de un año.
+Flujo: el navegador (Vercel) llama a la API (Render) con `VITE_API_URL`; la API guarda todo en MongoDB Atlas. Las imágenes subidas desde el panel se almacenan en **GridFS** (bucket `files`) y se sirven por `GET /api/files/:id` (las públicas con caché de un año; las de los mensajes del buzón son privadas).
 
 ## 2. Desarrollo local
 
@@ -37,6 +37,7 @@ npm install
 cp backend/.env.example backend/.env   # completa MONGODB_URI (contraseña real) y JWT_SECRET
 npm run seed                           # propuestas, ajustes y primera noticia (idempotente)
 npm run create-admin                   # crea el primer administrador (ver sección 5)
+npm run migrate                        # migraciones de datos (idempotentes; ver «Imágenes» en la sección 4)
 npm run dev                            # API en :4000, web en :5173 (Vite usa otro puerto si está ocupado)
 ```
 
@@ -76,7 +77,7 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, `a
 
 - Cada mensaje tiene un **tipo** (`queja`, `propuesta`, `pregunta`, `problema`), un **estado de bandeja** (`status`: `nuevo`, `leido`, `archivado`) y un **estado de revisión** (`review`: `pendiente` por defecto, `en_proceso`, `completado`, `rechazado`). Son independientes: un mensaje puede estar leído y a la vez en proceso. Los mensajes anteriores a `review` se tratan como pendientes.
 - Un mensaje **anónimo** nunca almacena nombre, teléfono, licenciatura, semestre ni grupo. Un mensaje **con datos** guarda además el **teléfono** (10 dígitos sin espacios; se captura y muestra como `000 000 0000`). El **grupo** solo se pide y guarda si la licenciatura elegida tiene varios grupos (ver Ajustes más abajo); en las demás se descarta.
-- Un mensaje puede llevar hasta **3 imágenes** (`images`, ids de GridFS; JPG/PNG/WEBP/GIF, 5 MB cada una, sin SVG), anónimo o no. Se validan por tipo y por la **firma real del archivo**; se envían en la misma petición multipart que el mensaje (si algo falla no quedan archivos huérfanos) y se borran de GridFS al eliminar el mensaje. Las imágenes pueden contener metadatos (p. ej. ubicación del EXIF) que no se eliminan: el formulario avisa a quien escribe de forma anónima que revise lo que adjunta.
+- Un mensaje puede llevar hasta **3 imágenes** (`images`, ids de GridFS; JPG/PNG/WEBP/GIF, 5 MB cada una, sin SVG), anónimo o no. Cada una se **decodifica y se vuelve a codificar** con `sharp` (se descarta lo que no sea una imagen real, se quitan los metadatos —ubicación GPS, cámara— y se aplica la orientación; máximo 4000 px por lado y 100 megapíxeles para evitar «bombas de descompresión»; el GIF animado se conserva) y son **privadas**: solo las ve un administrador con sesión. Se envían en la misma petición multipart que el mensaje (si algo falla no quedan archivos huérfanos) y se borran de GridFS al eliminar el mensaje.
 - **Papelera**: eliminar un mensaje solo le pone `deletedAt`; desaparece del listado y queda en Panel → Mensajes → Papelera, donde se puede **restaurar** o **eliminar definitivamente** (con sus imágenes). A los 30 días se borra solo (`backend/src/maintenance.js`, al arrancar la API y cada 6 horas).
 - **Bitácora** (`auditlogs`, Panel → Actividad): quién creó, editó o eliminó noticias, propuestas, integrantes y ajustes; cambios de estado y papelera de mensajes; cambios de contraseña, cierre de sesión en todos los dispositivos y bloqueos de cuenta por intentos fallidos. **Nunca guarda el contenido de los mensajes** (ni asunto ni texto), solo ids y el tipo de acción; tampoco contraseñas ni IPs. Se conserva un año (índice TTL).
 - Cada **integrante** (`members`) apunta a su cuenta (`users`) mediante `member.user`. La API pública de integrantes nunca devuelve ese campo ni el correo.
@@ -104,7 +105,7 @@ Resumen (detalle de validaciones en `backend/src/routes/`):
 - Buzón: `POST /api/messages` (público; multipart con los campos y hasta 3 archivos `images`, o JSON sin imágenes); admin: `GET /api/messages?status=&type=&review=` (filtros opcionales y combinables), `GET ?trash=1` (papelera), `PATCH /:id` (`{status?, review?}`, al menos uno), `DELETE /:id` (a la papelera), `POST /:id/restore` y `DELETE /:id/permanent` (solo desde la papelera). El buzón descarta en silencio (respondiendo 201) los envíos con el campo trampa `website` lleno o enviados en menos de 3 s (`fillMs`), rechaza con 413 las imágenes que juntas pasen de 12 MB y responde 429 si todo el buzón superó `MESSAGE_RATE_LIMIT` envíos en una hora.
 - Bitácora: `GET /api/audit?page=` (admin; 50 por página, la más reciente primero).
 - Integrantes: `GET /api/members` (público, sin correo); `GET /api/members/all`, `POST`, `PUT /:id`, `DELETE /:id` (admin).
-- Archivos: `POST /api/files` (admin, JPG/PNG/WEBP/GIF ≤ 5 MB, sin SVG), `GET /api/files/:id`, `DELETE /api/files/:id` (admin).
+- Archivos: `POST /api/files` (admin, JPG/PNG/WEBP/GIF ≤ 5 MB, sin SVG; se re-codifica y genera versiones reducidas), `GET /api/files/:id[?w=640|1280]` (público para noticias, propuestas y equipo; **admin con sesión** para los adjuntos del buzón, con `Cache-Control: private, no-store`; `?w=` sirve la versión WebP reducida si existe, si no la original), `DELETE /api/files/:id` (admin; borra también sus versiones reducidas).
 - Contenido: `/api/news`, `/api/proposals` (lectura pública; escritura admin; `/news/all` y `/proposals/all` incluyen no publicados), `GET /api/settings`, `PUT /api/settings/:key` (admin; claves `degrees`, `groups`, `semesters`, `groupDegrees`, `social`).
 - `GET /api/health` para el health check de Render.
 
@@ -114,6 +115,14 @@ Resumen (detalle de validaciones en `backend/src/routes/`):
 2. **Render** → New → Blueprint con `render.yaml`. Define `MONGODB_URI` y `CORS_ORIGIN`. Plan gratuito: se duerme por inactividad (primera carga lenta).
 3. **Vercel** → importar repo, *Root Directory* `frontend`, variable `VITE_API_URL`.
 4. Ejecuta `npm run seed` y `npm run create-admin` una vez contra la base de producción (desde tu equipo, con el `MONGODB_URI` de Atlas). Luego inicia sesión en `/acceso` y da de alta al resto del equipo en Panel → Equipo.
+
+### Imágenes
+
+- **Al subirlas** (`backend/src/uploads.js`, con `sharp`): se decodifican por completo y se guardan **re-codificadas** en su formato real: se quitan los metadatos (EXIF: ubicación GPS, modelo de cámara, fecha), se aplica la orientación, se reducen a 4000 px por lado como máximo y se rechaza todo lo que no sea una imagen válida (firma falsa, archivo dañado, más de 100 megapíxeles). El GIF y el WebP animados se conservan.
+- **Privadas:** los adjuntos del buzón se guardan con `metadata.private = true`; `GET /api/files/:id` exige sesión de administrador para ellos (`Cache-Control: private, no-store`). Como un `<img src>` no puede enviar el token, el panel las descarga con `fetch` y las muestra desde un `Blob` (`components/AuthImage.jsx`); el clic abre la original en otra pestaña. Las imágenes de noticias, propuestas y equipo siguen siendo públicas.
+- **Versiones reducidas:** junto a cada imagen no animada se guardan versiones WebP de 640 y 1280 px (solo las menores que el original), enlazadas en `metadata.variants`. `GET /api/files/:id?w=640` (o `1280`) la sirve; sin parámetro o sin versión, la original. Las tarjetas de noticias y propuestas usan `srcset`/`sizes`; el equipo, el perfil y el panel piden la de 640. Al borrar una imagen se borran sus versiones.
+- **Migraciones** (`npm run migrate`, idempotente; **corre contra la base de `backend/.env`**, así que revísalo antes): `001-private-message-images` marca como privadas las imágenes que ya estaban en mensajes (incluida la papelera) y `002-thumbnails` genera las versiones reducidas de lo subido antes. Se corren **después de desplegar el backend**. Hasta entonces las imágenes antiguas siguen como antes (públicas y sin versiones), así que nada se rompe.
+- Medición local (12 megapíxeles con ruido, el peor caso): limpiar y generar 2 versiones de 3 fotos tarda ≈ 1.2 s y el proceso llega a ≈ 200 MB; conviene confirmarlo en el servidor de staging. El panel de administración se carga por separado (`React.lazy`), así que los visitantes no descargan su código.
 
 ### Cabeceras de seguridad y CSP
 
@@ -146,7 +155,7 @@ Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS
 - **Imágenes huérfanas**: si en el panel subes una imagen y cancelas sin guardar, el archivo queda en GridFS. Se limpian solo al reemplazar o eliminar el registro que las usa.
 - **Login con freno de fuerza bruta** (2026-10-29; reemplazado el 2026-11-06, ver sección 5): 5 intentos fallidos por correo en 15 minutos, guardados en MongoDB. Un correo inexistente tarda lo mismo que uno existente (hash de relleno), para no delatar qué cuentas existen.
 - **Buzón sin captcha** (decisión del cliente): `POST /api/messages` es público. Desde el 2026-11-06 lleva protecciones invisibles (campo trampa, tiempo mínimo de llenado, tope de 12 MB por envío); **no hay ningún límite de envíos** (ni por IP ni global): la comunidad comparte red y el cliente no quiere topes.
-- **Imágenes de los mensajes**: `GET /api/files/:id` es público (el panel las muestra con un `<img>` normal). El id es largo y no se puede adivinar, pero quien tenga el enlace puede verla; no se les quitan los metadatos EXIF.
+- **Imágenes de los mensajes**: privadas desde la Fase 2 (ver «Imágenes» en la sección 4). Las que se subieron antes quedan públicas hasta correr `npm run migrate`.
 - **Sesiones**: el token (JWT, 12 horas con renovación) se guarda en `localStorage`; se invalida al cambiar la contraseña, al cerrar sesión en todos los dispositivos y al eliminar al integrante. Seguir en `localStorage` significa que un script malicioso en el sitio podría leerlo; la CSP (abajo) reduce ese riesgo. Pasar a una cookie `httpOnly` queda como mejora opcional (requiere dominio propio o un proxy).
 - Las páginas comparten un único `<title>` (“Generación de Impacto”).
 
@@ -163,6 +172,13 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - Rotar la contraseña de Atlas: la cadena de conexión se compartió en el chat durante el desarrollo.
 
 ## 10. Registro de cambios
+
+### 2026-11-06 — Fase 2 de mejoras: imágenes (0.9.0)
+- **Imágenes privadas y limpias (S2):** los adjuntos del buzón solo los ve un administrador con sesión (antes bastaba el enlace) y todas las imágenes se re-codifican con `sharp` al subirse: sin EXIF/GPS, orientadas, máximo 4000 px, protección contra «bombas de descompresión» y rechazo de lo que no se pueda decodificar. Nueva dependencia: `sharp` (binarios precompilados; funciona en Render).
+- **Miniaturas y carga más rápida (F7b):** versiones WebP de 640 y 1280 px (`?w=`), `srcset` en tarjetas de noticias y propuestas, y panel de administración con carga diferida. Ya no se descarga la imagen completa (hasta 5 MB) para una tarjeta.
+- **Migraciones:** `npm run migrate` (001 imágenes de mensajes privadas, 002 miniaturas de lo anterior). **Pendiente de correr contra la base real, con visto bueno** (después de desplegar el backend).
+- Se quitó `mozjpeg` de la codificación (12 veces más lento sin ventaja que importe) y se corrigió el PNG de prueba, que estaba dañado y ahora se rechaza al decodificarlo.
+- Pruebas: 82 de API (11 nuevas en `imagenes.test.js`: EXIF, orientación, bomba, GIF animado, privacidad, miniaturas y migraciones) y 12 de humo.
 
 ### 2026-11-06 — Fase 1 de mejoras: seguridad rápida (0.8.0)
 - **Contraseñas (S9):** mínimo de 10 caracteres y lista de contraseñas comunes (alta de integrantes, cambio de contraseña y `create-admin`); bcrypt costo 12 y re-hash automático de las cuentas anteriores al iniciar sesión. Las contraseñas existentes siguen funcionando.

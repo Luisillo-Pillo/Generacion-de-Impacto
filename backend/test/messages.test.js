@@ -98,16 +98,16 @@ test('adjuntos: una imagen PNG real se guarda, se sirve con su tipo y se borra c
   const [m] = await lista();
   assert.equal(m.images.length, 1);
 
-  const img = await t.call('GET', `/files/${m.images[0]}`);
+  const img = await t.call('GET', `/files/${m.images[0]}`, { token });
   assert.equal(img.status, 200);
   assert.equal(img.headers.get('content-type'), 'image/png');
   assert.equal(img.headers.get('x-content-type-options'), 'nosniff');
 
   // Eliminar manda a la papelera (la imagen se conserva); solo el borrado definitivo la elimina
   assert.equal((await t.call('DELETE', `/messages/${m._id}`, { token })).status, 204);
-  assert.equal((await t.call('GET', `/files/${m.images[0]}`)).status, 200);
+  assert.equal((await t.call('GET', `/files/${m.images[0]}`, { token })).status, 200);
   assert.equal((await t.call('DELETE', `/messages/${m._id}/permanent`, { token })).status, 204);
-  assert.equal((await t.call('GET', `/files/${m.images[0]}`)).status, 404);
+  assert.equal((await t.call('GET', `/files/${m.images[0]}`, { token })).status, 404);
 });
 
 test('adjuntos rechazados: firma falsa, SVG, más de 3 y más de 5 MB; no queda nada guardado', async () => {

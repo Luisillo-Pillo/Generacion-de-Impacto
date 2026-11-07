@@ -9,6 +9,7 @@
     "start": "node src/index.js",
     "seed": "node --env-file-if-exists=.env src/seed.js",
     "create-admin": "node --env-file-if-exists=.env src/create-admin.js",
+    "migrate": "node --env-file-if-exists=.env src/migrate.js",
     "test": "node --test"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.0",
     "multer": "^2.0.0",
+    "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
   "devDependencies": {
