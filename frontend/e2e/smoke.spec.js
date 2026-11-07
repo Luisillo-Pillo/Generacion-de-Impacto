@@ -24,6 +24,7 @@ test('se puede enviar un mensaje anónimo y no viaja ningún dato personal', asy
   const enviado = state.sent.message;
   expect(enviado).toContain('name="anonymous"');
   expect(enviado).toMatch(/name="anonymous"\r\n\r\ntrue/);
+  expect(enviado).toMatch(/name="urgency"\r\n\r\nmedia\r\n/); // media por defecto
   expect(enviado).not.toContain('name="name"');
   expect(enviado).not.toContain('name="phone"');
   // Protecciones contra bots: el campo trampa viaja vacío y se informa cuánto tardó en llenarse
@@ -336,5 +337,54 @@ test('si falla el dibujo de una página se muestra un aviso con la opción de re
   await page.goto('/noticias/rota');
   await expect(page.getByRole('heading', { name: 'Algo salió mal' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Recargar' })).toBeVisible();
+});
+
+test('el buzón permite elegir la urgencia del mensaje en un menú desplegable', async ({ page }) => {
+  const state = await mockApi(page);
+  await page.goto('/buzon');
+  const urgencia = page.getByLabel('Urgencia');
+  await expect(urgencia).toHaveValue('media');
+  await expect(urgencia.locator('option')).toHaveText(['Baja', 'Media', 'Alta', 'Urgente']);
+  await urgencia.selectOption('urgente');
+  await page.getByLabel('Asunto').fill('Fuga de agua en el edificio A');
+  await page.locator('textarea').fill('Hay una fuga que está inundando el pasillo.');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.getByRole('heading', { name: /Gracias por/ })).toBeVisible();
+  expect(state.sent.message).toMatch(/name="urgency"\r\n\r\nurgente\r\n/);
+});
+
+test('el panel muestra la urgencia de cada mensaje y permite filtrar por ella', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.messages[0].urgency = 'alta';
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  await expect(page.getByText('Urgencia: Alta')).toBeVisible();
+  await page.getByRole('combobox', { name: /^Urgencia/ }).selectOption('urgente');
+  await expect.poll(() => state.sent.query).toMatchObject({ urgency: 'urgente', page: '1' });
+});
+
+test('en Equipo el botón «Nuevo integrante» va al final de la página y el formulario no tiene campo de orden', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/admin/equipo');
+  const boton = page.getByRole('button', { name: 'Nuevo integrante' });
+  await expect(boton).toBeVisible();
+  const ultimaTarjeta = page.locator('article.card').last();
+  const [cajaBoton, cajaTarjeta] = [await boton.boundingBox(), await ultimaTarjeta.boundingBox()];
+  expect(cajaBoton.y).toBeGreaterThan(cajaTarjeta.y + cajaTarjeta.height - 1);
+
+  await page.getByRole('button', { name: 'Editar' }).first().click();
+  await expect(page.getByLabel('Nombre', { exact: true })).toBeVisible();
+  await expect(page.getByLabel(/^Orden/)).toHaveCount(0);
+  await expect(page.getByLabel('Licenciatura')).toBeVisible();
+});
+
+test('los ajustes ya no piden Facebook ni TikTok', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/admin/ajustes');
+  await expect(page.getByLabel('Instagram (URL)')).toBeVisible();
+  await expect(page.getByLabel('Correo de contacto')).toBeVisible();
+  await expect(page.getByText(/Facebook|TikTok/)).toHaveCount(0);
 });
 

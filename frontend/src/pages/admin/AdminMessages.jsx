@@ -6,7 +6,7 @@ import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { useList } from './shared.jsx';
 import MessageCard from './MessageCard.jsx';
-import { TYPES, STATUS, REVIEW, TYPE_LABEL } from './messageLabels.js';
+import { TYPES, STATUS, REVIEW, URGENCY, TYPE_LABEL } from './messageLabels.js';
 import './AdminMessages.css';
 
 const PAGE_SIZE = 20;
@@ -26,7 +26,7 @@ export default function AdminMessages() {
   const { user } = useAuth();
   const { stats, refreshStats } = useOutletContext();
   const moderator = user?.role === 'moderador'; // no ve datos de contacto ni la papelera, y no elimina
-  const [filters, setFilters] = useState({ type: '', status: 'nuevo', review: '' });
+  const [filters, setFilters] = useState({ type: '', status: 'nuevo', review: '', urgency: '' });
   const [typed, setTyped] = useState(''); // lo que se escribe en el buscador
   const [search, setSearch] = useState(''); // la búsqueda aplicada
   const [page, setPage] = useState(1);
@@ -97,6 +97,7 @@ export default function AdminMessages() {
             <Filter label="Tipo" options={TYPES} value={filters.type} onChange={setFilter('type')} />
             <Filter label="Estado" options={STATUS} value={filters.status} onChange={setFilter('status')} />
             <Filter label="Revisión" options={[['', 'Todas'], ...REVIEW]} value={filters.review} onChange={setFilter('review')} />
+            <Filter label="Urgencia" options={[['', 'Todas'], ...URGENCY]} value={filters.urgency} onChange={setFilter('urgency')} />
             <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); applySearch(typed.trim()); }}>
               <label>Buscar
                 <input type="search" value={typed} maxLength={100} placeholder="En el asunto o el mensaje" onChange={(e) => setTyped(e.target.value)} />

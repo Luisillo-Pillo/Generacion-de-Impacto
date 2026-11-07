@@ -152,3 +152,43 @@ test('un id de archivo con formato inválido o inexistente da 404', async () => 
   assert.equal((await t.call('GET', '/files/abc')).status, 404);
   assert.equal((await t.call('GET', '/files/000000000000000000000000')).status, 404);
 });
+
+test('urgencia: media por defecto, acepta baja/media/alta/urgente, rechaza otros valores y se puede filtrar', async () => {
+  assert.equal((await t.call('POST', '/messages', { body: anonimo({ subject: 'Sin urgencia' }) })).status, 201);
+  for (const urgency of ['baja', 'media', 'alta', 'urgente']) {
+    assert.equal((await t.call('POST', '/messages', { body: anonimo({ subject: `Es ${urgency}`, urgency }) })).status, 201, urgency);
+  }
+  for (const urgency of ['critica', 'ALTA', '', 5]) {
+    const res = await t.call('POST', '/messages', { body: anonimo({ subject: 'Mala urgencia', urgency }) });
+    assert.equal(res.status, 400, String(urgency));
+    assert.match(res.json.error, /urgencia/i);
+  }
+  const todos = await lista();
+  assert.equal(todos.length, 5);
+  assert.equal(todos.find((m) => m.subject === 'Sin urgencia').urgency, 'media');
+  assert.equal(todos.find((m) => m.subject === 'Es urgente').urgency, 'urgente');
+
+  assert.deepEqual((await lista('?urgency=urgente')).map((m) => m.subject), ['Es urgente']);
+  assert.deepEqual((await lista('?urgency=alta')).map((m) => m.subject), ['Es alta']);
+  assert.equal((await lista('?urgency=media')).length, 2, 'la media y la que no la mandó');
+  assert.equal((await lista('?urgency=inventada')).length, 5, 'un valor desconocido no filtra');
+
+  // Los mensajes de antes (sin el campo) cuentan como media
+  await t.models.Message.collection.insertOne({ type: 'queja', anonymous: true, subject: 'De antes', body: 'Mensaje de antes de la urgencia', status: 'nuevo', createdAt: new Date() });
+  assert.ok((await lista('?urgency=media')).some((m) => m.subject === 'De antes'));
+  assert.ok(!(await lista('?urgency=alta')).some((m) => m.subject === 'De antes'));
+
+  // Los moderadores también la ven
+  const mod = await t.models.User.create({ name: 'Mod', email: 'm@test.com', passwordHash: await (await import('bcryptjs')).default.hash('clave-de-mod-1234', 4), role: 'moderador' });
+  const tokenMod = (await t.call('POST', '/auth/login', { body: { email: mod.email, password: 'clave-de-mod-1234' } })).json.token;
+  assert.equal((await lista('?urgency=urgente', tokenMod)).length, 1);
+});
+
+test('la exportación a CSV incluye la urgencia', async () => {
+  await t.call('POST', '/messages', { body: anonimo({ subject: 'Para exportar', urgency: 'alta' }) });
+  const csv = (await t.call('GET', '/messages/export', { token })).text;
+  const [cabecera, fila] = csv.replace(/^\uFEFF/, '').split('\r\n');
+  assert.ok(cabecera.startsWith('"Fecha (UTC)","Tipo","Urgencia","Anónimo"'));
+  assert.ok(fila.includes('"queja","alta","Sí"'));
+});
+

@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useFetch } from '../hooks.js';
 import { formatPhone } from '../utils.js';
 import Spinner from '../components/Spinner.jsx';
+import { URGENCY, DEFAULT_URGENCY } from '../urgency.js';
 import TrackingCode from '../components/TrackingCode.jsx';
 import { CheckStamp, EnvelopeSticker, IconClip, IconLock, IconSend } from '../components/MailboxIcons.jsx';
 import './Mailbox.css';
@@ -16,7 +17,7 @@ const TYPES = [
   ['problema', 'Problema'],
 ];
 
-const empty = { type: 'propuesta', anonymous: true, name: '', degree: '', semester: '', group: '', phone: '', consent: false, subject: '', body: '' };
+const empty = { type: 'propuesta', urgency: DEFAULT_URGENCY, anonymous: true, name: '', degree: '', semester: '', group: '', phone: '', consent: false, subject: '', body: '' };
 
 const MAX_IMAGES = 3;
 const MAX_MB = 5;
@@ -86,7 +87,7 @@ export default function Mailbox() {
     e.preventDefault();
     setStatus({ sending: true, error: '', done: false });
     const data = new FormData();
-    for (const key of ['type', 'subject', 'body']) data.append(key, form[key]);
+    for (const key of ['type', 'urgency', 'subject', 'body']) data.append(key, form[key]);
     data.append('anonymous', String(form.anonymous));
     if (!form.anonymous) {
       for (const key of ['name', 'degree', 'semester', 'phone']) data.append(key, form[key]);
@@ -156,6 +157,13 @@ export default function Mailbox() {
               ))}
             </div>
           </fieldset>
+
+          <label>Urgencia
+            <select name="urgency" value={form.urgency} onChange={set('urgency')}>
+              {URGENCY.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <span className="hint">Ayúdanos a priorizar: marca «Urgente» solo si necesita atención inmediata.</span>
+          </label>
 
           <fieldset>
             <legend>¿Cómo quieres enviarlo?</legend>

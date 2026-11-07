@@ -6,6 +6,10 @@
 .review-en_proceso { background: #d9e6f7; color: #123c6b; border-color: #4a7bb7; }
 .review-completado { background: #d6efdc; color: #14532d; border-color: #3f9b5c; }
 .review-rechazado { background: #f7d4d6; color: #7a0f16; border-color: var(--red); }
+.urgency-baja { background: #e4ebe6; color: #2d4a38; border-color: #7a9a86; }
+.urgency-media { background: #ece6dc; color: #4a4338; border-color: #9a8f7e; }
+.urgency-alta { background: #fbdcb4; color: #6b3a00; border-color: #d98a1f; }
+.urgency-urgente { background: var(--red-dark); color: #fff; border-color: var(--red-dark); }
 .msg-actions { margin-top: .8rem; }
 .inline-select { display: flex; flex-direction: row; align-items: center; gap: .5rem; font-weight: 600; font-size: .9rem; }
 .inline-select select { width: auto; padding-top: .35rem; padding-bottom: .35rem; }

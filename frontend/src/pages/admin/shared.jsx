@@ -105,7 +105,8 @@ export function GalleryField({ value = [], onChange, label = 'Galería', max = 6
 }
 
 // Editor genérico (noticias / propuestas / equipo)
-export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote }) {
+// `newAtEnd`: el botón de crear va debajo de la lista en vez de encima
+export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote, newAtEnd = false }) {
   const { confirm, notify } = useDialog();
   const { items, loading, error, reload, setError } = useList(listPath);
   const [editing, setEditing] = useState(null);
@@ -137,6 +138,7 @@ export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel
     }
   }
   const set = (k) => (v) => setEditing((cur) => ({ ...cur, [k]: v }));
+  const newButton = <button className="btn btn-red" onClick={() => setEditing(blank(items))}>{newLabel}</button>;
 
   if (editing) {
     return (
@@ -152,7 +154,7 @@ export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel
   }
   return (
     <div>
-      <button className="btn btn-red" onClick={() => setEditing(blank(items))}>{newLabel}</button>
+      {!newAtEnd && newButton}
       {error && <p className="error">{error}</p>}
       {loading && <Spinner />}
       {items?.map((it) => (
@@ -164,6 +166,7 @@ export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel
           </div>
         </article>
       ))}
+      {newAtEnd && <div className="crud-new-end">{newButton}</div>}
     </div>
   );
 }

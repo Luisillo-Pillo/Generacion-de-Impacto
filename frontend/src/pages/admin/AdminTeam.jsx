@@ -9,7 +9,7 @@ export default function AdminTeam() {
     <>
     <MemberOrder onChange={() => setVersion((v) => v + 1)} />
     <CrudPanel key={version}
-      listPath="/members/all" endpoint="/members" newLabel="Nuevo integrante"
+      listPath="/members/all" endpoint="/members" newLabel="Nuevo integrante" newAtEnd
       deleteNote="También se eliminará su cuenta de acceso."
       blank={(items) => ({ name: '', role: '', degree: '', photo: null, order: items?.length || 0, email: '', password: '', access: 'admin' })}
       summary={(m) => <><strong>{m.name}</strong><br /><span className="muted">{m.role ? `${m.role} · ` : ''}{m.email}{m.access === 'moderador' ? ' · Moderador' : ''}</span></>}

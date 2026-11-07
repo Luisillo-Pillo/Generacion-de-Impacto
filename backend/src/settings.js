@@ -8,6 +8,8 @@ export async function loadSettings() {
   const rows = await Setting.find();
   const out = { ...DEFAULT_SETTINGS };
   for (const r of rows) if (SETTING_KEYS.includes(r.key)) out[r.key] = r.value;
+  // Facebook y TikTok ya no existen en el sitio: si quedaron guardados de antes, no se devuelven
+  if (out.social) out.social = { instagram: out.social.instagram ?? '', email: out.social.email ?? '' };
   if (!rows.some((r) => r.key === 'groupDegrees')) out.groupDegrees = out.degrees.filter((d) => /telesecundaria/i.test(d));
   return out;
 }

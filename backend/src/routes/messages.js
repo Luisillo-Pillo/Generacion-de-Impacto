@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Message, MESSAGE_TYPES, MESSAGE_STATUS, MESSAGE_REVIEW } from '../models.js';
+import { Message, MESSAGE_TYPES, MESSAGE_STATUS, MESSAGE_REVIEW, MESSAGE_URGENCY } from '../models.js';
 import { adminOnly, staffOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { imageUpload, saveImage } from '../uploads.js';
@@ -20,6 +20,8 @@ const base = {
   type: z.enum(MESSAGE_TYPES),
   subject: z.string().trim().min(3, 'Escribe un asunto').max(140),
   body: z.string().trim().min(10, 'El mensaje es muy corto').max(4000),
+  // Urgencia que le da quien escribe; si no la manda (formulario anterior), media
+  urgency: z.enum(MESSAGE_URGENCY, { error: 'Selecciona la urgencia' }).optional().default('media'),
 };
 
 // Anónimo: no se aceptan ni guardan datos personales. Identificado: todos los datos son obligatorios.
@@ -119,7 +121,7 @@ const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // Filtros comunes del listado y la exportación: estado, tipo, revisión y búsqueda `q` en asunto y texto. La búsqueda usa
 // una expresión regular ESCAPADA (nunca lo escrito tal cual) para que nadie pueda inyectar patrones.
 function buildFilter(query, { trash = false } = {}) {
-  const { status, type, review, q } = query;
+  const { status, type, review, urgency, q } = query;
   // `deletedAt: null` también cubre los mensajes anteriores a la papelera, que no tienen el campo
   const filter = { deletedAt: trash ? { $ne: null } : null };
   if (MESSAGE_STATUS.includes(status)) filter.status = status;
@@ -127,6 +129,9 @@ function buildFilter(query, { trash = false } = {}) {
   // Los mensajes anteriores a este campo no lo tienen: cuentan como pendientes
   if (review === 'pendiente') filter.review = { $in: ['pendiente', null] };
   else if (MESSAGE_REVIEW.includes(review)) filter.review = review;
+  // Los mensajes anteriores a este campo no lo tienen: cuentan como urgencia media
+  if (urgency === 'media') filter.urgency = { $in: ['media', null] };
+  else if (MESSAGE_URGENCY.includes(urgency)) filter.urgency = urgency;
   const text = typeof q === 'string' ? q.trim().slice(0, 100) : '';
   if (text) {
     const rx = new RegExp(escapeRegex(text), 'i');
@@ -173,11 +178,11 @@ router.get('/export', adminOnly, async (req, res) => {
   const items = await Message.find(buildFilter(req.query)).sort({ createdAt: -1 }).limit(10000);
   const date = (d) => (d ? new Date(d).toISOString().replace('T', ' ').slice(0, 19) : '');
   const rows = items.map((m) => [
-    date(m.createdAt), m.type, m.anonymous ? 'Sí' : 'No', m.name, m.degree, m.semester, m.group, m.phone, m.subject, m.body,
+    date(m.createdAt), m.type, m.urgency || 'media', m.anonymous ? 'Sí' : 'No', m.name, m.degree, m.semester, m.group, m.phone, m.subject, m.body,
     m.status, m.review || 'pendiente', m.publicReply, (m.notes ?? []).map((n) => `${n.authorName}: ${n.text}`).join(' | '),
   ]);
   const csv = toCsv(
-    ['Fecha (UTC)', 'Tipo', 'Anónimo', 'Nombre', 'Licenciatura', 'Semestre', 'Grupo', 'Teléfono', 'Asunto', 'Mensaje', 'Estado', 'Revisión', 'Respuesta pública', 'Notas internas'],
+    ['Fecha (UTC)', 'Tipo', 'Urgencia', 'Anónimo', 'Nombre', 'Licenciatura', 'Semestre', 'Grupo', 'Teléfono', 'Asunto', 'Mensaje', 'Estado', 'Revisión', 'Respuesta pública', 'Notas internas'],
     rows
   );
   await audit(req, 'mensaje.exportar', 'mensaje', undefined, `Exportó ${items.length} mensaje(s) a CSV`);

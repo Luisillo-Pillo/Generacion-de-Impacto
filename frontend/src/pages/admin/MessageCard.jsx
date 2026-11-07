@@ -3,13 +3,14 @@ import { formatDate, formatTime } from '../../api.js';
 import AuthImage from '../../components/AuthImage.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { formatPhone } from '../../utils.js';
-import { REVIEW, REVIEW_LABEL, TYPE_LABEL } from './messageLabels.js';
+import { REVIEW, REVIEW_LABEL, TYPE_LABEL, URGENCY_LABEL } from './messageLabels.js';
 import './MessageCard.css';
 
 // Una tarjeta de mensaje del panel: contenido, adjuntos, clasificación, respuesta para quien escribió y notas internas.
 // Las acciones llegan del padre (`actions`) y devuelven una promesa; los errores los muestra el padre.
 export default function MessageCard({ m, trash, moderator, actions }) {
   const review = m.review || 'pendiente';
+  const urgency = m.urgency || 'media'; // los mensajes anteriores a este campo cuentan como media
   const [reply, setReply] = useState(m.publicReply ?? '');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState('');
@@ -43,6 +44,7 @@ export default function MessageCard({ m, trash, moderator, actions }) {
         <span className="row">
           <span className="tag">{TYPE_LABEL[m.type]}</span>
           <span className={`badge review-${review}`}>{REVIEW_LABEL[review]}</span>
+          <span className={`badge urgency-${urgency}`}>Urgencia: {URGENCY_LABEL[urgency]}</span>
         </span>
         <span className="muted">{formatDate(m.createdAt)} · {formatTime(m.createdAt)}</span>
       </header>

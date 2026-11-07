@@ -12,8 +12,6 @@ export default function Team() {
   const social = settings?.social || {};
   const links = [
     ['Instagram', social.instagram],
-    ['Facebook', social.facebook],
-    ['TikTok', social.tiktok],
   ].filter(([, url]) => /^https?:\/\//i.test(url || '')); // solo enlaces http(s)
 
   return (

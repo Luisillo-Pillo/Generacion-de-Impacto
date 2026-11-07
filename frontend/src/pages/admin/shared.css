@@ -2,6 +2,7 @@
 .image-field img { max-height: 160px; width: auto; border-radius: 6px; }
 .image-field input { padding: .4rem; }
 .image-field > span { font-weight: 600; font-size: .92rem; }
+.crud-new-end { margin-top: 1.2rem; }
 .gallery-thumbs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .8rem; }
 .gallery-thumbs li { display: grid; gap: .2rem; justify-items: start; }
 .gallery-thumbs img { max-height: 90px; }

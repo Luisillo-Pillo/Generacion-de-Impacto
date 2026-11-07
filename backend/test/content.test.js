@@ -109,15 +109,22 @@ test('ajustes: valores por defecto, lectura pública y validación', async () =>
 });
 
 test('ajustes: las redes solo aceptan enlaces http(s) y el correo debe ser válido', async () => {
-  const social = (extra) => ({ token, body: { value: { instagram: '', facebook: '', tiktok: '', email: '', ...extra } } });
+  const social = (extra) => ({ token, body: { value: { instagram: '', email: '', ...extra } } });
   assert.equal((await t.call('PUT', '/settings/social', social({ instagram: 'javascript:alert(1)' }))).status, 400);
-  assert.equal((await t.call('PUT', '/settings/social', social({ facebook: '@usuario' }))).status, 400);
-  assert.equal((await t.call('PUT', '/settings/social', social({ tiktok: 'data:text/html,<script>' }))).status, 400);
+  assert.equal((await t.call('PUT', '/settings/social', social({ instagram: '@usuario' }))).status, 400);
+  assert.equal((await t.call('PUT', '/settings/social', social({ instagram: 'data:text/html,<script>' }))).status, 400);
   assert.equal((await t.call('PUT', '/settings/social', social({ email: 'no-es-correo' }))).status, 400);
   const ok = await t.call('PUT', '/settings/social', social({ instagram: 'https://instagram.com/gi', email: 'Contacto@Test.com' }));
   assert.equal(ok.status, 200);
   assert.equal(ok.json.value.email, 'contacto@test.com');
   assert.equal((await t.call('GET', '/settings')).json.social.instagram, 'https://instagram.com/gi');
+
+  // Facebook y TikTok ya no existen: se ignoran al guardar y, si quedaron guardados de antes, no se devuelven
+  const viejo = await t.call('PUT', '/settings/social', social({ facebook: 'https://facebook.com/gi', tiktok: 'https://tiktok.com/@gi' }));
+  assert.equal(viejo.status, 200);
+  assert.deepEqual(Object.keys(viejo.json.value).sort(), ['email', 'instagram']);
+  await t.models.Setting.updateOne({ key: 'social' }, { value: { instagram: 'https://instagram.com/gi', facebook: 'https://facebook.com/gi', tiktok: 'https://tiktok.com/@gi', email: '' } });
+  assert.deepEqual((await t.call('GET', '/settings')).json.social, { instagram: 'https://instagram.com/gi', email: '' });
 });
 
 test('ajustes: groupDegrees se deduce de las licenciaturas con "telesecundaria" hasta que se guarde', async () => {

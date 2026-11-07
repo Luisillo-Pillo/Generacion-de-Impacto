@@ -169,8 +169,6 @@ const settingSchemas = {
   semesters: list,
   social: z.object({
     instagram: url,
-    facebook: url,
-    tiktok: url,
     email: z.union([z.literal(''), z.string().trim().toLowerCase().max(200).email('Correo de contacto no válido')]).default(''),
   }),
 };

@@ -39,8 +39,6 @@ export default function AdminSettings() {
       {lines('groups', 'Grupos (para las licenciaturas con varios grupos)')}
       <h3>Redes y contacto</h3>
       {social('instagram', 'Instagram (URL)')}
-      {social('facebook', 'Facebook (URL)')}
-      {social('tiktok', 'TikTok (URL)')}
       {social('email', 'Correo de contacto')}
       <div className="row"><button className="btn btn-red">Guardar ajustes</button><span>{msg}</span></div>
     </form>

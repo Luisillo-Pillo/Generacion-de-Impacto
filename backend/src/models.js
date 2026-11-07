@@ -20,6 +20,8 @@ export const MESSAGE_TYPES = ['queja', 'propuesta', 'pregunta', 'problema'];
 export const MESSAGE_STATUS = ['nuevo', 'leido', 'archivado'];
 // Seguimiento que le da el equipo al mensaje, independiente de si ya se leyó o se archivó
 export const MESSAGE_REVIEW = ['pendiente', 'en_proceso', 'completado', 'rechazado'];
+// Qué tan pronto necesita atención, según quien escribe (los mensajes anteriores a este campo cuentan como «media»)
+export const MESSAGE_URGENCY = ['baja', 'media', 'alta', 'urgente'];
 
 const messageSchema = new Schema(
   {
@@ -35,6 +37,7 @@ const messageSchema = new Schema(
     body: { type: String, required: true, trim: true, maxlength: 4000 },
     status: { type: String, enum: MESSAGE_STATUS, default: 'nuevo' },
     review: { type: String, enum: MESSAGE_REVIEW, default: 'pendiente' },
+    urgency: { type: String, enum: MESSAGE_URGENCY, default: 'media' },
     // SHA-256 del código de seguimiento (el código en claro nunca se guarda; ver tracking.js). No sale en las consultas.
     codeHash: { type: String, select: false, index: { unique: true, sparse: true } },
     publicReply: { type: String, trim: true, maxlength: 1000 }, // respuesta del equipo que ve quien escribe con su código
@@ -130,5 +133,5 @@ export const DEFAULT_SETTINGS = {
   ],
   groups: ['A', 'B', 'C', 'D'],
   semesters: ['1', '2', '3', '4', '5', '6', '7', '8'],
-  social: { instagram: '', facebook: '', tiktok: '', email: '' },
+  social: { instagram: '', email: '' },
 };
