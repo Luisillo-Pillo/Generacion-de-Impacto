@@ -30,23 +30,43 @@ for (const ruta of PANEL) {
   });
 }
 
-test('accesibilidad: buzón con datos personales, editor de noticias y diálogo abiertos', async ({ page }) => {
-  await mockApi(page, { loggedIn: true });
-  await withSession(page);
+const ETIQUETAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+const sinViolaciones = async (page, donde) => {
+  const { violations } = await new AxeBuilder({ page }).withTags(ETIQUETAS).analyze();
+  expect(violations.map((v) => `${v.id}: ${v.help}`), donde).toEqual([]);
+};
+
+test('accesibilidad: buzón con datos personales', async ({ page }) => {
+  await mockApi(page);
   await page.goto('/buzon');
   await page.getByText('Con mis datos').click();
-  const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
-  expect(violations.map((v) => `${v.id}: ${v.help}`), 'buzón con datos').toEqual([]);
+  await sinViolaciones(page, 'buzón con datos');
+});
 
+test('accesibilidad: editor de noticias con vista previa', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await withSession(page);
   await page.goto('/admin/noticias');
   await page.getByRole('button', { name: 'Nueva noticia' }).click();
   await page.getByLabel('Vista previa').check();
-  const editor = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
-  expect(editor.violations.map((v) => `${v.id}: ${v.help}`), 'editor de noticias').toEqual([]);
+  await sinViolaciones(page, 'editor de noticias');
+});
 
+test('accesibilidad: diálogo de confirmación abierto', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await withSession(page);
   await page.goto('/admin/mensajes');
   await page.getByRole('button', { name: 'Eliminar', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  const dialogo = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
-  expect(dialogo.violations.map((v) => `${v.id}: ${v.help}`), 'diálogo').toEqual([]);
+  await sinViolaciones(page, 'diálogo');
 });
+
+for (const rol of ['presidente', 'miembro', 'moderador']) {
+  test(`accesibilidad del panel con el rol ${rol}`, async ({ page }) => {
+    await mockApi(page, { loggedIn: true, role: rol });
+    await withSession(page);
+    await page.goto(rol === 'miembro' ? '/admin/equipo' : '/admin/mensajes');
+    await page.waitForLoadState('networkidle');
+    await sinViolaciones(page, `panel (${rol})`);
+  });
+}

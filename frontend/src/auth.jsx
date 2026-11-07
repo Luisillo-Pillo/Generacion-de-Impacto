@@ -38,6 +38,8 @@ export function AuthProvider({ children }) {
     member,
     loading,
     expired,
+    // Vuelve a pedir la sesión (p. ej. tras editar la propia información) para que el nombre y la foto se actualicen
+    refresh: () => api('/auth/me').then(applySession),
     login: async (email, password) => {
       const d = await api('/auth/login', { method: 'POST', body: { email, password } });
       setToken(d.token);

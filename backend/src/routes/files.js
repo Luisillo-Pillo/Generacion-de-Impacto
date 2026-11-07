@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { getBucket, deleteFile } from '../db.js';
-import { adminOnly, requireAuth, requireStaff } from '../auth.js';
+import { adminOnly, requireAuth, requireReader } from '../auth.js';
 import { imageUpload, saveImage, ogImage, VARIANT_WIDTHS } from '../uploads.js';
 
 const router = Router();
@@ -20,7 +20,7 @@ async function loadFile(req, res, next) {
   if (!file) return res.status(404).end();
   req.fileDoc = file;
   if (!file.metadata?.private) return next();
-  requireAuth(req, res, (err) => (err ? next(err) : requireStaff(req, res, next)));
+  requireAuth(req, res, (err) => (err ? next(err) : requireReader(req, res, next)));
 }
 
 async function readAll(id) {

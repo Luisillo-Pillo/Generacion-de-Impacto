@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, fileUrl, uploadImage } from '../../api.js';
+import { useAuth } from '../../auth.jsx';
+import { canEdit } from '../../roles.js';
 import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import './shared.css';
@@ -108,6 +110,8 @@ export function GalleryField({ value = [], onChange, label = 'Galería', max = 6
 // `newAtEnd`: el botón de crear va debajo de la lista en vez de encima
 export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote, newAtEnd = false }) {
   const { confirm, notify } = useDialog();
+  const { user } = useAuth();
+  const readOnly = !canEdit(user?.role); // solo el Técnico crea, edita y elimina; los demás roles solo ven
   const { items, loading, error, reload, setError } = useList(listPath);
   const [editing, setEditing] = useState(null);
 
@@ -154,19 +158,21 @@ export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel
   }
   return (
     <div>
-      {!newAtEnd && newButton}
+      {!readOnly && !newAtEnd && newButton}
       {error && <p className="error">{error}</p>}
       {loading && <Spinner />}
       {items?.map((it) => (
         <article key={it._id} className="card row between">
           <div>{summary(it)}</div>
-          <div className="row">
-            <button className="btn btn-dark sm" onClick={() => setEditing({ ...it })}>Editar</button>
-            <button className="btn btn-red sm" onClick={() => remove(it)}>Eliminar</button>
-          </div>
+          {!readOnly && (
+            <div className="row">
+              <button className="btn btn-dark sm" onClick={() => setEditing({ ...it })}>Editar</button>
+              <button className="btn btn-red sm" onClick={() => remove(it)}>Eliminar</button>
+            </div>
+          )}
         </article>
       ))}
-      {newAtEnd && <div className="crud-new-end">{newButton}</div>}
+      {!readOnly && newAtEnd && <div className="crud-new-end">{newButton}</div>}
     </div>
   );
 }

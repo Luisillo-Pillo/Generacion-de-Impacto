@@ -7,8 +7,13 @@ const userSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 80 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
-    // admin: todo. moderador: solo lee y gestiona mensajes, sin ver datos de contacto ni borrar (ver auth.js y routes/messages.js).
-    role: { type: String, enum: ['admin', 'moderador', 'user'], default: 'user' },
+    // Roles del sitio (ver auth.js):
+    //  admin      = «Técnico»: ve y edita todo.
+    //  presidente = «Presidente»: ve todo (datos de contacto incluidos), no edita nada.
+    //  miembro    = «Miembro»: edita su propia información y ve la no crítica de los demás integrantes.
+    //  moderador  = lee y clasifica mensajes sin ver datos de contacto ni borrar.
+    // El valor guardado del Técnico sigue siendo `admin` (así las cuentas existentes no cambian).
+    role: { type: String, enum: ['admin', 'presidente', 'miembro', 'moderador', 'user'], default: 'user' },
     // Se suma al cambiar la contraseña o al cerrar sesión en todos los dispositivos: los tokens con otra versión dejan de valer.
     tokenVersion: { type: Number, default: 0 },
   },

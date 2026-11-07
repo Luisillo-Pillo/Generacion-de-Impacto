@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Message, MESSAGE_TYPES, MESSAGE_STATUS, MESSAGE_REVIEW, MESSAGE_URGENCY } from '../models.js';
-import { adminOnly, staffOnly } from '../auth.js';
+import { adminOnly, staffOnly, readerOnly, viewerOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { imageUpload, saveImage } from '../uploads.js';
 import { loadSettings } from '../settings.js';
@@ -103,11 +103,12 @@ router.post('/track', async (req, res) => {
   });
 });
 
-// Un moderador no ve quién escribió: los datos de contacto se quitan de la respuesta (solo se indica que los hay).
+// Solo el moderador no ve quién escribió: los datos de contacto se quitan de la respuesta (solo se indica que los hay).
+// El Técnico y el Presidente ven los mensajes completos.
 const CONTACT_FIELDS = ['name', 'degree', 'semester', 'group', 'phone'];
 function forRole(msg, role) {
   const json = msg.toObject ? msg.toObject() : msg;
-  if (role === 'admin') return json;
+  if (role === 'admin' || role === 'presidente') return json;
   const out = { ...json, hasContact: !json.anonymous };
   for (const field of CONTACT_FIELDS) delete out[field];
   return out;
@@ -142,9 +143,9 @@ function buildFilter(query, { trash = false } = {}) {
 
 // Con `?page=` responde { items, total, page, pages } (de `limit` en `limit`, 20 por defecto, máximo 100); sin él, la lista
 // completa hasta 500 como antes (compatibilidad con pestañas abiertas con el sitio anterior).
-router.get('/', staffOnly, async (req, res) => {
+router.get('/', readerOnly, async (req, res) => {
   const trash = req.query.trash === '1';
-  if (trash && req.user.role !== 'admin') return res.status(403).json({ error: 'Se requiere rol de administrador' });
+  if (trash && !['admin', 'presidente'].includes(req.user.role)) return res.status(403).json({ error: 'No tienes permiso para ver la papelera' });
   const filter = buildFilter(req.query, { trash });
   const sort = trash ? { deletedAt: -1 } : { createdAt: -1 };
   if (req.query.page === undefined) {
@@ -160,7 +161,7 @@ router.get('/', staffOnly, async (req, res) => {
 });
 
 // Contadores para la insignia del panel y el resumen sobre la lista (solo mensajes que no están en la papelera).
-router.get('/stats', staffOnly, async (_req, res) => {
+router.get('/stats', readerOnly, async (_req, res) => {
   const live = { deletedAt: null };
   const [nuevos, pendientes, total, tipos] = await Promise.all([
     Message.countDocuments({ ...live, status: 'nuevo' }),
@@ -172,9 +173,9 @@ router.get('/stats', staffOnly, async (_req, res) => {
   res.json({ nuevos, pendientes, total, porTipo });
 });
 
-// Exporta a CSV (UTF-8 con BOM para que Excel respete los acentos) con los mismos filtros del listado. Solo administradores:
+// Exporta a CSV (UTF-8 con BOM para que Excel respete los acentos) con los mismos filtros del listado. Técnico y Presidente:
 // incluye datos personales. Las celdas que Excel interpretaría como fórmula se neutralizan (ver csv.js). Queda en la bitácora.
-router.get('/export', adminOnly, async (req, res) => {
+router.get('/export', viewerOnly, async (req, res) => {
   const items = await Message.find(buildFilter(req.query)).sort({ createdAt: -1 }).limit(10000);
   const date = (d) => (d ? new Date(d).toISOString().replace('T', ' ').slice(0, 19) : '');
   const rows = items.map((m) => [

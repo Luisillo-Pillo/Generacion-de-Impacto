@@ -93,7 +93,7 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, `a
 
 **No hay registro público.** Solo las personas dadas de alta como integrantes de la planilla tienen cuenta:
 
-- **Alta de integrante** (Panel → Equipo → Nuevo integrante): se capturan nombre, cargo, licenciatura, foto, **correo y contraseña**. La API crea el usuario y la ficha juntos. Se elige el **acceso al panel**: **administrador** (por defecto; todo) o **moderador** (solo lee y clasifica mensajes: no ve nombre, teléfono, licenciatura, semestre ni grupo, no elimina y no entra a noticias, propuestas, equipo, ajustes ni actividad). Siempre debe quedar al menos un administrador y nadie se quita su propio rol. Si falla la creación de la ficha, se revierte la cuenta.
+- **Alta de integrante** (Panel → Equipo → Nuevo integrante): se capturan nombre, cargo, licenciatura, foto, **correo y contraseña**. La API crea el usuario y la ficha juntos. Se elige el **rol**: Técnico, Presidente, **Miembro (por defecto, el de menos permisos)** o Moderador (ver «Roles y permisos» abajo). Siempre debe quedar al menos un Técnico y nadie se quita su propio rol de Técnico. Si falla la creación de la ficha, se revierte la cuenta.
 - **Contraseñas**: mínimo **10 caracteres** y no pueden ser de las más comunes (`1234567890`, `password123`, el nombre del sitio, un solo carácter repetido…) en el alta, el cambio de contraseña y `npm run create-admin`. Se guardan con bcrypt costo 12; las cuentas con contraseñas anteriores (costo 10, incluso de 8 caracteres) siguen entrando y su hash se **actualiza solo** al iniciar sesión.
 - **Edición**: se puede cambiar el correo y restablecer la contraseña (campo vacío = no cambiar; al restablecerla se cierran las sesiones de esa persona). El nombre se sincroniza con la cuenta.
 - **Baja**: eliminar al integrante elimina también su cuenta (su sesión deja de funcionar al instante). Nadie puede eliminar su propia ficha, así que siempre queda al menos un administrador.
@@ -102,6 +102,23 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, `a
 - **Freno de intentos**: 5 intentos fallidos **por correo** en 15 minutos bloquean esa cuenta (429 con `Retry-After`, incluso con la contraseña correcta). **No se limita por IP**: la comunidad estudiantil comparte red (misma IP) y un límite por IP bloquearía a todos por culpa de uno. El conteo vive en MongoDB (sobrevive a reinicios), con la llave en hash.
 - **Perfil** (`/perfil`): datos del usuario, cambio de contraseña (pide la actual; cierra las demás sesiones y deja esta con un token nuevo) y «Cerrar sesión en todos los dispositivos».
 - El header muestra, con sesión iniciada, un menú con **Ver perfil** y **Cerrar sesión** (con confirmación). Los campos de contraseña tienen botón de “ojo” para mostrarla.
+
+### Roles y permisos
+
+Cada cuenta tiene un rol que elige un **Técnico** al dar de alta o editar al integrante (Panel → Equipo). La API lo lee de la base en cada petición, así que un cambio surte efecto de inmediato; el panel solo muestra a cada rol sus secciones y las rutas de la API responden 403 a lo que no le toca. La tabla vive en `backend/src/auth.js` y se prueba en `backend/test/permisos.test.js`.
+
+| Rol | Ve | Edita | Mensajes | Equipo y ficha propia |
+|---|---|---|---|---|
+| **Técnico** (`admin`) | todo | todo | lee y gestiona (estado, revisión, respuesta, notas), elimina y exporta | da de alta, cambia roles, orden y elimina; edita su ficha |
+| **Presidente** (`presidente`) | todo, con datos de contacto, papelera, bitácora, borradores y ajustes | nada | solo lee (y exporta) | ve el equipo completo; edita su ficha |
+| **Miembro** (`miembro`) | su información y la **no crítica** de los demás (nombre, cargo, licenciatura y foto; sin correo ni rol) | su propia ficha | sin acceso | ve el directorio; edita su ficha |
+| **Moderador** (`moderador`) | solo mensajes, sin nombre, teléfono, licenciatura, semestre ni grupo | estado, revisión, respuesta y notas | lee y clasifica; no elimina | sin acceso al equipo; edita su ficha |
+
+- El valor guardado del Técnico sigue siendo `admin`: así las cuentas que ya existían conservan todo sin migrar nada.
+- **El rol por defecto de un integrante nuevo es Miembro** (antes era administrador): quien da de alta debe elegir explícitamente Técnico, Presidente o Moderador. El primer Técnico se crea con `npm run create-admin`.
+- **Información no crítica** de un integrante = nombre, cargo, licenciatura y foto. **Crítica** = correo y rol de acceso.
+- El Miembro edita su ficha en **Mi perfil → Mi información** (`PUT /api/members/me`: solo nombre, cargo, licenciatura y foto; el correo, el rol y el orden no se pueden cambiar por esa vía) y su contraseña en la misma página.
+- El Presidente puede exportar a CSV (es «ver todo»: ya ve esos datos) y la exportación queda en la bitácora.
 
 ## 6. API
 
@@ -209,7 +226,7 @@ Copia del sitio con su propia API y base de datos, para probar cambios reales (s
 Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS y exports sin uso, `npm audit`, 59 pruebas de API y 43 comprobaciones en navegador contra una base de pruebas aparte (eliminada después). Resultado y limitaciones conocidas:
 
 - Sin errores, sin código muerto detectado y `npm audit` en 0 vulnerabilidades (se actualizaron `zod` 3→4 y `react-router-dom` 6→7).
-- El rol `user` de `User.role` ya no se asigna a nadie (las cuentas son de integrantes: `admin` o `moderador`). Se conserva el valor y la comprobación de rol como defensa si se edita la BD a mano: una cuenta `user` no ve mensajes ni imágenes privadas.
+- El rol `user` de `User.role` ya no se asigna a nadie (las cuentas son de integrantes: `admin`, `presidente`, `miembro` o `moderador`). Se conserva el valor y la comprobación de rol como defensa si se edita la BD a mano: una cuenta `user` no ve mensajes ni imágenes privadas.
 - **Imágenes huérfanas**: si en el panel subes una imagen y cancelas sin guardar, el archivo queda en GridFS. Se limpian solo al reemplazar o eliminar el registro que las usa.
 - **Login con freno de fuerza bruta** (2026-10-29; reemplazado el 2026-11-06, ver sección 5): 5 intentos fallidos por correo en 15 minutos, guardados en MongoDB. Un correo inexistente tarda lo mismo que uno existente (hash de relleno), para no delatar qué cuentas existen.
 - **Buzón sin captcha** (decisión del cliente): `POST /api/messages` es público. Desde el 2026-11-06 lleva protecciones invisibles (campo trampa, tiempo mínimo de llenado, tope de 12 MB por envío); **no hay ningún límite de envíos** (ni por IP ni global): la comunidad comparte red y el cliente no quiere topes.
@@ -237,6 +254,13 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - **Dependabot:** los PR de actualización mayor (React 19, ESLint 10, Vite 8, Mongoose 9, etc.) no se fusionan sin migrar y probar; los que fallen en el CI se pueden cerrar o dejar abiertos.
 
 ## 10. Registro de cambios
+
+### 2026-11-07 — Roles: Técnico, Presidente y Miembro (0.15.0)
+- **Nuevos roles** además del Moderador: **Técnico** (ve y edita todo; es el `admin` de siempre), **Presidente** (ve todo, no edita) y **Miembro** (edita su información y ve la no crítica de los demás). Tabla completa en «Roles y permisos».
+- **API:** `viewerOnly` (Técnico y Presidente) para la papelera, bitácora, exportación y listados con borradores; `readerOnly` (más Moderador) para leer mensajes e imágenes adjuntas; `panelUserOnly` para el directorio del equipo, que a un Miembro solo le devuelve lo no crítico; nuevo `PUT /api/members/me` para editar la propia ficha. Las escrituras siguen siendo solo del Técnico (y las de mensajes también del Moderador).
+- **Panel:** cada rol ve sus secciones; el Presidente ve todo sin controles de edición (ajustes deshabilitados, sin botones de crear/editar/eliminar ni acciones sobre mensajes); el Miembro solo ve «Equipo» y edita lo suyo en «Mi perfil». El selector de rol del formulario de Equipo ofrece los cuatro.
+- **Cambio de comportamiento:** el rol por defecto de un integrante nuevo es ahora **Miembro** (antes administrador). Las cuentas existentes no cambian.
+- Pruebas: 152 de API (`permisos.test.js` con la matriz completa por rol) y 53 de navegador (Presidente y Miembro, y axe con cada rol). El recorrido largo de accesibilidad se dividió en pruebas más cortas y el tiempo límite de Playwright subió a 60 s, porque en equipos lentos o ocupados se pasaban de tiempo sin ser fallos reales.
 
 ### 2026-11-07 — Urgencia en el buzón, equipo y ajustes (0.14.0)
 - **Urgencia del mensaje:** el buzón tiene un menú desplegable «Urgencia» (Baja, Media —por defecto—, Alta, Urgente). Se guarda en `messages.urgency` (la API rechaza otros valores con 400; los mensajes anteriores y los de formularios viejos cuentan como Media). En el panel cada mensaje muestra su urgencia con texto y color, hay un filtro «Urgencia» (también `?urgency=` en la API) y el CSV incluye la columna.

@@ -186,7 +186,7 @@ test('un moderador solo ve los mensajes, sin eliminar ni papelera, y no puede ab
   await page.goto('/admin/mensajes');
 
   await expect(page.getByText('Un asunto')).toBeVisible();
-  await expect(page.getByText(/solo los ve un administrador/)).toBeVisible();
+  await expect(page.getByText(/solo los ven el Técnico y el Presidente/)).toBeVisible();
   const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
   await expect(pestañas.getByRole('link')).toHaveText([/^Mensajes/]);
   await expect(page.getByRole('button', { name: 'Papelera' })).toHaveCount(0);
@@ -386,5 +386,60 @@ test('los ajustes ya no piden Facebook ni TikTok', async ({ page }) => {
   await expect(page.getByLabel('Instagram (URL)')).toBeVisible();
   await expect(page.getByLabel('Correo de contacto')).toBeVisible();
   await expect(page.getByText(/Facebook|TikTok/)).toHaveCount(0);
+});
+
+test('Presidente: ve todo el panel, con datos de contacto, pero sin ningún control para editar', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true, role: 'presidente' });
+  Object.assign(state.messages[0], { anonymous: false, name: 'Luis Pérez', degree: 'Primaria', semester: '3', phone: '5512345678' });
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+
+  const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
+  await expect(pestañas.getByRole('link')).toHaveText([/^Mensajes/, 'Noticias', 'Propuestas', 'Equipo', 'Ajustes', 'Actividad']);
+  await expect(page.getByText(/Luis Pérez · Primaria/)).toBeVisible(); // datos de contacto completos
+  await expect(page.getByText('Papelera', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Exportar CSV' })).toBeVisible();
+  for (const nombre of ['Marcar leído', 'Archivar', 'Eliminar']) await expect(page.getByRole('button', { name: nombre, exact: true })).toHaveCount(0);
+  await expect(page.locator('.msg').getByLabel('Revisión')).toHaveCount(0); // el filtro de la lista sí está, el de cada tarjeta no
+
+  await pestañas.getByRole('link', { name: 'Noticias' }).click();
+  await expect(page.getByText('Primera noticia')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Nueva noticia' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
+
+  await pestañas.getByRole('link', { name: 'Equipo' }).click();
+  await expect(page.getByText('Ana Prueba').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Nuevo integrante' })).toHaveCount(0);
+  await expect(page.getByText('Ordenar el equipo')).toHaveCount(0);
+
+  await pestañas.getByRole('link', { name: 'Ajustes' }).click();
+  await expect(page.getByLabel('Instagram (URL)')).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Guardar ajustes' })).toHaveCount(0);
+});
+
+test('Miembro: solo ve el equipo (sin correos ni roles) y edita su propia información en Mi perfil', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true, role: 'miembro' });
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+
+  await expect(page).toHaveURL(/\/admin\/equipo$/); // no tiene acceso a mensajes: lo regresa a lo suyo
+  const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
+  await expect(pestañas.getByRole('link')).toHaveText(['Equipo']);
+  await expect(page.getByText('Beto Segundo')).toBeVisible();
+  await expect(page.getByText(/@test\.com/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Nuevo integrante' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
+  for (const ruta of ['/admin/noticias', '/admin/ajustes', '/admin/actividad']) {
+    await page.goto(ruta);
+    await expect(page).toHaveURL(/\/admin\/equipo$/);
+  }
+
+  await page.getByRole('link', { name: 'Mi perfil' }).click();
+  await expect(page.getByText('Miembro', { exact: true })).toBeVisible();
+  await page.getByLabel('Cargo').fill('Vocal de eventos');
+  await page.getByRole('button', { name: 'Guardar mi información' }).click();
+  await expect(page.getByText('Información actualizada ✔')).toBeVisible();
+  expect(state.sent.me).toMatchObject({ name: 'Ana Prueba', role: 'Vocal de eventos' });
+  expect(state.sent.me).not.toHaveProperty('email');
 });
 

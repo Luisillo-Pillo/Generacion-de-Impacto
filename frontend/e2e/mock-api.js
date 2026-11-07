@@ -16,7 +16,7 @@ export async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
     ],
     messages: [{ _id: 'g1', type: 'queja', anonymous: true, subject: 'Un asunto', body: 'Un mensaje', status: 'nuevo', review: 'pendiente', images: [], createdAt: '2026-10-28T20:35:00Z' }],
     trash: [],
-    sent: { message: null, news: null, patch: null, note: null, track: null, query: null, order: null },
+    sent: { message: null, news: null, patch: null, note: null, track: null, query: null, order: null, me: null },
     fileRequests: [],
     members: [MEMBER, { _id: 'm2', name: 'Beto Segundo', role: 'Secretaría' }],
     loggedIn,
@@ -56,7 +56,14 @@ export async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
       state.members = state.sent.order.map((id) => state.members.find((m) => m._id === id));
       return json(route, state.members);
     }
-    if (path === '/members/all') return json(route, state.members.map((m) => ({ ...m, email: `${m._id}@test.com`, access: 'admin' })));
+    if (path === '/members/me' && method === 'PUT') {
+      state.sent.me = req.postDataJSON();
+      return json(route, { user: { ...admin, name: state.sent.me.name }, member: { ...MEMBER, ...state.sent.me } });
+    }
+    if (path === '/members/all') {
+      // El Miembro solo ve lo no crítico de los demás: sin correo ni rol de acceso
+      return json(route, state.members.map((m) => (role === 'miembro' ? m : { ...m, email: `${m._id}@test.com`, access: 'admin' })));
+    }
     if (path === '/members') return json(route, state.members);
     if (path === '/messages' && method === 'POST') {
       state.sent.message = req.postData() || '';

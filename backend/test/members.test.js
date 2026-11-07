@@ -15,7 +15,7 @@ after(() => t.stop());
 
 const integrante = (extra = {}) => ({ name: 'Beto Prueba', role: 'Tesorería', email: 'beto@test.com', password: 'clave-de-integrante-1', ...extra });
 
-test('dar de alta a un integrante crea su cuenta de administrador', async () => {
+test('dar de alta a un integrante crea su cuenta (Miembro por defecto)', async () => {
   assert.equal((await t.call('POST', '/members', { body: integrante() })).status, 401);
   const res = await t.call('POST', '/members', { token, body: integrante() });
   assert.equal(res.status, 201);
@@ -24,7 +24,7 @@ test('dar de alta a un integrante crea su cuenta de administrador', async () => 
 
   const login = await t.call('POST', '/auth/login', { body: { email: 'beto@test.com', password: 'clave-de-integrante-1' } });
   assert.equal(login.status, 200);
-  assert.equal(login.json.user.role, 'admin');
+  assert.equal(login.json.user.role, 'miembro');
 });
 
 test('correo y contraseña son obligatorios, con mínimo de 10 caracteres, sin contraseñas comunes y correo único sin importar mayúsculas', async () => {

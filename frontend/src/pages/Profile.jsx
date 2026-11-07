@@ -6,12 +6,46 @@ import { useDialog } from '../components/Dialog.jsx';
 import { initials } from '../utils.js';
 import PasswordInput from '../components/PasswordInput.jsx';
 import Spinner from '../components/Spinner.jsx';
+import { ImageField, text } from './admin/shared.jsx';
+import { ROLE_LABEL, ROLE_HELP } from '../roles.js';
 import './Profile.css';
 
 const blank = { currentPassword: '', newPassword: '', confirm: '' };
 
+// Cada persona edita su propia información; el correo y el rol los cambia un Técnico
+function MyInfo({ member, onSaved }) {
+  const [form, setForm] = useState({ name: member.name ?? '', role: member.role ?? '', degree: member.degree ?? '', photo: member.photo ?? null });
+  const [status, setStatus] = useState({ busy: false, error: '', ok: false });
+  const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
+  async function save(e) {
+    e.preventDefault();
+    setStatus({ busy: true, error: '', ok: false });
+    try {
+      await api('/members/me', { method: 'PUT', body: form });
+      await onSaved();
+      setStatus({ busy: false, error: '', ok: true });
+    } catch (err) {
+      setStatus({ busy: false, error: err.message, ok: false });
+    }
+  }
+  return (
+    <>
+      <h2 className="title small">Mi <mark>información</mark></h2>
+      <form className="form card" onSubmit={save}>
+        {text('Nombre', form.name, set('name'), { required: true, minLength: 2, maxLength: 100 })}
+        {text('Cargo', form.role, set('role'), { maxLength: 100 })}
+        {text('Licenciatura', form.degree, set('degree'), { maxLength: 120 })}
+        <ImageField label="Foto" value={form.photo} onChange={set('photo')} />
+        {status.error && <p className="error" role="alert">{status.error}</p>}
+        {status.ok && <p role="status"><strong>Información actualizada ✔</strong></p>}
+        <button className="btn btn-red" disabled={status.busy}>{status.busy ? <><Spinner inline /> Guardando…</> : 'Guardar mi información'}</button>
+      </form>
+    </>
+  );
+}
+
 export default function Profile() {
-  const { user, member, loading } = useAuth();
+  const { user, member, loading, refresh } = useAuth();
   const { confirm, notify } = useDialog();
   const [form, setForm] = useState(blank);
   const [status, setStatus] = useState({ busy: false, error: '', ok: false });
@@ -65,9 +99,11 @@ export default function Profile() {
             <p className="muted">{user.email}</p>
             {member?.role && <p className="role">{member.role}</p>}
             {member?.degree && <p className="muted">{member.degree}</p>}
-            <span className="tag">Administrador</span>
+            <span className="tag" title={ROLE_HELP[user.role]}>{ROLE_LABEL[user.role] ?? 'Sin rol'}</span>
           </div>
         </article>
+
+        {member && <MyInfo key={member._id} member={member} onSaved={refresh} />}
 
         <h2 className="title small">Cambiar <mark>contraseña</mark></h2>
         <form className="form card" onSubmit={submit}>

@@ -8,6 +8,8 @@ export default defineConfig({
   // Con más navegadores a la vez (el valor por defecto es la mitad de los núcleos) algunas pruebas se pasaban de tiempo
   // por falta de recursos, sin ser fallos reales
   workers: 3,
+  // Los recorridos con axe (varias páginas y revisiones en una prueba) pueden pasar de los 30 s por defecto en equipos lentos
+  timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {

@@ -33,15 +33,29 @@ export async function requireAuth(req, res, next) {
 }
 
 export function requireAdmin(req, res, next) {
-  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Se requiere rol de administrador' });
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Esta acción solo la puede hacer un Técnico' });
   next();
 }
 
-// Moderadores y administradores: leen y gestionan los mensajes del buzón. El resto del panel es solo de administradores.
-export function requireStaff(req, res, next) {
-  if (!['admin', 'moderador'].includes(req.user?.role)) return res.status(403).json({ error: 'No tienes permiso para esto' });
-  next();
-}
+// Permisos por rol (el panel y la API se rigen por esta tabla):
+//
+//   rol                 ver todo   editar todo   mensajes (leer)   mensajes (gestionar)   equipo (ver, sin datos críticos)   su propia ficha
+//   admin  (Técnico)       sí          sí             sí                  sí                       sí                          sí
+//   presidente             sí          no             sí (completos)      no                       sí                          sí
+//   miembro                no          no             no                  no                       sí                          sí
+//   moderador              no          no             sí (sin contacto)   sí                       no                          sí
+//
+// `ver todo` = datos de contacto, papelera, bitácora, exportación, borradores y ajustes.
+const rolesAllowed = (roles, message = 'No tienes permiso para esto') => (req, res, next) =>
+  roles.includes(req.user?.role) ? next() : res.status(403).json({ error: message });
+
+export const requireStaff = rolesAllowed(['admin', 'moderador']); // gestionar mensajes (estado, revisión, notas, respuesta)
+export const requireReader = rolesAllowed(['admin', 'presidente', 'moderador']); // leer mensajes e imágenes adjuntas
+export const requireViewer = rolesAllowed(['admin', 'presidente']); // ver todo
+export const requirePanelUser = rolesAllowed(['admin', 'presidente', 'miembro']); // ver el directorio del equipo
 
 export const adminOnly = [requireAuth, requireAdmin];
 export const staffOnly = [requireAuth, requireStaff];
+export const readerOnly = [requireAuth, requireReader];
+export const viewerOnly = [requireAuth, requireViewer];
+export const panelUserOnly = [requireAuth, requirePanelUser];

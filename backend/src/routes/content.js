@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { News, Proposal, Setting, PROPOSAL_PROGRESS } from '../models.js';
-import { adminOnly } from '../auth.js';
+import { adminOnly, viewerOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { loadSettings } from '../settings.js';
 import { objectId } from '../validators.js';
@@ -48,7 +48,7 @@ router.get('/news', async (_req, res) => {
   res.json(await News.find(visibleNow()).sort({ publishedAt: -1 }).select('-body -gallery'));
 });
 
-router.get('/news/all', adminOnly, async (_req, res) => {
+router.get('/news/all', viewerOnly, async (_req, res) => {
   res.json(await News.find().sort({ createdAt: -1 }));
 });
 
@@ -115,7 +115,7 @@ router.get('/proposals', async (_req, res) => {
   res.json(await Proposal.find({ published: true }).sort({ number: 1 }));
 });
 
-router.get('/proposals/all', adminOnly, async (_req, res) => {
+router.get('/proposals/all', viewerOnly, async (_req, res) => {
   res.json(await Proposal.find().sort({ number: 1 }));
 });
 

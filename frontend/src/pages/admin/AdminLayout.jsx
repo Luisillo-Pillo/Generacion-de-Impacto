@@ -3,6 +3,7 @@ import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { api } from '../../api.js';
 import { useAuth } from '../../auth.jsx';
 import Spinner from '../../components/Spinner.jsx';
+import { SECTIONS_BY_ROLE, canReadMessages } from '../../roles.js';
 import './AdminLayout.css';
 
 const TABS = [
@@ -19,7 +20,7 @@ export default function AdminLayout() {
   const { user, loading } = useAuth();
   const { pathname } = useLocation();
   const [stats, setStats] = useState(null); // contadores de mensajes (insignia de la pestaña y resumen de la lista)
-  const staff = ['admin', 'moderador'].includes(user?.role);
+  const staff = canReadMessages(user?.role);
   const refreshStats = useCallback(() => api('/messages/stats').then(setStats).catch(() => {}), []);
   useEffect(() => {
     if (staff) refreshStats();
@@ -27,21 +28,22 @@ export default function AdminLayout() {
 
   if (loading) return <section className="section paper page-min"><div className="container"><Spinner /></div></section>;
   if (!user) return <Navigate to="/acceso" replace />;
-  const moderator = user.role === 'moderador';
-  if (user.role !== 'admin' && !moderator) {
+  const sections = SECTIONS_BY_ROLE[user.role];
+  if (!sections) {
     return (
       <section className="section paper page-min">
         <div className="container narrow">
           <h1 className="title">Sin <mark>acceso</mark></h1>
-          <p className="lead">Tu cuenta no tiene permisos para el panel. Pide a un administrador que te los asigne.</p>
+          <p className="lead">Tu cuenta no tiene permisos para el panel. Pide a un Técnico que te asigne un rol.</p>
         </div>
       </section>
     );
   }
 
-  // Un moderador solo trabaja con los mensajes: cualquier otra sección lo regresa a ellos
-  if (moderator && pathname !== '/admin/mensajes') return <Navigate to="/admin/mensajes" replace />;
-  const tabs = moderator ? TABS.filter(([path]) => path === 'mensajes') : TABS;
+  // Cada rol ve solo sus secciones (ver roles.js): cualquier otra lo regresa a la primera que le corresponde
+  const section = pathname.split('/')[2];
+  if (!sections.includes(section)) return <Navigate to={`/admin/${sections[0]}`} replace />;
+  const tabs = TABS.filter(([path]) => sections.includes(path));
 
   return (
     <section className="section paper page-min">

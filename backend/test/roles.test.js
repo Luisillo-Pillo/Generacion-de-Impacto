@@ -27,8 +27,8 @@ before(async () => {
 });
 after(() => t.stop());
 
-test('el rol por defecto de un integrante nuevo es administrador', async () => {
-  const res = await t.call('POST', '/members', { token: admin, body: { name: 'Otro Admin', email: 'otro@test.com', password: 'clave-de-otro-admin-1' } });
+test('con access: admin el integrante nuevo es Técnico', async () => {
+  const res = await t.call('POST', '/members', { token: admin, body: { name: 'Otro Admin', email: 'otro@test.com', password: 'clave-de-otro-admin-1', access: 'admin' } });
   assert.equal(res.json.access, 'admin');
   assert.equal((await t.models.User.findOne({ email: 'otro@test.com' })).role, 'admin');
   await t.call('DELETE', `/members/${res.json._id}`, { token: admin });

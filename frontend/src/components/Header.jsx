@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
+import { hasPanel } from '../roles.js';
 import UserMenu from './UserMenu.jsx';
 import './Header.css';
 
@@ -30,7 +31,7 @@ export default function Header() {
               {label}
             </NavLink>
           ))}
-          {['admin', 'moderador'].includes(user?.role) && <NavLink to="/admin" onClick={close}>Panel</NavLink>}
+          {hasPanel(user?.role) && <NavLink to="/admin" onClick={close}>Panel</NavLink>}
           {!user && <NavLink to="/acceso" onClick={close}>Acceso</NavLink>}
         </nav>
         {user && <UserMenu />}
