@@ -7,6 +7,7 @@ import Spinner from '../components/Spinner.jsx';
 import TrackingCode from '../components/TrackingCode.jsx';
 import { CheckStamp, EnvelopeSticker, IconClip, IconLock, IconSend } from '../components/MailboxIcons.jsx';
 import './Mailbox.css';
+import { usePageMeta } from '../pageMeta.js';
 
 const TYPES = [
   ['queja', 'Queja'],
@@ -23,6 +24,7 @@ const MAX_TOTAL_MB = 12; // todas las imágenes juntas
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export default function Mailbox() {
+  usePageMeta({ title: 'Buzón digital', description: 'Cuéntanos tus quejas, propuestas, preguntas o problemas, de forma anónima o con tus datos.' });
   const { data: settings } = useFetch('/settings');
   const [form, setForm] = useState(empty);
   const [status, setStatus] = useState({ sending: false, error: '', done: false, code: '' });

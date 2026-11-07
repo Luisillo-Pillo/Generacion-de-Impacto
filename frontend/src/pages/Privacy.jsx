@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
 import { useFetch } from '../hooks.js';
 import './Privacy.css';
+import { usePageMeta } from '../pageMeta.js';
 
 // Aviso de privacidad. Es un BORRADOR razonable: debe revisarlo la ENSFA o alguien con conocimiento legal antes de darlo
 // por definitivo (ver README → «Privacidad y retención»). Si cambia lo que se guarda o por cuánto tiempo, hay que
 // actualizar este texto.
 export default function Privacy() {
+  usePageMeta({ title: 'Aviso de privacidad', description: 'Cómo cuidamos los datos y mensajes que nos compartes en el buzón de Generación de Impacto.' });
   const { data: settings } = useFetch('/settings');
   const email = settings?.social?.email;
   return (

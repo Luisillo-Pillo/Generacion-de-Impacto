@@ -11,11 +11,15 @@ async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
   const admin = { ...ADMIN, role };
   const state = {
     news: [{ _id: 'n1', slug: 'primera', title: 'Primera noticia', excerpt: 'Resumen', body: 'Cuerpo', published: true, createdAt: '2026-10-20T10:00:00Z', publishedAt: '2026-10-20T10:00:00Z' }],
-    proposals: [{ _id: 'p1', number: 1, title: 'Propuesta uno', objective: 'Objetivo uno', published: true }],
+    proposals: [
+      { _id: 'p1', number: 1, title: 'Propuesta uno', objective: 'Objetivo uno', published: true, progress: 'planeada' },
+      { _id: 'p2', number: 2, title: 'Propuesta dos', objective: 'Objetivo dos', published: true, progress: 'en_marcha', progressNote: 'Ya hay fecha' },
+    ],
     messages: [{ _id: 'g1', type: 'queja', anonymous: true, subject: 'Un asunto', body: 'Un mensaje', status: 'nuevo', review: 'pendiente', images: [], createdAt: '2026-10-28T20:35:00Z' }],
     trash: [],
-    sent: { message: null, news: null, patch: null, note: null, track: null, query: null },
+    sent: { message: null, news: null, patch: null, note: null, track: null, query: null, order: null },
     fileRequests: [],
+    members: [MEMBER, { _id: 'm2', name: 'Beto Segundo', role: 'Secretaría' }],
     loggedIn,
   };
   const json = (route, body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -42,9 +46,19 @@ async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
       state.news.unshift(created);
       return json(route, created, 201);
     }
+    if (path.startsWith('/news/') && method === 'GET') {
+      const n = state.news.find((x) => `/news/${x.slug}` === path);
+      return n ? json(route, n) : json(route, { error: 'Noticia no encontrada' }, 404);
+    }
     if (path === '/news') return json(route, state.news.filter((n) => n.published));
     if (path === '/proposals' || path === '/proposals/all') return json(route, state.proposals);
-    if (path === '/members') return json(route, [MEMBER]);
+    if (path === '/members/order' && method === 'PUT') {
+      state.sent.order = req.postDataJSON().ids;
+      state.members = state.sent.order.map((id) => state.members.find((m) => m._id === id));
+      return json(route, state.members);
+    }
+    if (path === '/members/all') return json(route, state.members.map((m) => ({ ...m, email: `${m._id}@test.com`, access: 'admin' })));
+    if (path === '/members') return json(route, state.members);
     if (path === '/messages' && method === 'POST') {
       state.sent.message = req.postData() || '';
       return json(route, { ok: true, code: CODE }, 201);
@@ -346,5 +360,70 @@ test('en el panel se escribe la respuesta pública y se agregan notas internas',
   await page.getByRole('button', { name: 'Agregar nota' }).click();
   await expect(page.getByText('Hablar con intendencia')).toBeVisible();
   expect(state.sent.note).toEqual({ text: 'Hablar con intendencia' });
+});
+
+test('la noticia se muestra con formato Markdown, sin HTML crudo y sin enlaces peligrosos', async ({ page }) => {
+  const state = await mockApi(page);
+  state.news[0].body = 'Texto con **negritas** y *cursiva*.\n\n<script>window.__xss = 1</script>\n\n[malo](javascript:alert(1)) y [bueno](https://example.com)\n\n- uno\n- dos';
+  await page.goto('/noticias/primera');
+  await expect(page.getByRole('heading', { name: 'Primera noticia' })).toBeVisible();
+  await expect(page.locator('.article strong')).toHaveText('negritas');
+  await expect(page.locator('.article em')).toHaveText('cursiva');
+  await expect(page.locator('.article li')).toHaveCount(2);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  await expect(page.locator('.article script')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'bueno' })).toHaveAttribute('href', 'https://example.com');
+  await expect(page.getByRole('link', { name: 'bueno' })).toHaveAttribute('rel', /noopener/);
+  expect(await page.getByText('malo').getAttribute('href')).toBeNull(); // javascript: se descarta
+  await expect(page).toHaveTitle('Primera noticia · Generación de Impacto');
+});
+
+test('las propuestas muestran su avance y se pueden filtrar por él', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/propuestas');
+  await expect(page).toHaveTitle('Propuestas · Generación de Impacto');
+  await expect(page.getByText('Ya hay fecha')).toBeVisible();
+  await expect(page.locator('.progress-en_marcha')).toHaveText('En marcha');
+  await expect(page.locator('.progress-planeada')).toHaveText('Planeada');
+
+  await page.getByRole('button', { name: 'En marcha' }).click();
+  await expect(page.getByText('Propuesta dos')).toBeVisible();
+  await expect(page.getByText('Propuesta uno')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Todas' }).click();
+  await expect(page.getByText('Propuesta uno')).toBeVisible();
+});
+
+test('en el panel el equipo se reordena con los botones y el orden completo se envía a la API', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/admin/equipo');
+  await page.getByText('Ordenar el equipo').click();
+  await page.getByRole('button', { name: 'Subir a Beto Segundo' }).click();
+  await expect.poll(() => state.sent.order).toEqual(['m2', 'm1']);
+  await expect(page.locator('.order-name').first()).toContainText('Beto Segundo');
+  await expect(page.getByRole('button', { name: 'Subir a Beto Segundo' })).toBeDisabled();
+});
+
+test('el editor de noticias da formato, muestra vista previa y permite programar la publicación', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/admin/noticias');
+  await page.getByRole('button', { name: 'Nueva noticia' }).click();
+
+  await page.getByLabel('Título').fill('Noticia programada');
+  const cuerpo = page.getByRole('textbox', { name: 'Contenido' });
+  await cuerpo.fill('Esto es importante');
+  await cuerpo.selectText();
+  await page.getByRole('button', { name: 'Negritas' }).click();
+  await expect(cuerpo).toHaveValue('**Esto es importante**');
+  await page.getByLabel('Vista previa').check();
+  await expect(page.locator('.md-preview strong')).toHaveText('Esto es importante');
+
+  await page.getByLabel(/Fecha y hora de publicación/).fill('2030-01-15T09:30');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(page.getByText('Noticia programada')).toBeVisible();
+  expect(state.sent.news.body).toBe('**Esto es importante**');
+  expect(state.sent.news.publishedAt).toBe(new Date('2030-01-15T09:30').toISOString());
+  await expect(page.getByText(/Programada para/)).toBeVisible();
 });
 

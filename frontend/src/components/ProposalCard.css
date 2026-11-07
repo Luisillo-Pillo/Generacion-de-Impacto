@@ -10,6 +10,11 @@
 .section.paper .objective { background: var(--paper); }
 .proposal-num { font-family: var(--font-display); font-size: 4.5rem; line-height: .9; color: var(--red); display: block; }
 .proposal h3 { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: 1.4rem; }
+.progress { display: inline-block; border: 2px solid; border-radius: 999px; padding: .1rem .75rem; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .4rem; }
+.progress-planeada { background: #f6e2b3; color: #6b4b00; border-color: #c9a227; }
+.progress-en_marcha { background: #d9e6f7; color: #123c6b; border-color: #4a7bb7; }
+.progress-cumplida { background: #d6efdc; color: #14532d; border-color: #3f9b5c; }
+.progress-note { margin: 0 0 .8rem; font-size: .9rem; color: #444; }
 .proposal-img { border-radius: 6px; margin-bottom: 1rem; }
 .objective { background: #fff; border-radius: 10px; padding: .9rem 1rem; margin-top: 1rem; }
 .objective p { margin: .5rem 0 0; }

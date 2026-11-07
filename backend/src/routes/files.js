@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { getBucket, deleteFile } from '../db.js';
 import { adminOnly, requireAuth, requireStaff } from '../auth.js';
-import { imageUpload, saveImage, VARIANT_WIDTHS } from '../uploads.js';
+import { imageUpload, saveImage, ogImage, VARIANT_WIDTHS } from '../uploads.js';
 
 const router = Router();
 
@@ -23,9 +23,25 @@ async function loadFile(req, res, next) {
   requireAuth(req, res, (err) => (err ? next(err) : requireStaff(req, res, next)));
 }
 
+async function readAll(id) {
+  const chunks = [];
+  for await (const chunk of getBucket().openDownloadStream(id)) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+// `?og=1` sirve la imagen en JPEG de 1200 × 630 para la vista previa al compartir (solo imágenes públicas).
 // `?w=640` (o 1280) sirve la versión reducida en WebP si existe; sin parámetro, o si no hay versión, la original.
 router.get('/:id', loadFile, async (req, res) => {
   let file = req.fileDoc;
+  if (req.query.og !== undefined && !file.metadata?.private) {
+    try {
+      const jpg = await ogImage(await readAll(file._id));
+      res.set({ 'Content-Type': 'image/jpeg', 'Content-Length': jpg.length, 'Cache-Control': 'public, max-age=31536000, immutable', 'Cross-Origin-Resource-Policy': 'cross-origin' });
+      return res.send(jpg);
+    } catch {
+      /* no se pudo procesar: se sirve la imagen normal */
+    }
+  }
   const w = Number(req.query.w);
   const variantId = VARIANT_WIDTHS.includes(w) ? file.metadata?.variants?.[w] : null;
   if (variantId) file = (await getBucket().find({ _id: variantId }).toArray())[0] ?? file;

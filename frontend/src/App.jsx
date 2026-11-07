@@ -5,7 +5,6 @@ import Footer from './components/Footer.jsx';
 import Home from './pages/Home.jsx';
 import Proposals from './pages/Proposals.jsx';
 import News from './pages/News.jsx';
-import NewsDetail from './pages/NewsDetail.jsx';
 import Mailbox from './pages/Mailbox.jsx';
 import Team from './pages/Team.jsx';
 import Privacy from './pages/Privacy.jsx';
@@ -16,6 +15,8 @@ import Spinner from './components/Spinner.jsx';
 import './App.css';
 
 // El panel de administración se descarga solo cuando alguien entra a él: los visitantes no cargan su código.
+// La noticia individual también se descarga aparte: trae el lector de Markdown, que el resto del sitio no necesita
+const NewsDetail = lazy(() => import('./pages/NewsDetail.jsx'));
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout.jsx'));
 const AdminMessages = lazy(() => import('./pages/admin/AdminMessages.jsx'));
 const AdminNews = lazy(() => import('./pages/admin/AdminNews.jsx'));

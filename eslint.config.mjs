@@ -10,7 +10,8 @@ const sinUso = ['warn', { argsIgnorePattern: '^_' }];
 export default [
   { ignores: ['**/dist/**', '**/node_modules/**', 'frontend/playwright-report/**', 'frontend/test-results/**'] },
   {
-    files: ['backend/**/*.js'],
+    // Backend, funciones de Vercel del frontend (frontend/api) y scripts de la raíz: todo corre en Node
+    files: ['backend/**/*.js', 'frontend/api/**/*.js', 'scripts/**/*.mjs'],
     languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: globals.node },
     rules: { ...js.configs.recommended.rules, 'no-unused-vars': sinUso },
   },

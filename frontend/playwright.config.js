@@ -5,6 +5,9 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
+  // Con más navegadores a la vez (el valor por defecto es la mitad de los núcleos) algunas pruebas se pasaban de tiempo
+  // por falta de recursos, sin ser fallos reales
+  workers: 3,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {

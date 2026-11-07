@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { z } from 'zod';
 import { Member, User } from '../models.js';
 import { adminOnly } from '../auth.js';
@@ -38,6 +39,16 @@ router.get('/', async (_req, res) => {
 router.get('/all', adminOnly, async (_req, res) => {
   const members = await Member.find().sort({ order: 1, createdAt: 1 }).populate('user', 'email');
   res.json(members.map((m) => toAdminJson(m, m.user)));
+});
+
+// Reordena el equipo: recibe los ids en el orden nuevo y asigna 0, 1, 2… de una sola vez.
+// Va antes de `/:id` para que "order" no se tome por un id.
+router.put('/order', adminOnly, async (req, res) => {
+  const { ids } = z.object({ ids: z.array(z.string().refine((v) => mongoose.isValidObjectId(v), 'Id inválido')).min(1).max(200) }).parse(req.body);
+  if (new Set(ids).size !== ids.length) return res.status(400).json({ error: 'Hay integrantes repetidos' });
+  await Member.bulkWrite(ids.map((id, index) => ({ updateOne: { filter: { _id: id }, update: { $set: { order: index } } } })));
+  await audit(req, 'integrante.reordenar', 'integrante', undefined, 'Cambió el orden del equipo');
+  res.json(await Member.find().sort({ order: 1, createdAt: 1 }).select('-user'));
 });
 
 router.post('/', adminOnly, async (req, res) => {

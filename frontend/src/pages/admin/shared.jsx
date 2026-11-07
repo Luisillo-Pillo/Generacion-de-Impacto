@@ -64,6 +64,46 @@ export function ImageField({ value, onChange, label = 'Imagen' }) {
   );
 }
 
+// Varias imágenes (galería de una noticia): hasta `max`, con vista previa y botón para quitar cada una
+export function GalleryField({ value = [], onChange, label = 'Galería', max = 6 }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function add(e) {
+    const files = [...e.target.files].slice(0, max - value.length);
+    e.target.value = '';
+    if (!files.length) return;
+    setBusy(true);
+    setError('');
+    const added = [];
+    try {
+      for (const file of files) added.push((await uploadImage(file)).id);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      onChange([...value, ...added]);
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="image-field">
+      <span>{label} (hasta {max} imágenes)</span>
+      {value.length > 0 && (
+        <ul className="gallery-thumbs">
+          {value.map((id) => (
+            <li key={id}>
+              <img src={fileUrl(id, 640)} alt="" />
+              <button type="button" className="link-btn" onClick={() => onChange(value.filter((v) => v !== id))}>Quitar</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" onChange={add} disabled={busy || value.length >= max} />
+      {busy && <small><Spinner inline /> Subiendo…</small>}
+      {error && <small className="error">{error}</small>}
+    </div>
+  );
+}
+
 // Editor genérico (noticias / propuestas / equipo)
 export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote }) {
   const { confirm, notify } = useDialog();

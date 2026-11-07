@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { News, Proposal, Setting } from '../models.js';
+import { News, Proposal, Setting, PROPOSAL_PROGRESS } from '../models.js';
 import { adminOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { loadSettings } from '../settings.js';
 import { objectId } from '../validators.js';
 import { audit } from '../audit.js';
+import mongoose from 'mongoose';
 
 const router = Router();
 
@@ -31,11 +32,20 @@ const newsSchema = z.object({
   excerpt: z.string().trim().max(300).optional().default(''),
   body: z.string().trim().min(1).max(20000),
   coverImage: objectId,
+  gallery: z.array(z.string().refine((v) => mongoose.isValidObjectId(v), 'Id inválido')).max(6, 'La galería admite hasta 6 imágenes').optional().default([]),
   published: z.boolean().optional().default(false),
+  // Fecha y hora de publicación (ISO). Futura = programada. Vacía: ahora (o la que ya tenía)
+  publishedAt: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha de publicación inválida').nullable().optional(),
 });
 
+// Las consultas públicas solo ven lo publicado cuya hora ya llegó (las anteriores a este campo, sin fecha, también)
+const visibleNow = () => ({ published: true, $or: [{ publishedAt: { $lte: new Date() } }, { publishedAt: null }] });
+
+// Quita del almacén las imágenes que ya no se usan (con sus versiones reducidas)
+const dropFiles = (ids) => Promise.all(ids.map(deleteFile));
+
 router.get('/news', async (_req, res) => {
-  res.json(await News.find({ published: true }).sort({ publishedAt: -1 }).select('-body'));
+  res.json(await News.find(visibleNow()).sort({ publishedAt: -1 }).select('-body -gallery'));
 });
 
 router.get('/news/all', adminOnly, async (_req, res) => {
@@ -43,7 +53,7 @@ router.get('/news/all', adminOnly, async (_req, res) => {
 });
 
 router.get('/news/:slug', async (req, res) => {
-  const item = await News.findOne({ slug: req.params.slug, published: true });
+  const item = await News.findOne({ slug: req.params.slug, ...visibleNow() });
   if (!item) return res.status(404).json({ error: 'Noticia no encontrada' });
   res.json(item);
 });
@@ -54,7 +64,7 @@ router.post('/news', adminOnly, async (req, res) => {
     ...data,
     coverImage: data.coverImage || undefined,
     slug: await uniqueSlug(data.title),
-    publishedAt: data.published ? new Date() : undefined,
+    publishedAt: data.published ? (data.publishedAt ? new Date(data.publishedAt) : new Date()) : undefined,
     author: req.user.name,
   });
   await audit(req, 'noticia.crear', 'noticia', item._id, `Creó la noticia «${item.title}»`);
@@ -68,8 +78,14 @@ router.put('/news/:id', adminOnly, async (req, res) => {
   const newCover = data.coverImage || undefined;
   if (item.coverImage && String(item.coverImage) !== String(newCover)) await deleteFile(item.coverImage);
   if (item.title !== data.title) item.slug = await uniqueSlug(data.title, item._id);
-  if (data.published && !item.published) item.publishedAt = new Date();
-  Object.assign(item, { ...data, coverImage: newCover });
+  // La fecha de publicación solo cambia si se elige una; despublicar y volver a publicar no la reescribe
+  const { publishedAt, ...rest } = data;
+  if (data.published) {
+    if (publishedAt) item.publishedAt = new Date(publishedAt);
+    else if (!item.publishedAt) item.publishedAt = new Date();
+  }
+  await dropFiles((item.gallery ?? []).filter((id) => !data.gallery.includes(String(id))));
+  Object.assign(item, { ...rest, coverImage: newCover });
   await item.save();
   await audit(req, 'noticia.editar', 'noticia', item._id, `Editó la noticia «${item.title}»`);
   res.json(item);
@@ -78,7 +94,7 @@ router.put('/news/:id', adminOnly, async (req, res) => {
 router.delete('/news/:id', adminOnly, async (req, res) => {
   const item = await News.findByIdAndDelete(req.params.id);
   if (item) {
-    await deleteFile(item.coverImage);
+    await dropFiles([item.coverImage, ...(item.gallery ?? [])]);
     await audit(req, 'noticia.eliminar', 'noticia', item._id, `Eliminó la noticia «${item.title}»`);
   }
   res.status(204).end();
@@ -90,6 +106,8 @@ const proposalSchema = z.object({
   title: z.string().trim().min(3).max(160),
   objective: z.string().trim().min(3).max(600),
   image: objectId,
+  progress: z.enum(PROPOSAL_PROGRESS).optional().default('planeada'),
+  progressNote: z.string().trim().max(200).optional().default(''),
   published: z.boolean().optional().default(true),
 });
 

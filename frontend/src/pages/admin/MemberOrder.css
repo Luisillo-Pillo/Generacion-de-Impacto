@@ -1,0 +1,9 @@
+.order-panel { margin-bottom: 1rem; }
+.order-panel summary { cursor: pointer; font-weight: 700; }
+.order-list { list-style: none; margin: .8rem 0 0; padding: 0; display: grid; gap: .4rem; }
+.order-row { display: flex; align-items: center; gap: .6rem; background: #fff; border: 2px solid var(--black); border-radius: 6px; padding: .35rem .6rem; }
+.order-row.dragging { box-shadow: 4px 4px 0 var(--red); position: relative; z-index: 2; }
+.order-handle { border: 0; background: none; font-size: 1.4rem; line-height: 1; cursor: grab; touch-action: none; padding: .2rem .4rem; }
+.order-handle:active { cursor: grabbing; }
+.order-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.order-moves { display: flex; gap: .3rem; }

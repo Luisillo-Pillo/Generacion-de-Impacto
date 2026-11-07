@@ -52,6 +52,11 @@ export async function cleanImage(input) {
   }
 }
 
+// Imagen para la vista previa al compartir un enlace (WhatsApp, Facebook…): JPEG de 1200 × 630, ligero y recortado al centro.
+// Esas aplicaciones no aceptan bien WebP ni archivos de varios MB.
+export const ogImage = (buffer) =>
+  sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).rotate().resize(1200, 630, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer();
+
 function upload(filename, buffer, metadata) {
   const stream = getBucket().openUploadStream(filename, { metadata });
   return new Promise((resolve, reject) => {

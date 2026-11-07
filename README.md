@@ -68,7 +68,7 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 | `TEST_MONGODB_URI` | pruebas | Opcional: base `gi_test` para correr las pruebas sin MongoDB en memoria (ver sección 2). |
 | `RETENTION_MONTHS` | backend, GitHub (variable) | Opcional. Meses que se conservan los mensajes **resueltos** (archivados, completados o rechazados) antes de borrarlos con sus imágenes. Sin definir (o 0) no se borra nada por antigüedad. Pendientes y en proceso nunca se borran. |
 | `PORT` | backend | Puerto (Render lo define solo). |
-| `VITE_API_URL` | frontend | URL pública del backend sin barra final (vacía en desarrollo). |
+| `VITE_API_URL` | frontend | URL pública del backend sin barra final (vacía en desarrollo). También la leen en tiempo de ejecución las funciones de Vercel de `frontend/api` (vista previa y sitemap); si prefieres, define `API_URL` con el mismo valor. |
 
 `backend/.env` está en `.gitignore`; los `.env.example` solo llevan marcadores.
 
@@ -90,7 +90,7 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, `a
 
 **No hay registro público.** Solo las personas dadas de alta como integrantes de la planilla tienen cuenta:
 
-- **Alta de integrante** (Panel → Equipo → Nuevo integrante): se capturan nombre, cargo, licenciatura, orden, foto, **correo y contraseña**. La API crea el usuario y la ficha juntos. Se elige el **acceso al panel**: **administrador** (por defecto; todo) o **moderador** (solo lee y clasifica mensajes: no ve nombre, teléfono, licenciatura, semestre ni grupo, no elimina y no entra a noticias, propuestas, equipo, ajustes ni actividad). Siempre debe quedar al menos un administrador y nadie se quita su propio rol. Si falla la creación de la ficha, se revierte la cuenta.
+- **Alta de integrante** (Panel → Equipo → Nuevo integrante): se capturan nombre, cargo, licenciatura, foto, **correo y contraseña**. La API crea el usuario y la ficha juntos. Se elige el **acceso al panel**: **administrador** (por defecto; todo) o **moderador** (solo lee y clasifica mensajes: no ve nombre, teléfono, licenciatura, semestre ni grupo, no elimina y no entra a noticias, propuestas, equipo, ajustes ni actividad). Siempre debe quedar al menos un administrador y nadie se quita su propio rol. Si falla la creación de la ficha, se revierte la cuenta.
 - **Contraseñas**: mínimo **10 caracteres** y no pueden ser de las más comunes (`1234567890`, `password123`, el nombre del sitio, un solo carácter repetido…) en el alta, el cambio de contraseña y `npm run create-admin`. Se guardan con bcrypt costo 12; las cuentas con contraseñas anteriores (costo 10, incluso de 8 caracteres) siguen entrando y su hash se **actualiza solo** al iniciar sesión.
 - **Edición**: se puede cambiar el correo y restablecer la contraseña (campo vacío = no cambiar; al restablecerla se cierran las sesiones de esa persona). El nombre se sincroniza con la cuenta.
 - **Baja**: eliminar al integrante elimina también su cuenta (su sesión deja de funcionar al instante). Nadie puede eliminar su propia ficha, así que siempre queda al menos un administrador.
@@ -108,9 +108,9 @@ Resumen (detalle de validaciones en `backend/src/routes/`):
 - Seguimiento: `POST /api/messages/track` (público; `{code}` → `{ type, subject, status, review, createdAt, updatedAt, publicReply, publicReplyAt }`; nunca el texto del mensaje ni datos personales; la misma respuesta 404 para cualquier código que no exista, esté mal escrito o sea de un mensaje eliminado; **sin límite de intentos**: la comunidad comparte IP y el código tiene 50 bits de aleatoriedad).
 - Buzón: `POST /api/messages` (público; multipart con los campos y hasta 3 archivos `images`, o JSON sin imágenes); admin: `GET /api/messages?status=&type=&review=&q=&page=&limit=` (filtros opcionales y combinables; `q` busca en asunto y texto como texto literal, nunca como patrón; con `page` responde `{ items, total, page, pages }` de 20 en 20, máx. 100, y sin `page` el arreglo de siempre, hasta 500), `GET /stats` (`{ nuevos, pendientes, total, porTipo }`, para la insignia y el resumen del panel), `GET /export` (CSV UTF-8 con BOM, mismos filtros, **solo administradores**, con las fórmulas de hoja de cálculo neutralizadas y registrado en la bitácora), `GET ?trash=1` (papelera), `PATCH /:id` (`{status?, review?, publicReply?}`, al menos uno; `publicReply` vacío la quita), `POST /:id/notes` (`{text}`: nota interna del equipo), `DELETE /:id` (a la papelera), `POST /:id/restore` y `DELETE /:id/permanent` (solo desde la papelera). El buzón descarta en silencio (respondiendo 201) los envíos con el campo trampa `website` lleno o enviados en menos de 3 s (`fillMs`), rechaza con 413 las imágenes que juntas pasen de 12 MB. Un mensaje **con datos personales** exige `consent: true` (aceptar el aviso de privacidad; se guarda `consentAt`) y responde 400 si falta. `GET /api/messages` y `PATCH` también los usan los **moderadores**, a quienes la API les quita `name`, `degree`, `semester`, `group` y `phone` (y marca `hasContact`); la papelera y el borrado son solo de administradores.
 - Bitácora: `GET /api/audit?page=` (admin; 50 por página, la más reciente primero).
-- Integrantes: `GET /api/members` (público, sin correo); `GET /api/members/all`, `POST`, `PUT /:id`, `DELETE /:id` (admin).
+- Integrantes: `GET /api/members` (público, sin correo); `GET /api/members/all`, `POST`, `PUT /:id`, `DELETE /:id` y `PUT /order` (`{ ids }` en el orden nuevo; asigna 0, 1, 2… de una vez) (admin).
 - Archivos: `POST /api/files` (admin, JPG/PNG/WEBP/GIF ≤ 5 MB, sin SVG; se re-codifica y genera versiones reducidas), `GET /api/files/:id[?w=640|1280]` (público para noticias, propuestas y equipo; **admin con sesión** para los adjuntos del buzón, con `Cache-Control: private, no-store`; `?w=` sirve la versión WebP reducida si existe, si no la original), `DELETE /api/files/:id` (admin; borra también sus versiones reducidas).
-- Contenido: `/api/news`, `/api/proposals` (lectura pública; escritura admin; `/news/all` y `/proposals/all` incluyen no publicados), `GET /api/settings`, `PUT /api/settings/:key` (admin; claves `degrees`, `groups`, `semesters`, `groupDegrees`, `social`).
+- Contenido: `/api/news`, `/api/proposals` (lectura pública; escritura admin; `/news/all` y `/proposals/all` incluyen no publicados; la lista pública de noticias solo trae las publicadas **cuya hora de publicación ya llegó**), `GET /api/settings`, `PUT /api/settings/:key` (admin; claves `degrees`, `groups`, `semesters`, `groupDegrees`, `social`).
 - `GET /api/health` para el health check de Render.
 
 ## 7. Despliegue
@@ -119,6 +119,23 @@ Resumen (detalle de validaciones en `backend/src/routes/`):
 2. **Render** → New → Blueprint con `render.yaml`. Define `MONGODB_URI` y `CORS_ORIGIN`. Plan gratuito: se duerme por inactividad (primera carga lenta).
 3. **Vercel** → importar repo, *Root Directory* `frontend`, variable `VITE_API_URL`.
 4. Ejecuta `npm run seed` y `npm run create-admin` una vez contra la base de producción (desde tu equipo, con el `MONGODB_URI` de Atlas). Luego inicia sesión en `/acceso` y da de alta al resto del equipo en Panel → Equipo.
+
+### Contenido: noticias, propuestas y equipo
+
+- **Noticias con formato:** el cuerpo se guarda como **Markdown** y se muestra con `react-markdown` **sin HTML crudo** (`skipHtml`), solo con negritas, cursiva, enlaces `https`/`mailto`, listas, subtítulos y citas; los enlaces peligrosos (`javascript:`) se descartan. Las noticias anteriores (párrafos separados por una línea en blanco) ya son Markdown válido, no hubo migración, y los saltos de línea simples se respetan. En el panel, `MarkdownEditor` ofrece una barra (negritas, cursiva, enlace, lista) y vista previa en vivo.
+- **Galería:** hasta 6 imágenes más por noticia (campo `gallery`), con sus miniaturas; al quitar una o eliminar la noticia se borran del almacén. La portada lleva el título como texto alternativo.
+- **Publicación programada:** el panel permite elegir fecha y hora de publicación; una fecha futura deja la noticia «Programada» y **aparece sola al llegar la hora** (las consultas públicas filtran `publishedAt <= ahora`; no hay ningún proceso programado). Despublicar y volver a publicar ya no reescribe la fecha original.
+- **Avance de las propuestas:** cada propuesta tiene un avance público (`planeada` por defecto, `en_marcha`, `cumplida`) y una nota de hasta 200 caracteres; se muestra como insignia con texto (no solo color) y `/propuestas` permite filtrar por avance. Las propuestas anteriores quedan como «Planeada» sin migrar.
+- **Orden del equipo:** en Panel → Equipo, «Ordenar el equipo» permite arrastrar a cada persona (ratón, dedo o teclado, con `@dnd-kit`) o usar los botones subir/bajar; cada cambio envía el orden completo a `PUT /api/members/order`. El campo numérico «Orden» desapareció del formulario.
+
+### Vista previa al compartir y SEO
+
+El sitio es una app de una sola página y los rastreadores de WhatsApp, Facebook, X, Telegram, LinkedIn, etc. **no ejecutan JavaScript**, así que sin ayuda todos los enlaces mostrarían la misma tarjeta en blanco. Por eso:
+
+- `frontend/vercel.json` manda a esos rastreadores (por su User-Agent; **no** a Googlebot/Bingbot, que sí ejecutan JavaScript y deben ver la app) a la función `frontend/api/og.js`, que responde un HTML mínimo con las etiquetas Open Graph/Twitter de la página: título, descripción, canónica e imagen. Para una noticia usa su título, resumen (o el inicio del texto) y su portada, que la API entrega en JPEG de 1200 × 630 con `GET /api/files/:id?og=1`; para el resto, el título y la descripción de la página y la imagen `frontend/public/og-default.png` (se regenera con `node scripts/make-og-image.mjs`). Las personas siempre reciben la app normal.
+- `usePageMeta` (`src/pageMeta.js`) pone título, descripción, canónica y etiquetas en cada página para el navegador y para Google; `index.html` lleva valores por defecto.
+- `/sitemap.xml` (`api/sitemap.js`, rutas públicas + noticias publicadas con su fecha) y `/robots.txt` (`api/robots.js`; bloquea `/admin`, `/acceso` y `/perfil` y apunta al sitemap) son dinámicos para usar el dominio actual.
+- Las funciones leen la URL de la API de `API_URL` o `VITE_API_URL` (variable de Vercel) y, si la API no responde, caen a los valores por defecto. **Después de desplegar, comprueba una noticia real** con el depurador de enlaces de Facebook (developers.facebook.com/tools/debug) y compartiendo un enlace por WhatsApp; la lógica está probada (`backend/test/seo.test.js`), pero el reenvío por User-Agent solo se puede verificar ya publicado.
 
 ### Imágenes
 
@@ -197,6 +214,13 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - **Texto legal:** el aviso de privacidad (`/privacidad`) es un borrador; lo debe revisar la ENSFA o alguien con conocimiento legal. Definir también `RETENTION_MONTHS`.
 
 ## 10. Registro de cambios
+
+### 2026-11-06 — Fase 5 de mejoras: contenido y alcance (0.12.0)
+- **Vista previa al compartir y SEO (F1):** etiquetas Open Graph/Twitter por página, función de Vercel para los rastreadores de redes sociales (WhatsApp, Facebook…), imagen por defecto 1200 × 630, `sitemap.xml` y `robots.txt` dinámicos, `usePageMeta` y `?og=1` en la API para portadas ligeras en JPEG. **Falta comprobarlo ya publicado** (depurador de Facebook / WhatsApp).
+- **Avance de propuestas (F4):** estado público (Planeada, En marcha, Cumplida) con nota y filtro en `/propuestas`.
+- **Editor de noticias (F5):** Markdown sin HTML crudo con barra y vista previa, galería de hasta 6 imágenes y publicación programada; se corrigió que `publishedAt` se reescribía al despublicar y volver a publicar. Nuevas dependencias: `react-markdown` y `remark-breaks` (la noticia individual se carga aparte para no pesar en el resto del sitio).
+- **Equipo reordenable (F6):** arrastrar o botones subir/bajar (`@dnd-kit`), `PUT /api/members/order`; se quitó el campo «Orden».
+- Pruebas: 134 de API (`contenido.test.js`, `seo.test.js` y `?og=1` en `imagenes.test.js`) y 22 de humo; Playwright usa 3 navegadores a la vez porque con más algunas pruebas se pasaban de tiempo por falta de recursos.
 
 ### 2026-11-06 — Fase 4 de mejoras: buzón (0.11.0)
 - **Código de seguimiento (F3):** cada mensaje devuelve un código que se muestra una sola vez; en `/seguimiento` se consulta el estado y la respuesta pública del equipo. Solo se guarda su hash. Sin límite de intentos ni por IP ni global (decisión del cliente), a diferencia del plan original.

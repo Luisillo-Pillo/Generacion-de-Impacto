@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, formatDate, formatTime } from '../api.js';
 import Spinner from '../components/Spinner.jsx';
 import './Track.css';
+import { usePageMeta } from '../pageMeta.js';
 
 const TYPE_LABEL = { queja: 'Queja', propuesta: 'Propuesta', pregunta: 'Pregunta', problema: 'Problema' };
 const STATUS_LABEL = { nuevo: 'Recibido', leido: 'Leído por el equipo', archivado: 'Archivado' };
@@ -10,6 +11,7 @@ const REVIEW_LABEL = { pendiente: 'Pendiente', en_proceso: 'En proceso', complet
 
 // Seguimiento de un mensaje con su código: solo estado y respuesta; nunca el texto del mensaje ni datos de nadie.
 export default function Track() {
+  usePageMeta({ title: 'Seguimiento de tu mensaje', description: 'Consulta en qué va tu mensaje del buzón con tu código de seguimiento.' });
   const [code, setCode] = useState('');
   const [state, setState] = useState({ loading: false, error: '', result: null });
 

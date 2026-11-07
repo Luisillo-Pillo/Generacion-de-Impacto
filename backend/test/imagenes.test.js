@@ -190,3 +190,18 @@ test('migraciones: marcan como privadas las imágenes de mensajes y crean versio
   assert.match(await miniaturas(), /^0 imagen/);
   assert.equal(await archivos().countDocuments(), total);
 });
+
+test('?og=1 sirve la vista previa para compartir: JPEG de 1200 × 630, solo de imágenes públicas', async () => {
+  const id = await subirPublica(await foto(2000, 1000));
+  const res = await t.call('GET', `/files/${id}?og=1`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'image/jpeg');
+  assert.match(res.headers.get('cache-control'), /immutable/);
+  const meta = await sharp(res.buffer).metadata();
+  assert.deepEqual([meta.width, meta.height, meta.format], [1200, 630, 'jpeg']);
+  assert.ok(res.buffer.length < 300 * 1024, 'ligera para WhatsApp');
+
+  // Una imagen privada no se sirve sin sesión por esta vía tampoco
+  const [privada] = await enviar(await foto(1800, 900));
+  assert.equal((await t.call('GET', `/files/${privada}?og=1`)).status, 401);
+});

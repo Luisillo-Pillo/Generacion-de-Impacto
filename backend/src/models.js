@@ -54,12 +54,18 @@ const newsSchema = new Schema(
     excerpt: { type: String, trim: true, maxlength: 300, default: '' },
     body: { type: String, required: true, maxlength: 20000 },
     coverImage: { type: Schema.Types.ObjectId }, // _id del archivo en GridFS
+    gallery: [{ type: Schema.Types.ObjectId }], // más imágenes bajo el artículo (máximo 6)
     published: { type: Boolean, default: false },
+    // Fecha de publicación. Si es futura la noticia está PROGRAMADA: aparece sola al llegar la hora (las consultas públicas
+    // filtran `publishedAt <= ahora`, no hace falta ningún proceso programado).
     publishedAt: { type: Date },
     author: { type: String, trim: true, maxlength: 80 },
   },
   { timestamps: true }
 );
+
+// Avance público de cada propuesta (rendición de cuentas)
+export const PROPOSAL_PROGRESS = ['planeada', 'en_marcha', 'cumplida'];
 
 const proposalSchema = new Schema(
   {
@@ -67,6 +73,8 @@ const proposalSchema = new Schema(
     title: { type: String, required: true, trim: true, maxlength: 160 },
     objective: { type: String, required: true, trim: true, maxlength: 600 },
     image: { type: Schema.Types.ObjectId },
+    progress: { type: String, enum: PROPOSAL_PROGRESS, default: 'planeada' },
+    progressNote: { type: String, trim: true, maxlength: 200, default: '' },
     published: { type: Boolean, default: true },
   },
   { timestamps: true }

@@ -3,8 +3,10 @@ import Spinner from '../components/Spinner.jsx';
 import { fileUrl } from '../api.js';
 import { initials } from '../utils.js';
 import './Team.css';
+import { usePageMeta } from '../pageMeta.js';
 
 export default function Team() {
+  usePageMeta({ title: 'Equipo', description: 'Conoce a las personas de la planilla Generación de Impacto y cómo contactarlas.' });
   const members = useFetch('/members');
   const { data: settings } = useFetch('/settings');
   const social = settings?.social || {};

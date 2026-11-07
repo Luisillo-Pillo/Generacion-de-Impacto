@@ -1,7 +1,8 @@
 const BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 // `w` pide la versión reducida (640 o 1280 px, en WebP); sin él, la imagen original.
-export const fileUrl = (id, w) => (id ? `${BASE}/api/files/${id}${w ? `?w=${w}` : ''}` : null);
+// `{ og: true }` pide el JPEG de 1200 × 630 para la vista previa al compartir (la URL es absoluta si VITE_API_URL lo es).
+export const fileUrl = (id, w, { og = false } = {}) => (id ? `${BASE}/api/files/${id}${og ? '?og=1' : w ? `?w=${w}` : ''}` : null);
 
 // Atributos de <img> para las imágenes públicas: el navegador elige la versión de 640 o de 1280 px según el espacio
 // que ocupa (`sizes`) y la densidad de la pantalla, en vez de bajar siempre la original (de hasta 5 MB).
