@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useRef } from 'react';
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { usePageMeta } from './pageMeta.js';
 import Header from './components/Header.jsx';
 import Footer from './components/Footer.jsx';
 import Home from './pages/Home.jsx';
@@ -25,20 +26,39 @@ const AdminTeam = lazy(() => import('./pages/admin/AdminTeam.jsx'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings.jsx'));
 const AdminActivity = lazy(() => import('./pages/admin/AdminActivity.jsx'));
 
+// Al cambiar de página: arriba del todo y, para quien usa teclado o lector de pantalla, el foco al contenido nuevo
+// (no en la primera carga, para no robarle el foco a la página recién abierta)
 function ScrollToTop() {
   const { pathname } = useLocation();
+  const first = useRef(true);
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (first.current) first.current = false;
+    else document.getElementById('contenido')?.focus({ preventScroll: true });
   }, [pathname]);
   return null;
+}
+
+function NotFound() {
+  usePageMeta({ title: 'Página no encontrada' });
+  return (
+    <section className="section paper page-min">
+      <div className="container narrow">
+        <h1 className="title">Página <mark>no encontrada</mark></h1>
+        <p className="lead">La dirección que abriste no existe o ya cambió.</p>
+        <Link to="/" className="btn btn-red">Ir al inicio</Link>
+      </div>
+    </section>
+  );
 }
 
 export default function App() {
   return (
     <>
+      <a className="skip-link" href="#contenido">Saltar al contenido</a>
       <ScrollToTop />
       <Header />
-      <main>
+      <main id="contenido" tabIndex={-1}>
         <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -60,7 +80,7 @@ export default function App() {
               <Route path="ajustes" element={<AdminSettings />} />
               <Route path="actividad" element={<AdminActivity />} />
             </Route>
-            <Route path="*" element={<div className="container section"><h1 className="title">Página no encontrada</h1></div>} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </main>

@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import cors from 'cors';
 import helmet from 'helmet';
 import { ZodError } from 'zod';
@@ -8,6 +9,7 @@ import messageRoutes from './routes/messages.js';
 import memberRoutes from './routes/members.js';
 import contentRoutes from './routes/content.js';
 import auditRoutes from './routes/audit.js';
+import { reportError, sanitizeMessage } from './monitoring.js';
 
 // La aplicación Express sin arrancar (ni base de datos ni puerto): así las pruebas pueden montarla por su cuenta.
 // `index.js` es quien conecta con MongoDB y la pone a escuchar.
@@ -36,9 +38,15 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(
   cors({
     origin: (origin, callback) => callback(null, !origin || originAllowed(origin)),
-    exposedHeaders: ['X-Renewed-Token', 'Retry-After'], // el frontend necesita leerlas
+    exposedHeaders: ['X-Renewed-Token', 'Retry-After', 'X-Request-Id'], // el frontend necesita leerlas
   })
 );
+// Id de cada petición: va en la cabecera X-Request-Id y en los registros de error, para rastrear un fallo concreto
+app.use((req, res, next) => {
+  req.id = crypto.randomUUID();
+  res.set('X-Request-Id', req.id);
+  next();
+});
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -52,7 +60,7 @@ app.use('/api', contentRoutes);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 
 // Express identifica el manejador de errores por sus 4 parámetros, aunque _next no se use.
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   if (err instanceof ZodError) {
     return res.status(400).json({ error: err.issues[0]?.message || 'Datos inválidos', issues: err.issues });
   }
@@ -70,6 +78,12 @@ app.use((err, _req, res, _next) => {
   if (err?.name === 'CastError') {
     return err.path === '_id' ? res.status(404).json({ error: 'No encontrado' }) : res.status(400).json({ error: 'Datos inválidos' });
   }
-  console.error(err);
-  res.status(500).json({ error: 'Error interno del servidor' });
+  // Registro estructurado (una línea JSON por error). Nunca el cuerpo, la consulta ni las cabeceras de la petición, y el
+  // mensaje sin los valores que pudiera traer (ver monitoring.js).
+  console.error(JSON.stringify({
+    level: 'error', time: new Date().toISOString(), requestId: req.id, method: req.method, path: req.path,
+    error: err?.name, message: sanitizeMessage(err?.message), stack: String(err?.stack ?? '').split('\n').slice(1, 9).map((l) => l.trim()),
+  }));
+  reportError(err, req.id);
+  res.status(500).json({ error: 'Error interno del servidor', requestId: req.id });
 });

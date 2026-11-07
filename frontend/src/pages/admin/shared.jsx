@@ -55,7 +55,7 @@ export function ImageField({ value, onChange, label = 'Imagen' }) {
       <span>{label}</span>
       {value && <img src={fileUrl(value, 640)} alt="" />}
       <div className="row">
-        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={pick} disabled={busy} />
+        <input type="file" aria-label={label} accept="image/jpeg,image/png,image/webp,image/gif" onChange={pick} disabled={busy} />
         {value && <button type="button" className="link-btn" onClick={() => onChange(null)}>Quitar</button>}
       </div>
       {busy && <small><Spinner inline /> Subiendo…</small>}
@@ -97,7 +97,7 @@ export function GalleryField({ value = [], onChange, label = 'Galería', max = 6
           ))}
         </ul>
       )}
-      <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" onChange={add} disabled={busy || value.length >= max} />
+      <input type="file" multiple aria-label={`Agregar imágenes a ${label.toLowerCase()}`} accept="image/jpeg,image/png,image/webp,image/gif" onChange={add} disabled={busy || value.length >= max} />
       {busy && <small><Spinner inline /> Subiendo…</small>}
       {error && <small className="error">{error}</small>}
     </div>

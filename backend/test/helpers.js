@@ -95,5 +95,5 @@ export async function startServer(env = {}) {
     await mongod?.stop();
   }
 
-  return { call, createAdmin, login, messageForm, models, stop };
+  return { call, createAdmin, login, messageForm, models, stop, base };
 }

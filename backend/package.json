@@ -14,6 +14,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@sentry/node": "^11.11.0",
     "bcryptjs": "^3.0.0",
     "cors": "^2.8.5",
     "express": "^5.0.0",

@@ -1,6 +1,9 @@
 import { app } from './app.js';
 import { connectDb } from './db.js';
 import { startMaintenance } from './maintenance.js';
+import { initMonitoring } from './monitoring.js';
+
+if (initMonitoring()) console.log('Monitoreo de errores activado (Sentry)');
 
 const port = process.env.PORT || 4000;
 connectDb()

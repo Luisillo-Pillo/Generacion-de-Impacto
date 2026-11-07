@@ -48,8 +48,8 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 | Comando | Qué hace |
 |---|---|
 | `npm run lint` | ESLint sobre todo el proyecto (variables sin uso, reglas de React y hooks). |
-| `npm test` | Pruebas de la API (`backend/test`, `node:test`): permisos, validaciones, imágenes, anonimato, equipo, ajustes, CORS y cabeceras, freno del login, política de contraseñas, sesiones, protecciones del buzón, papelera y bitácora. Cada archivo levanta su **propia MongoDB en memoria**, así que nunca toca Atlas. |
-| `npm run e2e` | Pruebas de humo en el navegador (`frontend/e2e`, Playwright con el Chrome instalado): inicio, enviar un mensaje anónimo (y el campo trampa), iniciar y cerrar sesión, sesión vencida, crear una noticia, papelera, pestaña Actividad, página 404. La API se simula, no necesitan backend. |
+| `npm test` | Pruebas de la API (`backend/test`, `node:test`): permisos, validaciones, imágenes, anonimato, equipo, ajustes, CORS y cabeceras, freno del login, política de contraseñas, sesiones, protecciones del buzón, papelera y bitácora, imágenes, roles, retención, código de seguimiento, panel de mensajes, contenido, vista previa al compartir y monitoreo. Cada archivo levanta su **propia MongoDB en memoria**, así que nunca toca Atlas. |
+| `npm run e2e` | Pruebas de humo en el navegador (`frontend/e2e`, Playwright con el Chrome instalado): inicio, enviar un mensaje anónimo (y el campo trampa), iniciar y cerrar sesión, sesión vencida, crear una noticia, papelera, pestaña Actividad, página 404, seguimiento, roles, Markdown, orden del equipo, teclado, y una **revisión de accesibilidad con axe** (WCAG 2.1 A y AA) de todas las páginas públicas y del panel (`e2e/a11y.spec.js`). La API se simula (`e2e/mock-api.js`), no necesitan backend. |
 | `npm run check` | `lint` + `build` + `test`. Córrelo antes de subir cambios. |
 
 - Las pruebas **se niegan a correr** si la base no es local y llamada `gi_test`. Si no puedes descargar el binario de MongoDB que usa `mongodb-memory-server`, define `TEST_MONGODB_URI` con una base llamada exactamente `gi_test` (nunca la real) y ejecuta `node --test --test-concurrency=1` dentro de `backend/`: se vacía al empezar y se elimina al terminar.
@@ -67,6 +67,9 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 | `CORS_ORIGIN_PATTERN` | backend | **Solo staging.** Acepta las previews de Vercel, p. ej. `https://generacion-impacto-*.vercel.app` (el `*` es un tramo de letras, números y guiones; no admite expresiones regulares). No se define en producción. |
 | `TEST_MONGODB_URI` | pruebas | Opcional: base `gi_test` para correr las pruebas sin MongoDB en memoria (ver sección 2). |
 | `RETENTION_MONTHS` | backend, GitHub (variable) | Opcional. Meses que se conservan los mensajes **resueltos** (archivados, completados o rechazados) antes de borrarlos con sus imágenes. Sin definir (o 0) no se borra nada por antigüedad. Pendientes y en proceso nunca se borran. |
+| `SENTRY_DSN` · `SENTRY_ENVIRONMENT` | backend | Opcional. Activa el reporte de errores a Sentry (ver «Monitoreo»). Sin `SENTRY_DSN` no se envía nada. |
+| `VITE_SENTRY_DSN` | frontend | Opcional. Lo mismo para el navegador; el código de Sentry solo se descarga si está definida. |
+| `API_URL` | frontend (funciones de Vercel) | Opcional. URL de la API para `frontend/api`; si falta se usa `VITE_API_URL`. |
 | `PORT` | backend | Puerto (Render lo define solo). |
 | `VITE_API_URL` | frontend | URL pública del backend sin barra final (vacía en desarrollo). También la leen en tiempo de ejecución las funciones de Vercel de `frontend/api` (vista previa y sitemap); si prefieres, define `API_URL` con el mismo valor. |
 
@@ -136,6 +139,20 @@ El sitio es una app de una sola página y los rastreadores de WhatsApp, Facebook
 - `usePageMeta` (`src/pageMeta.js`) pone título, descripción, canónica y etiquetas en cada página para el navegador y para Google; `index.html` lleva valores por defecto.
 - `/sitemap.xml` (`api/sitemap.js`, rutas públicas + noticias publicadas con su fecha) y `/robots.txt` (`api/robots.js`; bloquea `/admin`, `/acceso` y `/perfil` y apunta al sitemap) son dinámicos para usar el dominio actual.
 - Las funciones leen la URL de la API de `API_URL` o `VITE_API_URL` (variable de Vercel) y, si la API no responde, caen a los valores por defecto. **Después de desplegar, comprueba una noticia real** con el depurador de enlaces de Facebook (developers.facebook.com/tools/debug) y compartiendo un enlace por WhatsApp; la lógica está probada (`backend/test/seo.test.js`), pero el reenvío por User-Agent solo se puede verificar ya publicado.
+
+### Accesibilidad
+
+- **Revisión automática:** `frontend/e2e/a11y.spec.js` pasa axe (reglas WCAG 2.1 A y AA) por cada página pública, cada sección del panel, el buzón con datos, el editor de noticias y el diálogo de confirmación; corre en el CI, así que una violación nueva rompe la compilación.
+- **Teclado y lectores de pantalla:** enlace «Saltar al contenido» como primer elemento enfocable; al cambiar de página el foco pasa al contenido (`<main id="contenido">`); el contorno de foco es rojo sobre papel y **papel sobre fondos oscuros** (encabezado, pie, secciones oscuras); los avisos de éxito y error usan `role="status"`/`role="alert"`; los campos de archivo del panel llevan nombre accesible; la portada del artículo usa el título como `alt` y las fotos del equipo el nombre (las imágenes decorativas llevan `alt=""`).
+- **Contraste medido** (mínimo 4.5:1 para texto normal, 3:1 para texto grande y componentes): tinta sobre papel 14.2 · negro sobre papel 15.4 · papel sobre negro 15.4 · gris `--muted` sobre papel 4.9 y sobre blanco 6.0 · blanco sobre rojo 5.4 · rojo oscuro sobre papel 6.3 · pie `#b9afa3` sobre negro 8.7. **El rojo de la marca sobre papel da 4.42:1** (no llega a 4.5), por eso los textos y enlaces rojos sobre papel usan el rojo oscuro (`--red-dark`); el rojo solo se deja en texto grande, números y fondos de botones con texto blanco. El gris `--muted` sobre `--paper-2` da 4.4: no usarlo en esa combinación.
+- **Falta una prueba humana** (ninguna herramienta la sustituye): recorrer el envío de un mensaje con un lector de pantalla (NVDA en Windows, gratuito) y comprobar el orden de lectura y que se anuncian los errores.
+
+### Monitoreo
+
+- **Disponibilidad (tú):** crea una cuenta gratuita en UptimeRobot y un monitor HTTP(s) a `https://<tu-api>.onrender.com/api/health` cada 5 minutos, con aviso por correo. Además de avisar si cae, mantiene despierto el servicio gratuito de Render (ojo: con dos servicios encendidos todo el mes se exceden las 750 horas gratuitas; ver «Entorno de pruebas»).
+- **Errores (Sentry, opcional):** crea un proyecto de Node y otro de React en Sentry (capa gratuita) y define `SENTRY_DSN` en Render y `VITE_SENTRY_DSN` en Vercel. **Con privacidad:** el sitio guarda mensajes y datos personales, así que un filtro (`backend/src/monitoring.js`, `frontend/src/sanitize.js`) borra de cada evento la petición (URL con consulta, cabeceras, cuerpo), el usuario y su IP, extras, rastros de clics, nombre del equipo y variables locales, y quita de los mensajes de error los textos entre comillas, objetos, correos y números largos. Solo viaja el tipo de error, su pila y un id de petición. Sin las variables no se envía nada y el código de Sentry del navegador ni se descarga. La política CSP ya permite `*.ingest.sentry.io`.
+- **Registros con id de petición:** cada respuesta lleva `X-Request-Id`; un error interno responde 500 con ese `requestId` (el sitio muestra sus primeros 8 caracteres: «id del error: …») y deja **una línea JSON** en los registros de Render con el id, método, ruta sin consulta, tipo de error, mensaje sin valores y las primeras líneas de la pila, nunca cuerpos ni cabeceras. Con el id que te dé una persona buscas esa línea en Render → Logs.
+- Si falla el dibujo de una página, `ErrorBoundary` muestra «Algo salió mal» con un botón para recargar, en lugar de una pantalla en blanco.
 
 ### Imágenes
 
@@ -210,10 +227,22 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - **Licenciaturas** por defecto son una suposición: confirmarlas con la ENSFA y editarlas en Panel → Ajustes.
 - Integrantes del equipo, redes sociales y correo de contacto: capturar desde el panel.
 - **Aviso por correo de mensajes nuevos: aplazado por decisión del cliente** (no hay código ni variables). Si se retoma: Render gratis bloquea SMTP (puertos 25/465/587), así que hay que usar una API HTTPS (p. ej. Brevo, verificando el remitente) o SMTP en hosting de pago; `ensfa.edu.mx` usa Google Workspace (SMTP con contraseña de aplicación entrega mejor). Guardar el mensaje antes de enviar el correo y que un fallo del correo nunca afecte al usuario; el correo no debe incluir datos personales de mensajes anónimos.
-- Rotar la contraseña de Atlas: la cadena de conexión se compartió en el chat durante el desarrollo.
-- **Texto legal:** el aviso de privacidad (`/privacidad`) es un borrador; lo debe revisar la ENSFA o alguien con conocimiento legal. Definir también `RETENTION_MONTHS`.
+- **Rotar la contraseña de Atlas (S1):** la cadena de conexión se compartió en el chat durante el desarrollo. Decisión del cliente (2026-11-06): se deja igual por ahora y se hace al terminar el plan de trabajo, que ya terminó (ver «Rotar la contraseña de Atlas»). Conviene además un usuario de base de datos con permisos solo sobre la base del sitio.
+- **Staging (Q2):** crear la base `gi_staging` en Atlas, el servicio de staging en Render desde `render.yaml` y la variable `VITE_API_URL` del entorno Preview en Vercel (ver «Entorno de pruebas (staging)»). Pospuesto por el cliente igual que S1.
+- **Migraciones de imágenes:** tras desplegar el backend de la Fase 2, correr **una vez** `npm run migrate` (con el `MONGODB_URI` de la base real en `backend/.env`; es idempotente) para marcar como privadas las imágenes que ya estaban en mensajes y generar las miniaturas de lo anterior. Hasta entonces las imágenes antiguas siguen públicas.
+- **Texto legal y retención:** el aviso de privacidad (`/privacidad`) es un borrador; lo debe revisar la ENSFA o alguien con conocimiento legal. Definir también `RETENTION_MONTHS` (se recomienda 12) como variable de Render y del repositorio.
+- **Respaldos y limpieza programada:** crear el bucket privado (Backblaze B2 o Cloudflare R2) y los secretos de `backup.yml` y `purge.yml`, generar la llave `age` y **probar una restauración** (ver «Respaldos»).
+- **Verificar ya publicado:** (1) la vista previa de un enlace de noticia en el depurador de Facebook y por WhatsApp, `/sitemap.xml` y `/robots.txt`; (2) el CI de GitHub tras cada subida; (3) activar la CSP (cambiar `Content-Security-Policy-Report-Only` por `Content-Security-Policy` en `frontend/vercel.json`) tras una semana sin avisos en la consola del sitio publicado.
+- **Monitoreo:** crear el monitor de UptimeRobot y, si se quiere, las cuentas de Sentry (ver «Monitoreo»). Prueba con NVDA del envío de un mensaje (ver «Accesibilidad»).
+- **Dependabot:** los PR de actualización mayor (React 19, ESLint 10, Vite 8, Mongoose 9, etc.) no se fusionan sin migrar y probar; los que fallen en el CI se pueden cerrar o dejar abiertos.
 
 ## 10. Registro de cambios
+
+### 2026-11-06 — Fase 6 de mejoras: accesibilidad y monitoreo (0.13.0) — cierra el programa de mejoras
+- **Accesibilidad (F8):** revisión automática con axe en el CI sobre todas las páginas y el panel (sin violaciones), enlace «Saltar al contenido», foco al contenido al cambiar de página, contorno de foco visible sobre fondos oscuros, nombres accesibles en los campos de archivo, página 404 con el diseño del sitio, y contraste corregido (el rojo de la marca sobre papel da 4.42:1: los textos y enlaces rojos sobre papel usan el rojo oscuro).
+- **Monitoreo (Q3):** `X-Request-Id` en cada respuesta, errores internos con `requestId` y registro de una línea JSON sin datos, Sentry opcional (servidor y navegador) con filtro de privacidad, `ErrorBoundary` en el navegador y guía de UptimeRobot.
+- Nuevas dependencias: `@sentry/node` (backend), `@sentry/react` (frontend, se descarga solo si hay clave) y `@axe-core/playwright` (pruebas).
+- Revisión final: lint y build limpios, `npm audit` en 0 vulnerabilidades, CSP activa probada sobre 12 páginas sin violaciones ni hosts externos, 141 pruebas de API y 42 de humo/accesibilidad. Con esto se cierra el programa de mejoras de 21 puntos; el documento de trabajo temporal se eliminó y sus pendientes pasaron a la sección 9.
 
 ### 2026-11-06 — Fase 5 de mejoras: contenido y alcance (0.12.0)
 - **Vista previa al compartir y SEO (F1):** etiquetas Open Graph/Twitter por página, función de Vercel para los rastreadores de redes sociales (WhatsApp, Facebook…), imagen por defecto 1200 × 630, `sitemap.xml` y `robots.txt` dinámicos, `usePageMeta` y `?og=1` en la API para portadas ligeras en JPEG. **Falta comprobarlo ya publicado** (depurador de Facebook / WhatsApp).

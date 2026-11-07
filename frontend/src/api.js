@@ -57,7 +57,8 @@ export async function api(path, { method = 'GET', body, form, blob = false } = {
   if (res.status === 204) return null;
   if (blob && res.ok) return res.blob();
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Ocurrió un error');
+  // En un error del servidor se añade el id de la petición: con él se encuentra el fallo en los registros
+  if (!res.ok) throw new Error(`${data.error || 'Ocurrió un error'}${res.status >= 500 && data.requestId ? ` (id del error: ${data.requestId.slice(0, 8)})` : ''}`);
   return data;
 }
 

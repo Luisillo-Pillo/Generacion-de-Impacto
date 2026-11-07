@@ -4,7 +4,7 @@
 .article p, .article li { font-size: 1.05rem; }
 .article h2, .article h3 { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; margin: 1.6rem 0 .4rem; }
 .article blockquote { margin: 1rem 0; padding: .2rem 1rem; border-left: 6px solid var(--red); background: #ebe1d2; }
-.article a { color: var(--red); font-weight: 600; }
+.article a { color: var(--red-dark); font-weight: 600; }
 .article-gallery { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .6rem; }
 .article-gallery img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; display: block; }
 .article time { color: var(--muted); font-size: .85rem; }
