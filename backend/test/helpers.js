@@ -20,7 +20,7 @@ export async function startServer(env = {}) {
   process.env.JWT_SECRET = 'secreto-solo-para-pruebas-'.repeat(3);
   delete process.env.CORS_ORIGIN_PATTERN;
   // El límite de envíos del buzón se sube para que las pruebas normales no lo topen; sus pruebas lo fijan en `env`.
-  Object.assign(process.env, { CORS_ORIGIN: 'http://localhost:5173', MESSAGE_RATE_LIMIT: '1000', ...env });
+  Object.assign(process.env, { CORS_ORIGIN: 'http://localhost:5173', ...env });
 
   const external = process.env.TEST_MONGODB_URI;
   let mongod = null;

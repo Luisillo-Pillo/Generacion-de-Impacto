@@ -5,19 +5,14 @@ import { adminOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { imageUpload, saveImage } from '../uploads.js';
 import { loadSettings } from '../settings.js';
-import { hit, peek, retryAfter } from '../rateLimit.js';
 import { audit } from '../audit.js';
 
 const router = Router();
 
 const MAX_IMAGES = 3;
 const MAX_TOTAL_BYTES = 12 * 1024 * 1024; // tope de todas las imágenes juntas en un envío
-const HOUR_MS = 60 * 60 * 1000;
 const MIN_FILL_MS = 3000; // una persona no escribe asunto y mensaje en menos de 3 segundos
-// Tope de envíos por hora de TODO el buzón, no por IP: la comunidad estudiantil comparte la misma red (misma IP), así
-// que limitar por IP bloquearía a todos por culpa de uno. Es solo un freno de emergencia contra una inundación; el
-// valor normal queda muy por debajo. Se ajusta con la variable de entorno MESSAGE_RATE_LIMIT.
-const sendLimit = () => Number(process.env.MESSAGE_RATE_LIMIT) || 100;
+// El buzón no limita envíos (ni por IP ni en total): la comunidad comparte red y el cliente no quiere ningún tope.
 
 const base = {
   type: z.enum(MESSAGE_TYPES),
@@ -44,24 +39,13 @@ const createSchema = z.discriminatedUnion('anonymous', [
   }),
 ]);
 
-// Corta antes de procesar nada (y antes de que multer cargue archivos en memoria) si el buzón ya recibió demasiados envíos.
-async function mailboxGuard(req, res, next) {
-  const { count, resetAt } = await peek('buzon', 'global');
-  if (count >= sendLimit()) {
-    res.set('Retry-After', String(retryAfter(resetAt)));
-    return res.status(429).json({ error: 'El buzón recibió demasiados mensajes en poco tiempo. Inténtalo de nuevo en unos minutos.' });
-  }
-  next();
-}
-
 // Multipart: los campos de texto y hasta 3 imágenes (campo "images") llegan en una sola petición, así no quedan
 // archivos huérfanos si el mensaje no es válido. También se acepta JSON sin imágenes.
-router.post('/', mailboxGuard, imageUpload.array('images', MAX_IMAGES), async (req, res) => {
+router.post('/', imageUpload.array('images', MAX_IMAGES), async (req, res) => {
   // Señales de bot: un campo oculto que las personas no ven (`website`) y un formulario enviado demasiado rápido
   // (`fillMs`: milisegundos desde que se mostró). Se responde "éxito" y se descarta, para no darle pistas al bot.
   const fillMs = Number(req.body?.fillMs);
   if ((typeof req.body?.website === 'string' && req.body.website.trim() !== '') || (Number.isFinite(fillMs) && fillMs < MIN_FILL_MS)) {
-    await hit('buzon', 'global', HOUR_MS);
     return res.status(201).json({ ok: true });
   }
   const totalBytes = (req.files ?? []).reduce((sum, f) => sum + f.size, 0);
@@ -81,7 +65,6 @@ router.post('/', mailboxGuard, imageUpload.array('images', MAX_IMAGES), async (r
     await Promise.all(images.map(deleteFile));
     throw err;
   }
-  await hit('buzon', 'global', HOUR_MS); // solo cuentan los envíos que sí se guardaron: los errores de captura no gastan el límite
   res.status(201).json({ ok: true });
 });
 
