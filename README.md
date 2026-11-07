@@ -66,6 +66,7 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 | `CORS_ORIGIN` | backend | Orígenes permitidos, separados por coma (URL de Vercel). |
 | `CORS_ORIGIN_PATTERN` | backend | **Solo staging.** Acepta las previews de Vercel, p. ej. `https://generacion-impacto-*.vercel.app` (el `*` es un tramo de letras, números y guiones; no admite expresiones regulares). No se define en producción. |
 | `TEST_MONGODB_URI` | pruebas | Opcional: base `gi_test` para correr las pruebas sin MongoDB en memoria (ver sección 2). |
+| `RETENTION_MONTHS` | backend, GitHub (variable) | Opcional. Meses que se conservan los mensajes **resueltos** (archivados, completados o rechazados) antes de borrarlos con sus imágenes. Sin definir (o 0) no se borra nada por antigüedad. Pendientes y en proceso nunca se borran. |
 | `PORT` | backend | Puerto (Render lo define solo). |
 | `VITE_API_URL` | frontend | URL pública del backend sin barra final (vacía en desarrollo). |
 
@@ -87,7 +88,7 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, `a
 
 **No hay registro público.** Solo las personas dadas de alta como integrantes de la planilla tienen cuenta:
 
-- **Alta de integrante** (Panel → Equipo → Nuevo integrante): se capturan nombre, cargo, licenciatura, orden, foto, **correo y contraseña**. La API crea el usuario y la ficha juntos, y **todo integrante es administrador**. Si falla la creación de la ficha, se revierte la cuenta.
+- **Alta de integrante** (Panel → Equipo → Nuevo integrante): se capturan nombre, cargo, licenciatura, orden, foto, **correo y contraseña**. La API crea el usuario y la ficha juntos. Se elige el **acceso al panel**: **administrador** (por defecto; todo) o **moderador** (solo lee y clasifica mensajes: no ve nombre, teléfono, licenciatura, semestre ni grupo, no elimina y no entra a noticias, propuestas, equipo, ajustes ni actividad). Siempre debe quedar al menos un administrador y nadie se quita su propio rol. Si falla la creación de la ficha, se revierte la cuenta.
 - **Contraseñas**: mínimo **10 caracteres** y no pueden ser de las más comunes (`1234567890`, `password123`, el nombre del sitio, un solo carácter repetido…) en el alta, el cambio de contraseña y `npm run create-admin`. Se guardan con bcrypt costo 12; las cuentas con contraseñas anteriores (costo 10, incluso de 8 caracteres) siguen entrando y su hash se **actualiza solo** al iniciar sesión.
 - **Edición**: se puede cambiar el correo y restablecer la contraseña (campo vacío = no cambiar; al restablecerla se cierran las sesiones de esa persona). El nombre se sincroniza con la cuenta.
 - **Baja**: eliminar al integrante elimina también su cuenta (su sesión deja de funcionar al instante). Nadie puede eliminar su propia ficha, así que siempre queda al menos un administrador.
@@ -102,7 +103,7 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, `a
 Resumen (detalle de validaciones en `backend/src/routes/`):
 
 - Auth: `POST /api/auth/login`, `GET /api/auth/me`, `PATCH /api/auth/password` y `POST /api/auth/logout-all` (ambos devuelven un `token` nuevo para el dispositivo actual).
-- Buzón: `POST /api/messages` (público; multipart con los campos y hasta 3 archivos `images`, o JSON sin imágenes); admin: `GET /api/messages?status=&type=&review=` (filtros opcionales y combinables), `GET ?trash=1` (papelera), `PATCH /:id` (`{status?, review?}`, al menos uno), `DELETE /:id` (a la papelera), `POST /:id/restore` y `DELETE /:id/permanent` (solo desde la papelera). El buzón descarta en silencio (respondiendo 201) los envíos con el campo trampa `website` lleno o enviados en menos de 3 s (`fillMs`), rechaza con 413 las imágenes que juntas pasen de 12 MB y responde 429 si todo el buzón superó `MESSAGE_RATE_LIMIT` envíos en una hora.
+- Buzón: `POST /api/messages` (público; multipart con los campos y hasta 3 archivos `images`, o JSON sin imágenes); admin: `GET /api/messages?status=&type=&review=` (filtros opcionales y combinables), `GET ?trash=1` (papelera), `PATCH /:id` (`{status?, review?}`, al menos uno), `DELETE /:id` (a la papelera), `POST /:id/restore` y `DELETE /:id/permanent` (solo desde la papelera). El buzón descarta en silencio (respondiendo 201) los envíos con el campo trampa `website` lleno o enviados en menos de 3 s (`fillMs`), rechaza con 413 las imágenes que juntas pasen de 12 MB. Un mensaje **con datos personales** exige `consent: true` (aceptar el aviso de privacidad; se guarda `consentAt`) y responde 400 si falta. `GET /api/messages` y `PATCH` también los usan los **moderadores**, a quienes la API les quita `name`, `degree`, `semester`, `group` y `phone` (y marca `hasContact`); la papelera y el borrado son solo de administradores.
 - Bitácora: `GET /api/audit?page=` (admin; 50 por página, la más reciente primero).
 - Integrantes: `GET /api/members` (público, sin correo); `GET /api/members/all`, `POST`, `PUT /:id`, `DELETE /:id` (admin).
 - Archivos: `POST /api/files` (admin, JPG/PNG/WEBP/GIF ≤ 5 MB, sin SVG; se re-codifica y genera versiones reducidas), `GET /api/files/:id[?w=640|1280]` (público para noticias, propuestas y equipo; **admin con sesión** para los adjuntos del buzón, con `Cache-Control: private, no-store`; `?w=` sirve la versión WebP reducida si existe, si no la original), `DELETE /api/files/:id` (admin; borra también sus versiones reducidas).
@@ -123,6 +124,26 @@ Resumen (detalle de validaciones en `backend/src/routes/`):
 - **Versiones reducidas:** junto a cada imagen no animada se guardan versiones WebP de 640 y 1280 px (solo las menores que el original), enlazadas en `metadata.variants`. `GET /api/files/:id?w=640` (o `1280`) la sirve; sin parámetro o sin versión, la original. Las tarjetas de noticias y propuestas usan `srcset`/`sizes`; el equipo, el perfil y el panel piden la de 640. Al borrar una imagen se borran sus versiones.
 - **Migraciones** (`npm run migrate`, idempotente; **corre contra la base de `backend/.env`**, así que revísalo antes): `001-private-message-images` marca como privadas las imágenes que ya estaban en mensajes (incluida la papelera) y `002-thumbnails` genera las versiones reducidas de lo subido antes. Se corren **después de desplegar el backend**. Hasta entonces las imágenes antiguas siguen como antes (públicas y sin versiones), así que nada se rompe.
 - Medición local (12 megapíxeles con ruido, el peor caso): limpiar y generar 2 versiones de 3 fotos tarda ≈ 1.2 s y el proceso llega a ≈ 200 MB; conviene confirmarlo en el servidor de staging. El panel de administración se carga por separado (`React.lazy`), así que los visitantes no descargan su código.
+
+### Privacidad y retención
+
+- **Aviso de privacidad** en `/privacidad` (enlazado en el pie de página y desde la casilla del buzón). **Es un borrador razonable, no asesoría jurídica: debe revisarlo la ENSFA o alguien con conocimiento legal antes de darlo por definitivo** (`frontend/src/pages/Privacy.jsx`). Si cambia lo que se guarda o por cuánto tiempo, hay que actualizar ese texto.
+- **Consentimiento:** al elegir «Con mis datos» el buzón pide marcar que se leyó el aviso; la API lo exige y guarda la fecha (`consentAt`). Los anónimos no guardan datos personales, así que no aplica. En el panel, los mensajes con datos muestran un recordatorio de no copiarlos fuera.
+- **Retención:** los mensajes de la papelera se borran a los 30 días y los resueltos (archivados, completados o rechazados) al pasar `RETENTION_MONTHS` meses desde su última actualización (desactivado hasta que el cliente decida el plazo; se recomienda 12). Lo hace la propia API al arrancar y cada 6 horas (`maintenance.js`) y, de forma programada, el flujo `.github/workflows/purge.yml` (diario, necesita el secreto `MONGODB_URI` y la variable `RETENTION_MONTHS` en el repositorio; sin el secreto no hace nada). Manual: `npm run purge -- --dry-run` cuenta sin borrar y `npm run purge` borra. Cada borrado por retención queda en la bitácora sin contenido.
+
+### Respaldos
+
+`.github/workflows/backup.yml` hace cada domingo (y a demanda desde Actions → Run workflow) un `mongodump --gzip` de **toda** la base, lo **cifra con `age`** (los datos incluyen información personal) y lo sube a un almacenamiento compatible con S3 (Backblaze B2 o Cloudflare R2, ambos con capa gratuita), conservando las últimas 8 copias. Sin los secretos configurados no hace nada.
+
+1. Instala `age` (`winget install FiloSottile.age` o `apt install age`) y genera la llave: `age-keygen -o llave-respaldos.txt`. **Guarda ese archivo en tu gestor de contraseñas y fuera del repositorio**; sin él las copias no se pueden abrir. La línea «public key: age1…» sí va como secreto.
+2. Crea un bucket **privado** en B2 o R2 y una llave de aplicación con acceso solo a ese bucket.
+3. En GitHub → Settings → Secrets and variables → Actions, crea los secretos `MONGODB_URI`, `AGE_PUBLIC_KEY`, `BACKUP_BUCKET`, `BACKUP_ENDPOINT` (la URL S3 del proveedor, p. ej. `https://s3.us-west-004.backblazeb2.com`), `BACKUP_KEY_ID` y `BACKUP_KEY_SECRET`. Corre el flujo a mano una vez y confirma que aparece la copia en el bucket.
+4. **Prueba de restauración (hazla al menos una vez; un respaldo que nunca se probó no es un respaldo):** descarga una copia y restáurala en una base de prueba, nunca sobre la real:
+   ```
+   age -d -i llave-respaldos.txt gi-AAAAMMDD-HHMMSS.archive.gz.age > copia.archive.gz
+   mongorestore --uri="<URI de un clúster de PRUEBA>" --gzip --archive=copia.archive.gz --nsFrom="generacion_impacto.*" --nsTo="gi_restore_test.*"
+   ```
+   Revisa en Atlas que `gi_restore_test` tenga mensajes, noticias y `files.files`, y bórrala al terminar. Alternativa sin código: un plan de Atlas de pago con respaldo continuo.
 
 ### Cabeceras de seguridad y CSP
 
@@ -151,7 +172,7 @@ Copia del sitio con su propia API y base de datos, para probar cambios reales (s
 Ejecutado: ESLint (variables sin uso, reglas de React y hooks), búsqueda de CSS y exports sin uso, `npm audit`, 59 pruebas de API y 43 comprobaciones en navegador contra una base de pruebas aparte (eliminada después). Resultado y limitaciones conocidas:
 
 - Sin errores, sin código muerto detectado y `npm audit` en 0 vulnerabilidades (se actualizaron `zod` 3→4 y `react-router-dom` 6→7).
-- El rol `user` de `User.role` ya no se asigna a nadie (todas las cuentas son de integrantes y por tanto `admin`). Se conserva el campo y la comprobación de rol como defensa si se edita la BD a mano.
+- El rol `user` de `User.role` ya no se asigna a nadie (las cuentas son de integrantes: `admin` o `moderador`). Se conserva el valor y la comprobación de rol como defensa si se edita la BD a mano: una cuenta `user` no ve mensajes ni imágenes privadas.
 - **Imágenes huérfanas**: si en el panel subes una imagen y cancelas sin guardar, el archivo queda en GridFS. Se limpian solo al reemplazar o eliminar el registro que las usa.
 - **Login con freno de fuerza bruta** (2026-10-29; reemplazado el 2026-11-06, ver sección 5): 5 intentos fallidos por correo en 15 minutos, guardados en MongoDB. Un correo inexistente tarda lo mismo que uno existente (hash de relleno), para no delatar qué cuentas existen.
 - **Buzón sin captcha** (decisión del cliente): `POST /api/messages` es público. Desde el 2026-11-06 lleva protecciones invisibles (campo trampa, tiempo mínimo de llenado, tope de 12 MB por envío); **no hay ningún límite de envíos** (ni por IP ni global): la comunidad comparte red y el cliente no quiere topes.
@@ -170,8 +191,15 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - Integrantes del equipo, redes sociales y correo de contacto: capturar desde el panel.
 - **Aviso por correo de mensajes nuevos: aplazado por decisión del cliente** (no hay código ni variables). Si se retoma: Render gratis bloquea SMTP (puertos 25/465/587), así que hay que usar una API HTTPS (p. ej. Brevo, verificando el remitente) o SMTP en hosting de pago; `ensfa.edu.mx` usa Google Workspace (SMTP con contraseña de aplicación entrega mejor). Guardar el mensaje antes de enviar el correo y que un fallo del correo nunca afecte al usuario; el correo no debe incluir datos personales de mensajes anónimos.
 - Rotar la contraseña de Atlas: la cadena de conexión se compartió en el chat durante el desarrollo.
+- **Texto legal:** el aviso de privacidad (`/privacidad`) es un borrador; lo debe revisar la ENSFA o alguien con conocimiento legal. Definir también `RETENTION_MONTHS`.
 
 ## 10. Registro de cambios
+
+### 2026-11-06 — Fase 3 de mejoras: privacidad, respaldos y roles (0.10.0)
+- **Privacidad (S3):** página `/privacidad` (borrador) enlazada en el pie, casilla de consentimiento obligatoria en el buzón cuando se envían datos personales (se guarda `consentAt`; la API responde 400 sin ella) y recordatorio en el panel. Retención configurable (`RETENTION_MONTHS`, desactivada por defecto) para mensajes resueltos, además de la papelera de 30 días; `npm run purge [-- --dry-run]` y flujo diario `purge.yml` en GitHub (sin el secreto no hace nada).
+- **Respaldos (S4):** flujo semanal `backup.yml` (`mongodump` → cifrado con `age` → bucket S3 de B2/R2, últimas 8 copias) y guía con prueba de restauración. **Falta que el cliente cree el bucket y los secretos** (ver «Respaldos»).
+- **Rol moderador (S6):** además de administrador, un integrante puede ser moderador: lee y clasifica mensajes, sin ver datos de contacto, sin eliminar y sin el resto del panel. Se elige en Equipo; siempre queda al menos un administrador. Cambia la regla «todo integrante es administrador»: ahora lo es **por defecto**.
+- Pruebas: 93 de API (nuevas: `roles.test.js`, `retencion.test.js` y el consentimiento en `messages.test.js`) y 15 de humo. Se quitó una mención obsoleta del límite global del buzón.
 
 ### 2026-11-06 — Fase 2 de mejoras: imágenes (0.9.0)
 - **Imágenes privadas y limpias (S2):** los adjuntos del buzón solo los ve un administrador con sesión (antes bastaba el enlace) y todas las imágenes se re-codifican con `sharp` al subirse: sin EXIF/GPS, orientadas, máximo 4000 px, protección contra «bombas de descompresión» y rechazo de lo que no se pueda decodificar. Nueva dependencia: `sharp` (binarios precompilados; funciona en Render).

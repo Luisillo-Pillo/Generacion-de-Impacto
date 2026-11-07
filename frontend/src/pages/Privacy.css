@@ -1,0 +1,4 @@
+.privacy h2 { font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: .02em; font-size: 1.3rem; margin: 2rem 0 .5rem; }
+.privacy p, .privacy li { line-height: 1.65; }
+.privacy ul { padding-left: 1.2rem; display: grid; gap: .7rem; }
+.privacy a { color: var(--red); font-weight: 600; }

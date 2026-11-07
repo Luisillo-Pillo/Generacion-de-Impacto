@@ -7,7 +7,8 @@ const userSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 80 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'user'], default: 'user' },
+    // admin: todo. moderador: solo lee y gestiona mensajes, sin ver datos de contacto ni borrar (ver auth.js y routes/messages.js).
+    role: { type: String, enum: ['admin', 'moderador', 'user'], default: 'user' },
     // Se suma al cambiar la contraseña o al cerrar sesión en todos los dispositivos: los tokens con otra versión dejan de valer.
     tokenVersion: { type: Number, default: 0 },
   },
@@ -34,6 +35,7 @@ const messageSchema = new Schema(
     body: { type: String, required: true, trim: true, maxlength: 4000 },
     status: { type: String, enum: MESSAGE_STATUS, default: 'nuevo' },
     review: { type: String, enum: MESSAGE_REVIEW, default: 'pendiente' },
+    consentAt: { type: Date }, // cuándo aceptó el aviso de privacidad (solo mensajes con datos personales)
     deletedAt: { type: Date }, // papelera: se marca al eliminar y se borra de verdad a los 30 días
   },
   { timestamps: true }
@@ -71,7 +73,7 @@ const memberSchema = new Schema(
     degree: { type: String, trim: true, maxlength: 120, default: '' },
     photo: { type: Schema.Types.ObjectId },
     order: { type: Number, default: 0 },
-    // Cuenta de acceso del integrante; todo integrante con cuenta es administrador.
+    // Cuenta de acceso del integrante (administrador por defecto; puede ser moderador).
     user: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

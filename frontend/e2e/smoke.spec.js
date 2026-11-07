@@ -6,7 +6,8 @@ const ADMIN = { id: 'u1', name: 'Ana Prueba', email: 'ana@test.com', role: 'admi
 const MEMBER = { _id: 'm1', name: 'Ana Prueba', role: 'Presidencia' };
 
 // Simula las rutas de la API con un estado en memoria. Devuelve lo que la página envió, para poder comprobarlo.
-async function mockApi(page, { loggedIn = false } = {}) {
+async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
+  const admin = { ...ADMIN, role };
   const state = {
     news: [{ _id: 'n1', slug: 'primera', title: 'Primera noticia', excerpt: 'Resumen', body: 'Cuerpo', published: true, createdAt: '2026-10-20T10:00:00Z', publishedAt: '2026-10-20T10:00:00Z' }],
     proposals: [{ _id: 'p1', number: 1, title: 'Propuesta uno', objective: 'Objetivo uno', published: true }],
@@ -30,9 +31,9 @@ async function mockApi(page, { loggedIn = false } = {}) {
     if (privada && method !== 'POST' && !state.loggedIn) return json(route, { error: 'Sesión inválida o expirada' }, 401);
     if (path === '/auth/login') {
       state.loggedIn = true;
-      return json(route, { token: 'token-de-prueba', user: ADMIN, member: MEMBER });
+      return json(route, { token: 'token-de-prueba', user: admin, member: MEMBER });
     }
-    if (path === '/auth/me') return state.loggedIn ? json(route, { user: ADMIN, member: MEMBER }) : json(route, { error: 'No autenticado' }, 401);
+    if (path === '/auth/me') return state.loggedIn ? json(route, { user: admin, member: MEMBER }) : json(route, { error: 'No autenticado' }, 401);
     if (path === '/news/all') return json(route, state.news);
     if (path === '/news' && method === 'POST') {
       state.sent.news = req.postDataJSON();
@@ -215,5 +216,54 @@ test('las imágenes adjuntas de los mensajes se piden con la sesión y se muestr
   await expect(imagen).toBeVisible();
   expect(await imagen.getAttribute('src')).toMatch(/^blob:/); // no es una URL pública que se pueda abrir sin sesión
   expect(state.fileRequests).toEqual([{ path: '/files/img1?w=640', auth: 'Bearer token-de-prueba' }]);
+});
+
+test('con datos personales hace falta aceptar el aviso de privacidad y el consentimiento viaja con el mensaje', async ({ page }) => {
+  const state = await mockApi(page);
+  await page.goto('/buzon');
+  await page.getByText('Con mis datos').click();
+  await page.getByLabel('Nombre completo').fill('Luis Pérez');
+  await page.getByLabel('Teléfono').fill('5512345678');
+  await page.getByLabel('Licenciatura').selectOption('Licenciatura en Primaria');
+  await page.getByLabel('Semestre').selectOption('1');
+  await page.getByLabel('Asunto').fill('Una idea para el comedor');
+  await page.locator('textarea').fill('Propongo ampliar el horario del comedor.');
+
+  const casilla = page.getByRole('checkbox', { name: /aviso de privacidad/ });
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  expect(state.sent.message).toBeNull(); // sin aceptar el aviso el navegador no deja enviar
+  await expect(casilla).toBeVisible();
+
+  await casilla.check();
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.getByRole('heading', { name: /Gracias por/ })).toBeVisible();
+  expect(state.sent.message).toMatch(/name="consent"\r\n\r\ntrue/);
+});
+
+test('el aviso de privacidad es público y se enlaza desde el pie de página', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Aviso de privacidad' }).click();
+  await expect(page).toHaveURL(/\/privacidad$/);
+  await expect(page.getByRole('heading', { name: /Aviso de privacidad/i })).toBeVisible();
+  await expect(page.getByText(/No guardamos ningún dato personal/)).toBeVisible();
+});
+
+test('un moderador solo ve los mensajes, sin eliminar ni papelera, y no puede abrir otras secciones', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true, role: 'moderador' });
+  state.messages[0].anonymous = false;
+  state.messages[0].hasContact = true;
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+
+  await expect(page.getByText('Un asunto')).toBeVisible();
+  await expect(page.getByText(/solo los ve un administrador/)).toBeVisible();
+  const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
+  await expect(pestañas.getByRole('link')).toHaveText(['Mensajes']);
+  await expect(page.getByRole('button', { name: 'Papelera' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Eliminar', exact: true })).toHaveCount(0);
+
+  await page.goto('/admin/noticias');
+  await expect(page).toHaveURL(/\/admin\/mensajes$/);
 });
 

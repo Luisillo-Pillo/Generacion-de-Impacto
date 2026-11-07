@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { getBucket, deleteFile } from '../db.js';
-import { adminOnly, requireAuth, requireAdmin } from '../auth.js';
+import { adminOnly, requireAuth, requireStaff } from '../auth.js';
 import { imageUpload, saveImage, VARIANT_WIDTHS } from '../uploads.js';
 
 const router = Router();
@@ -12,7 +12,7 @@ router.post('/', adminOnly, imageUpload.single('file'), async (req, res) => {
   res.status(201).json({ id: String(id), url: `/api/files/${id}` });
 });
 
-// Busca el archivo. Si es privado (imágenes de los mensajes del buzón) exige sesión de administrador; las imágenes de
+// Busca el archivo. Si es privado (imágenes de los mensajes del buzón) exige sesión de administrador o moderador; las imágenes de
 // noticias, propuestas y equipo son públicas.
 async function loadFile(req, res, next) {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).end();
@@ -20,7 +20,7 @@ async function loadFile(req, res, next) {
   if (!file) return res.status(404).end();
   req.fileDoc = file;
   if (!file.metadata?.private) return next();
-  requireAuth(req, res, (err) => (err ? next(err) : requireAdmin(req, res, next)));
+  requireAuth(req, res, (err) => (err ? next(err) : requireStaff(req, res, next)));
 }
 
 // `?w=640` (o 1280) sirve la versión reducida en WebP si existe; sin parámetro, o si no hay versión, la original.

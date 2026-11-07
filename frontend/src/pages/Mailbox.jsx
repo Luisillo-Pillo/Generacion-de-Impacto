@@ -14,7 +14,7 @@ const TYPES = [
   ['problema', 'Problema'],
 ];
 
-const empty = { type: 'propuesta', anonymous: true, name: '', degree: '', semester: '', group: '', phone: '', subject: '', body: '' };
+const empty = { type: 'propuesta', anonymous: true, name: '', degree: '', semester: '', group: '', phone: '', consent: false, subject: '', body: '' };
 
 const MAX_IMAGES = 3;
 const MAX_MB = 5;
@@ -88,6 +88,7 @@ export default function Mailbox() {
     if (!form.anonymous) {
       for (const key of ['name', 'degree', 'semester', 'phone']) data.append(key, form[key]);
       if (hasGroups) data.append('group', form.group);
+      data.append('consent', String(form.consent));
     }
     attachments.forEach((a) => data.append('images', a.file));
     data.append('website', trap);
@@ -196,6 +197,12 @@ export default function Mailbox() {
                   <option value="">{hasGroups ? 'Selecciona…' : 'No aplica'}</option>
                   {options(settings?.groups)}
                 </select>
+              </label>
+              <label className="check full">
+                <input type="checkbox" required checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} />
+                <span>
+                  He leído el <Link to="/privacidad" target="_blank">aviso de privacidad</Link> y acepto que mis datos se usen para atender mi mensaje.
+                </span>
               </label>
             </div>
           )}

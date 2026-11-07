@@ -8,6 +8,7 @@ import News from './pages/News.jsx';
 import NewsDetail from './pages/NewsDetail.jsx';
 import Mailbox from './pages/Mailbox.jsx';
 import Team from './pages/Team.jsx';
+import Privacy from './pages/Privacy.jsx';
 import Login from './pages/Login.jsx';
 import Profile from './pages/Profile.jsx';
 import Spinner from './components/Spinner.jsx';
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="/noticias/:slug" element={<NewsDetail />} />
             <Route path="/buzon" element={<Mailbox />} />
             <Route path="/equipo" element={<Team />} />
+            <Route path="/privacidad" element={<Privacy />} />
             <Route path="/acceso" element={<Login />} />
             <Route path="/perfil" element={<Profile />} />
             <Route path="/admin" element={<AdminLayout />}>

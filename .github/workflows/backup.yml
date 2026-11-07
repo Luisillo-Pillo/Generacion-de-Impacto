@@ -1,0 +1,74 @@
+name: Respaldo de la base de datos
+
+# Copia semanal (y a demanda) de TODA la base de Atlas, cifrada con `age` y subida a un almacenamiento compatible con S3
+# (Backblaze B2 o Cloudflare R2). Los datos incluyen información personal: la copia sale ya cifrada y la llave privada
+# nunca está en el repositorio. Si falta algún secreto, avisa y no hace nada. Instrucciones y prueba de restauración:
+# sección «Respaldos» del README.
+#
+# Secretos del repositorio: MONGODB_URI, AGE_PUBLIC_KEY (empieza con age1…), BACKUP_BUCKET, BACKUP_ENDPOINT (URL S3 del
+# proveedor), BACKUP_KEY_ID y BACKUP_KEY_SECRET (llave de aplicación con acceso solo a ese bucket).
+
+on:
+  schedule:
+    - cron: '41 8 * * 0' # domingos
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: respaldo
+  cancel-in-progress: false
+
+jobs:
+  respaldar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
+      BACKUP_BUCKET: ${{ secrets.BACKUP_BUCKET }}
+      BACKUP_ENDPOINT: ${{ secrets.BACKUP_ENDPOINT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_KEY_SECRET }}
+      AWS_DEFAULT_REGION: auto
+      KEEP: 8 # cuántas copias se conservan
+    steps:
+      - name: Comprobar configuración
+        id: config
+        run: |
+          faltan=""
+          for v in MONGODB_URI AGE_PUBLIC_KEY BACKUP_BUCKET BACKUP_ENDPOINT AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            [ -z "${!v}" ] && faltan="$faltan $v"
+          done
+          if [ -n "$faltan" ]; then
+            echo "::notice::Faltan secretos ($faltan ): no se hizo ningún respaldo."
+            echo "listo=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "listo=si" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Instalar herramientas (mongodump y age)
+        if: steps.config.outputs.listo == 'si'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+          curl -fsSL -o tools.tgz https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-x86_64-100.10.0.tgz
+          tar -xzf tools.tgz
+          echo "$PWD/mongodb-database-tools-ubuntu2404-x86_64-100.10.0/bin" >> "$GITHUB_PATH"
+      - name: Volcar, cifrar y subir
+        if: steps.config.outputs.listo == 'si'
+        run: |
+          set -euo pipefail
+          archivo="gi-$(date -u +%Y%m%d-%H%M%S).archive.gz.age"
+          mongodump --uri="$MONGODB_URI" --gzip --archive | age -r "$AGE_PUBLIC_KEY" -o "$archivo"
+          test -s "$archivo"
+          aws s3 cp "$archivo" "s3://$BACKUP_BUCKET/$archivo" --endpoint-url "$BACKUP_ENDPOINT"
+          echo "Subido $archivo ($(du -h "$archivo" | cut -f1))"
+      - name: Conservar solo las últimas copias
+        if: steps.config.outputs.listo == 'si'
+        run: |
+          set -euo pipefail
+          aws s3 ls "s3://$BACKUP_BUCKET/" --endpoint-url "$BACKUP_ENDPOINT" | awk '{print $4}' | grep '^gi-.*\.age$' | sort | head -n -"$KEEP" | while read -r viejo; do
+            echo "Borrando $viejo"
+            aws s3 rm "s3://$BACKUP_BUCKET/$viejo" --endpoint-url "$BACKUP_ENDPOINT"
+          done

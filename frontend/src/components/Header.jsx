@@ -29,7 +29,7 @@ export default function Header() {
               {label}
             </NavLink>
           ))}
-          {user?.role === 'admin' && <NavLink to="/admin" onClick={close}>Panel</NavLink>}
+          {['admin', 'moderador'].includes(user?.role) && <NavLink to="/admin" onClick={close}>Panel</NavLink>}
           {!user && <NavLink to="/acceso" onClick={close}>Acceso</NavLink>}
         </nav>
         {user && <UserMenu />}

@@ -37,4 +37,11 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
+// Moderadores y administradores: leen y gestionan los mensajes del buzón. El resto del panel es solo de administradores.
+export function requireStaff(req, res, next) {
+  if (!['admin', 'moderador'].includes(req.user?.role)) return res.status(403).json({ error: 'No tienes permiso para esto' });
+  next();
+}
+
 export const adminOnly = [requireAuth, requireAdmin];
+export const staffOnly = [requireAuth, requireStaff];

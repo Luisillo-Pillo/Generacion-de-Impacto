@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '../../auth.jsx';
 import { api, formatDate, formatTime } from '../../api.js';
 import AuthImage from '../../components/AuthImage.jsx';
 import { useDialog } from '../../components/Dialog.jsx';
@@ -25,6 +26,8 @@ function Filter({ label, options, value, onChange }) {
 
 export default function AdminMessages() {
   const { confirm, notify } = useDialog();
+  const { user } = useAuth();
+  const moderator = user?.role === 'moderador'; // no ve datos de contacto ni la papelera, y no elimina
   const [filters, setFilters] = useState({ type: '', status: 'nuevo', review: '' });
   const [trash, setTrash] = useState(false); // papelera: mensajes eliminados, se borran solos a los 30 días
   const query = trash ? 'trash=1' : new URLSearchParams(Object.entries(filters).filter(([, v]) => v)).toString();
@@ -71,9 +74,9 @@ export default function AdminMessages() {
             <Filter label="Revisión" options={[['', 'Todas'], ...REVIEW]} value={filters.review} onChange={setFilter('review')} />
           </>
         )}
-        <button type="button" className="btn btn-dark sm trash-toggle" aria-pressed={trash} onClick={() => setTrash(!trash)}>
+        {!moderator && <button type="button" className="btn btn-dark sm trash-toggle" aria-pressed={trash} onClick={() => setTrash(!trash)}>
           {trash ? '← Volver a los mensajes' : 'Papelera'}
-        </button>
+        </button>}
       </div>
       {trash && <p className="muted">Los mensajes eliminados se quedan aquí 30 días y después se borran solos.</p>}
       {error && <p className="error">{error}</p>}
@@ -101,8 +104,9 @@ export default function AdminMessages() {
                 ))}
               </ul>
             )}
+            {!m.anonymous && !moderator && <p className="muted privacy-note">Contiene datos personales: úsalos solo para atender este mensaje y no los copies fuera del panel.</p>}
             <p className="muted">
-              {m.anonymous ? 'Anónimo' : [m.name, m.degree, `${m.semester}° semestre`, m.group && `grupo ${m.group}`, `Tel. ${formatPhone(m.phone)}`].filter(Boolean).join(' · ')}
+              {m.anonymous ? 'Anónimo' : moderator ? 'Con datos de contacto (solo los ve un administrador)' : [m.name, m.degree, `${m.semester}° semestre`, m.group && `grupo ${m.group}`, `Tel. ${formatPhone(m.phone)}`].filter(Boolean).join(' · ')}
             </p>
             {trash ? (
               <div className="row msg-actions">
@@ -120,7 +124,7 @@ export default function AdminMessages() {
               {m.status !== 'leido' && <button className="btn btn-dark sm" onClick={() => update(m._id, { status: 'leido' })}>Marcar leído</button>}
               {m.status !== 'archivado' && <button className="btn btn-dark sm" onClick={() => update(m._id, { status: 'archivado' })}>Archivar</button>}
               {m.status !== 'nuevo' && <button className="btn btn-dark sm" onClick={() => update(m._id, { status: 'nuevo' })}>Marcar nuevo</button>}
-              <button className="btn btn-red sm" onClick={() => remove(m._id)}>Eliminar</button>
+              {!moderator && <button className="btn btn-red sm" onClick={() => remove(m._id)}>Eliminar</button>}
             </div>
             )}
           </article>

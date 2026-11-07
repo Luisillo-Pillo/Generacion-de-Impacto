@@ -8,7 +8,7 @@ let token;
 const anonimo = (extra = {}) => ({ type: 'queja', anonymous: true, subject: 'Baños', body: 'Mensaje anónimo de prueba', ...extra });
 const conDatos = (extra = {}) => ({
   type: 'propuesta', anonymous: false, name: 'Luis Pérez', degree: 'Licenciatura en Primaria', semester: '3',
-  phone: '551 234 5678', subject: 'Una idea', body: 'Mensaje con datos completos', ...extra,
+  phone: '551 234 5678', consent: true, subject: 'Una idea', body: 'Mensaje con datos completos', ...extra,
 });
 const lista = async (query = '') => (await t.call('GET', `/messages${query}`, { token })).json;
 
@@ -38,6 +38,25 @@ test('mensaje con datos: guarda el teléfono sin espacios y descarta el grupo fu
   assert.equal(m.name, 'Luis Pérez');
   assert.equal(m.phone, '5512345678');
   assert.ok(!('group' in m));
+});
+
+test('con datos personales hace falta aceptar el aviso de privacidad, y se guarda cuándo se aceptó', async () => {
+  for (const consent of [undefined, false, 'false', 'no']) {
+    const res = await t.call('POST', '/messages', { body: conDatos({ consent }) });
+    assert.equal(res.status, 400, `consent=${consent}`);
+    assert.match(res.json.error, /aviso de privacidad/);
+  }
+  assert.deepEqual(await lista(), []);
+  const antes = Date.now();
+  assert.equal((await t.call('POST', '/messages', { body: conDatos({ consent: 'true' }) })).status, 201, 'en multipart llega como texto');
+  const [m] = await lista();
+  assert.ok(new Date(m.consentAt).getTime() >= antes - 1000 && new Date(m.consentAt).getTime() <= Date.now() + 1000);
+  assert.ok(!('consent' in m));
+
+  // En los anónimos no aplica: no hace falta y no se guarda
+  await t.call('POST', '/messages', { body: anonimo({ consent: true }) });
+  const anon = (await lista()).find((x) => x.anonymous);
+  assert.ok(anon && !('consentAt' in anon));
 });
 
 test('en Telesecundaria el grupo es obligatorio y se guarda', async () => {

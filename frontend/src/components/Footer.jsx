@@ -13,7 +13,10 @@ export default function Footer() {
       </div>
       <div className="container footer-bottom">
         <span>© {new Date().getFullYear()} Generación de Impacto · ENSFA “Profr. José Santos Valdés”</span>
-        {!user && <Link to="/acceso">Acceso integrantes</Link>}
+        <span className="footer-links">
+          <Link to="/privacidad">Aviso de privacidad</Link>
+          {!user && <Link to="/acceso">Acceso integrantes</Link>}
+        </span>
       </div>
     </footer>
   );

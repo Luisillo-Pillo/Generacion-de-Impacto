@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Message, MESSAGE_TYPES, MESSAGE_STATUS, MESSAGE_REVIEW } from '../models.js';
-import { adminOnly } from '../auth.js';
+import { adminOnly, staffOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { imageUpload, saveImage } from '../uploads.js';
 import { loadSettings } from '../settings.js';
@@ -26,6 +26,8 @@ const createSchema = z.discriminatedUnion('anonymous', [
   z.object({
     ...base,
     anonymous: z.literal(false),
+    // Los datos personales solo se guardan si la persona aceptó el aviso de privacidad (se guarda cuándo, en `consentAt`)
+    consent: z.literal(true, { error: 'Acepta el aviso de privacidad para enviar tus datos' }),
     name: z.string().trim().min(2, 'Escribe tu nombre').max(120),
     degree: z.string().trim().min(1, 'Selecciona tu licenciatura').max(120),
     semester: z.string().trim().min(1, 'Selecciona tu semestre').max(20),
@@ -50,9 +52,15 @@ router.post('/', imageUpload.array('images', MAX_IMAGES), async (req, res) => {
   }
   const totalBytes = (req.files ?? []).reduce((sum, f) => sum + f.size, 0);
   if (totalBytes > MAX_TOTAL_BYTES) return res.status(413).json({ error: 'Las imágenes juntas deben pesar máximo 12 MB' });
-  const body = { ...req.body, anonymous: req.body?.anonymous === true || req.body?.anonymous === 'true' };
+  const body = {
+    ...req.body,
+    anonymous: req.body?.anonymous === true || req.body?.anonymous === 'true',
+    consent: req.body?.consent === true || req.body?.consent === 'true',
+  };
   const data = createSchema.parse(body);
+  delete data.consent; // solo sirve para validar: lo que se guarda es la fecha (`consentAt`)
   if (!data.anonymous) {
+    data.consentAt = new Date();
     const { groupDegrees } = await loadSettings();
     if (!groupDegrees.includes(data.degree)) delete data.group; // no aplica: no se guarda
     else if (!data.group) return res.status(400).json({ error: 'Selecciona tu grupo' });
@@ -68,9 +76,20 @@ router.post('/', imageUpload.array('images', MAX_IMAGES), async (req, res) => {
   res.status(201).json({ ok: true });
 });
 
-router.get('/', adminOnly, async (req, res) => {
+// Un moderador no ve quién escribió: los datos de contacto se quitan de la respuesta (solo se indica que los hay).
+const CONTACT_FIELDS = ['name', 'degree', 'semester', 'group', 'phone'];
+function forRole(msg, role) {
+  const json = msg.toObject ? msg.toObject() : msg;
+  if (role === 'admin') return json;
+  const out = { ...json, hasContact: !json.anonymous };
+  for (const field of CONTACT_FIELDS) delete out[field];
+  return out;
+}
+
+router.get('/', staffOnly, async (req, res) => {
   const { status, type, review } = req.query;
   const trash = req.query.trash === '1';
+  if (trash && req.user.role !== 'admin') return res.status(403).json({ error: 'Se requiere rol de administrador' });
   // `deletedAt: null` también cubre los mensajes anteriores a la papelera, que no tienen el campo
   const filter = { deletedAt: trash ? { $ne: null } : null };
   if (MESSAGE_STATUS.includes(status)) filter.status = status;
@@ -78,10 +97,11 @@ router.get('/', adminOnly, async (req, res) => {
   // Los mensajes anteriores a este campo no lo tienen: cuentan como pendientes
   if (review === 'pendiente') filter.review = { $in: ['pendiente', null] };
   else if (MESSAGE_REVIEW.includes(review)) filter.review = review;
-  res.json(await Message.find(filter).sort(trash ? { deletedAt: -1 } : { createdAt: -1 }).limit(500));
+  const items = await Message.find(filter).sort(trash ? { deletedAt: -1 } : { createdAt: -1 }).limit(500);
+  res.json(items.map((m) => forRole(m, req.user.role)));
 });
 
-router.patch('/:id', adminOnly, async (req, res) => {
+router.patch('/:id', staffOnly, async (req, res) => {
   const changes = z
     .object({ status: z.enum(MESSAGE_STATUS), review: z.enum(MESSAGE_REVIEW) })
     .partial()
@@ -91,7 +111,7 @@ router.patch('/:id', adminOnly, async (req, res) => {
   if (!msg) return res.status(404).json({ error: 'Mensaje no encontrado' });
   const detail = Object.entries(changes).map(([k, v]) => `${k === 'status' ? 'estado' : 'revisión'}: ${v}`).join(', ');
   await audit(req, 'mensaje.actualizar', 'mensaje', msg._id, `Cambió ${detail}`);
-  res.json(msg);
+  res.json(forRole(msg, req.user.role));
 });
 
 // Eliminar manda el mensaje a la papelera; a los 30 días se borra de verdad (ver maintenance.js).

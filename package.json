@@ -16,6 +16,7 @@
     "seed": "npm run seed -w backend",
     "create-admin": "npm run create-admin -w backend",
     "migrate": "npm run migrate -w backend",
+    "purge": "npm run purge -w backend --",
     "lint": "eslint .",
     "test": "npm test -w backend",
     "e2e": "npm run e2e -w frontend",
