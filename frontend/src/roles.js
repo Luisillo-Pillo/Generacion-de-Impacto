@@ -17,8 +17,8 @@ export const canReadMessages = (role) => role === 'admin' || role === 'president
 
 // Secciones del panel que ve cada rol (la primera es a la que se llega al entrar)
 export const SECTIONS_BY_ROLE = {
-  admin: ['mensajes', 'noticias', 'propuestas', 'equipo', 'ajustes', 'actividad'],
-  presidente: ['mensajes', 'noticias', 'propuestas', 'equipo', 'ajustes', 'actividad'],
+  admin: ['mensajes', 'noticias', 'propuestas', 'equipo', 'ajustes'],
+  presidente: ['mensajes', 'noticias', 'propuestas', 'equipo', 'ajustes'],
   moderador: ['mensajes'],
   miembro: ['equipo'],
 };

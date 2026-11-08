@@ -124,17 +124,6 @@ test('eliminar un mensaje lo manda a la papelera, donde se puede restaurar', asy
   await expect(page.getByText('La papelera está vacía.')).toBeVisible();
 });
 
-test('la pestaña Actividad muestra quién hizo qué', async ({ page }) => {
-  await mockApi(page, { loggedIn: true });
-  await withSession(page);
-  await page.goto('/admin/mensajes');
-  await page.getByRole('link', { name: 'Actividad' }).click();
-
-  await expect(page).toHaveURL(/\/admin\/actividad$/);
-  await expect(page.getByText('Creó la noticia «Una noticia»')).toBeVisible();
-  await expect(page.getByText('Ana Prueba', { exact: true }).last()).toBeVisible();
-});
-
 test('las imágenes adjuntas de los mensajes se piden con la sesión y se muestran reducidas', async ({ page }) => {
   const state = await mockApi(page, { loggedIn: true });
   state.messages[0].images = ['img1'];
@@ -395,7 +384,7 @@ test('Presidente: ve todo el panel, con datos de contacto, pero sin ningún cont
   await page.goto('/admin/mensajes');
 
   const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
-  await expect(pestañas.getByRole('link')).toHaveText([/^Mensajes/, 'Noticias', 'Propuestas', 'Equipo', 'Ajustes', 'Actividad']);
+  await expect(pestañas.getByRole('link')).toHaveText([/^Mensajes/, 'Noticias', 'Propuestas', 'Equipo', 'Ajustes']);
   await expect(page.getByText(/Luis Pérez · Primaria/)).toBeVisible(); // datos de contacto completos
   await expect(page.getByText('Papelera', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exportar CSV' })).toBeVisible();
@@ -429,7 +418,7 @@ test('Miembro: solo ve el equipo (sin correos ni roles) y edita su propia inform
   await expect(page.getByText(/@test\.com/)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Nuevo integrante' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
-  for (const ruta of ['/admin/noticias', '/admin/ajustes', '/admin/actividad']) {
+  for (const ruta of ['/admin/noticias', '/admin/ajustes']) {
     await page.goto(ruta);
     await expect(page).toHaveURL(/\/admin\/equipo$/);
   }

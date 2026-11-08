@@ -24,7 +24,6 @@ const AdminNews = lazy(() => import('./pages/admin/AdminNews.jsx'));
 const AdminProposals = lazy(() => import('./pages/admin/AdminProposals.jsx'));
 const AdminTeam = lazy(() => import('./pages/admin/AdminTeam.jsx'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings.jsx'));
-const AdminActivity = lazy(() => import('./pages/admin/AdminActivity.jsx'));
 
 // Al cambiar de página: arriba del todo y, para quien usa teclado o lector de pantalla, el foco al contenido nuevo
 // (no en la primera carga, para no robarle el foco a la página recién abierta)
@@ -78,7 +77,6 @@ export default function App() {
               <Route path="propuestas" element={<AdminProposals />} />
               <Route path="equipo" element={<AdminTeam />} />
               <Route path="ajustes" element={<AdminSettings />} />
-              <Route path="actividad" element={<AdminActivity />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -5,7 +5,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { mockApi, withSession } from './mock-api.js';
 
 const PUBLICAS = ['/', '/propuestas', '/noticias', '/noticias/primera', '/buzon', '/seguimiento', '/equipo', '/privacidad', '/acceso', '/esta-ruta-no-existe'];
-const PANEL = ['/admin/mensajes', '/admin/noticias', '/admin/propuestas', '/admin/equipo', '/admin/ajustes', '/admin/actividad', '/perfil'];
+const PANEL = ['/admin/mensajes', '/admin/noticias', '/admin/propuestas', '/admin/equipo', '/admin/ajustes', '/perfil'];
 
 async function revisar(page, ruta) {
   await page.goto(ruta);
