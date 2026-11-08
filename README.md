@@ -56,7 +56,7 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 | `npm run check` | `lint` + `build` + `test`. Córrelo antes de subir cambios. |
 
 - Las pruebas **se niegan a correr** si la base no es local y llamada `gi_test`. Si no puedes descargar el binario de MongoDB que usa `mongodb-memory-server`, define `TEST_MONGODB_URI` con una base llamada exactamente `gi_test` (nunca la real) y ejecuta `node --test --test-concurrency=1` dentro de `backend/`: se vacía al empezar y se elimina al terminar.
-- **CI** (`.github/workflows/ci.yml`, en cada push a `main` y en cada PR): `lint` + `build` + `test` + `npm audit --omit=dev --audit-level=high`; las pruebas de humo; y una búsqueda de secretos con gitleaks sobre todo el historial. **Dependabot** (`.github/dependabot.yml`) abre cada lunes un PR con las actualizaciones menores agrupadas (y uno por cada actualización mayor).
+- **CI** (`.github/workflows/ci.yml`, en cada push a `main` y en cada PR): `lint` + `build` + `test` + `npm audit --omit=dev --audit-level=high`; las pruebas de humo; y una búsqueda de secretos con gitleaks sobre todo el historial. Su configuración (`.gitleaks.toml`) ignora **solo** las contraseñas falsas de las pruebas, que por su variedad de letras la regla genérica confunde con secretos: por eso las contraseñas inventadas en las pruebas deben empezar con `clave-` (p. ej. `clave-de-beto-1234`). **Dependabot** (`.github/dependabot.yml`) abre cada lunes un PR con las actualizaciones menores agrupadas (y uno por cada actualización mayor).
 
 > `npm run dev` usa `node --watch`: si cierras solo el proceso hijo del servidor, el vigilante lo reinicia. Cierra la terminal (o el árbol completo de procesos) para detenerlo.
 
@@ -265,6 +265,9 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - **Dependabot:** los PR de actualización mayor (React 19, ESLint 10, Vite 8, Mongoose 9, etc.) no se fusionan sin migrar y probar; los que fallen en el CI se pueden cerrar o dejar abiertos.
 
 ## 10. Registro de cambios
+
+### 2026-11-07 — Escáner de secretos del CI (0.16.8)
+- El trabajo «Búsqueda de secretos» (gitleaks) marcó como posibles secretos las contraseñas inventadas de las pruebas de permisos (las mismas que ya lo habían hecho fallar en la Fase 3): no eran secretos reales. Se agregó `.gitleaks.toml`, que suma las reglas por defecto e ignora únicamente los valores que empiezan con `clave-`. Convención: toda contraseña falsa de una prueba empieza con `clave-`.
 
 ### 2026-11-07 — Revisión general (0.16.7)
 - **Error corregido (seguridad):** editar a un integrante sin mandar el campo de rol (`PUT /api/members/:id` sin `access`) lo **ascendía a Moderador**, porque quedaba un valor por omisión de cuando el rol por defecto era administrador. Ahora el rol no cambia (y una cuenta nueva sin rol es Miembro). El panel siempre manda el rol, así que no se había podido dar por la interfaz; prueba nueva.

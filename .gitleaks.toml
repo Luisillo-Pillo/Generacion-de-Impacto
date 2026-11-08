@@ -1,0 +1,11 @@
+# Configuración del escáner de secretos (gitleaks) del CI. Se suman las reglas por defecto.
+title = "Generación de Impacto"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Contraseñas inventadas de las pruebas"
+# Las pruebas crean cuentas con contraseñas falsas (p. ej. «clave-de-beto-1234») que, por su variedad de letras, la regla
+# genérica de claves confunde con un secreto real. Todas empiezan con «clave-»; nada más se ignora.
+regexes = ['''clave-[a-z0-9-]{4,}''']
