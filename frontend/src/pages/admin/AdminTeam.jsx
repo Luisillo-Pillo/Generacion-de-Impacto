@@ -23,7 +23,7 @@ export default function AdminTeam() {
       summary={(m) => <><strong>{m.name}</strong><br /><span className="muted">{m.role ? `${m.role} · ` : ''}{m.email}{m.access ? ` · ${ROLE_LABEL[m.access]}` : ''}</span></>}
       fields={(m, set) => (
         <>
-          {text('Nombre', m.name, set('name'), { required: true, maxLength: 100 })}
+          {text('Nombre', m.name, set('name'), { required: true, maxLength: 100, spellCheck: false })}
           {text('Cargo', m.role, set('role'), { maxLength: 100 })}
           <DegreeSelect value={m.degree} onChange={set('degree')} />
           {text('Correo de acceso', m.email, set('email'), { type: 'email', required: true, autoComplete: 'off' })}

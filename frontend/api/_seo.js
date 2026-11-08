@@ -55,7 +55,7 @@ export function renderPreview({ origin, path, title, description, image, type = 
     ['name', 'twitter:image', img],
   ];
   return `<!doctype html>
-<html lang="es">
+<html lang="es-MX">
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(fullTitle)}</title>

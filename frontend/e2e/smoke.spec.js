@@ -578,3 +578,56 @@ test('Miembro: abre una noticia para editar su contenido y guarda los cambios', 
   expect(state.sent.news).toMatchObject({ title: 'Primera noticia corregida' });
 });
 
+test('cada página empieza arriba: al cambiar de ruta, al recargar y al volver atrás', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1200, height: 500 });
+  const scrollY = () => page.evaluate(() => window.scrollY);
+
+  await page.goto('/');
+  await page.evaluate(() => window.scrollTo({ top: 99999, behavior: 'instant' }));
+  expect(await scrollY()).toBeGreaterThan(300); // la portada es larga: sí se bajó
+
+  // Cambiar de ruta (desde el pie de página, para estar abajo): la nueva página aparece arriba
+  await page.getByRole('link', { name: 'Aviso de privacidad' }).click();
+  await expect(page).toHaveURL(/\/privacidad$/);
+  expect(await scrollY()).toBe(0);
+
+  // Recargar con la página bajada: no se restaura el scroll anterior
+  await page.evaluate(() => window.scrollTo({ top: 99999, behavior: 'instant' }));
+  expect(await scrollY()).toBeGreaterThan(100);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: /Aviso de privacidad/i })).toBeVisible();
+  expect(await scrollY()).toBe(0);
+
+  // Volver atrás también lleva arriba
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  expect(await scrollY()).toBe(0);
+});
+
+test('todo el sitio está en español de México: idioma de la página y corrector ortográfico en los campos de texto', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  const rutas = ['/', '/buzon', '/seguimiento', '/acceso', '/privacidad', '/perfil', '/admin/mensajes', '/admin/noticias', '/admin/equipo', '/admin/ajustes'];
+  for (const ruta of rutas) {
+    await page.goto(ruta);
+    await page.waitForLoadState('networkidle');
+    expect(await page.evaluate(() => document.documentElement.lang), ruta).toBe('es-MX');
+    expect(await page.locator('meta[http-equiv="content-language"]').getAttribute('content'), ruta).toBe('es-MX');
+    expect(await page.locator('[lang]:not(html)').evaluateAll((els) => els.filter((e) => !e.lang.startsWith('es')).length), `${ruta}: ningún elemento con otro idioma`).toBe(0);
+  }
+
+  // Lo que se escribe en español se corrige; los nombres, códigos y contraseñas no
+  await page.goto('/buzon');
+  expect(await page.locator('textarea').evaluate((e) => e.spellcheck), 'mensaje').toBe(true);
+  expect(await page.getByLabel('Asunto').evaluate((e) => e.spellcheck), 'asunto').toBe(true);
+  await page.getByText('Con mis datos').click();
+  expect(await page.getByLabel('Nombre completo').evaluate((e) => e.spellcheck), 'nombre').toBe(false);
+  await page.goto('/seguimiento');
+  expect(await page.getByLabel('Código de seguimiento').evaluate((e) => e.spellcheck), 'código').toBe(false);
+  await page.goto('/perfil');
+  const contraseña = page.locator('.password-field input').first();
+  await page.getByRole('button', { name: 'Mostrar contraseña' }).first().click(); // visible: sería texto normal
+  expect(await contraseña.evaluate((e) => [e.type, e.spellcheck])).toEqual(['text', false]);
+});
+

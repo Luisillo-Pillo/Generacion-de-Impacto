@@ -112,12 +112,13 @@ router.put('/:id', adminOnly, async (req, res) => {
     if (!mail || !pass) return res.status(400).json({ error: 'Captura correo y contraseña para darle acceso' });
     user = new User({ name: data.name, email: mail, passwordHash: await hashPassword(pass) });
   }
-  const newRole = access ?? (user.role === 'moderador' ? 'moderador' : 'admin');
+  // Sin `access` el rol no cambia (y una cuenta nueva sin rol es Miembro): nunca se asciende por omisión
+  const newRole = access ?? (user.role === 'admin' ? 'admin' : 'miembro');
   if (user.role === 'admin' && newRole !== 'admin') {
-    // Siempre debe quedar al menos un administrador, y nadie se quita el acceso a sí mismo
-    if (String(user._id) === String(req.user._id)) return res.status(400).json({ error: 'No puedes quitarte tu propio rol de administrador' });
+    // Siempre debe quedar al menos un Moderador, y nadie se quita el acceso a sí mismo
+    if (String(user._id) === String(req.user._id)) return res.status(400).json({ error: 'No puedes quitarte tu propio rol de Moderador' });
     if ((await User.countDocuments({ role: 'admin', _id: { $ne: user._id } })) === 0) {
-      return res.status(400).json({ error: 'Debe quedar al menos un administrador' });
+      return res.status(400).json({ error: 'Debe quedar al menos un Moderador' });
     }
   }
   const changedRole = user.role !== newRole && !user.isNew;
@@ -136,7 +137,7 @@ router.delete('/:id', adminOnly, async (req, res) => {
   const member = await Member.findById(req.params.id);
   if (!member) return res.status(204).end();
   // Quitar a alguien de la planilla le retira el acceso. Como quien borra es admin y no puede
-  // borrarse a sí mismo, siempre queda al menos un administrador.
+  // borrarse a sí mismo, siempre queda al menos un Moderador.
   if (member.user) {
     if (String(member.user) === String(req.user._id)) {
       return res.status(400).json({ error: 'No puedes eliminar tu propio perfil de integrante' });

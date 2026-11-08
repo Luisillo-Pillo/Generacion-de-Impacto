@@ -12,15 +12,18 @@ Para regenerar el proyecto desde cero con una IA, ver [`docs/Prompt Inicial.md`]
 Generacion-de-Impacto/
 ├── frontend/            React 18 + Vite + React Router 7 → Vercel
 │   ├── public/brand/    logo-planilla.svg, logo-ensfa.png   (favicon.png = emblema de la planilla)
-│   ├── e2e/             pruebas de humo con Playwright (API simulada)
+│   ├── api/             funciones de Vercel: vista previa al compartir (og), sitemap y robots (_seo.js lleva la lógica)
+│   ├── e2e/             pruebas de humo y de accesibilidad (axe) con Playwright (API simulada en mock-api.js)
 │   └── src/             App, auth, api, hooks, utils, pages/ (admin/: una página por sección del panel), components/; cada .jsx con estilos lleva su .css (mismo nombre) y `index.css` guarda solo lo global
 ├── backend/             Express 5 + Mongoose + Zod 4 → Render
 │   ├── src/             app (Express sin arrancar), index (conecta y escucha), db (GridFS), uploads (multer + sharp: limpieza y versiones reducidas), migrate + migrations/ (migraciones de datos),
-│   │                    settings, auth, passwords (política), rateLimit (limitador en MongoDB), audit (bitácora), maintenance (papelera),
+│   │                    settings, auth (tabla de permisos por rol), passwords (política), rateLimit (limitador del login), audit (bitácora),
+│   │                    maintenance + purge (papelera y retención), tracking (códigos de seguimiento), csv, monitoring (Sentry con privacidad),
 │   │                    models, validators, seed, create-admin, routes/ (auth, messages, members, files, content, audit)
 │   ├── test/            pruebas de la API (node:test + MongoDB en memoria)
 │   └── seed/            reto-impacto.jpg (portada de la primera noticia)
-├── .github/             CI (workflows/ci.yml) y Dependabot
+├── .github/             CI (ci.yml), respaldos cifrados (backup.yml), limpieza de datos (purge.yml) y Dependabot
+├── scripts/             make-og-image.mjs (imagen por defecto para compartir)
 ├── docs/                Prompt Inicial y referencias visuales
 ├── eslint.config.mjs    reglas de lint (frontend, backend y pruebas)
 ├── README.md            esta documentación
@@ -262,6 +265,23 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - **Dependabot:** los PR de actualización mayor (React 19, ESLint 10, Vite 8, Mongoose 9, etc.) no se fusionan sin migrar y probar; los que fallen en el CI se pueden cerrar o dejar abiertos.
 
 ## 10. Registro de cambios
+
+### 2026-11-07 — Revisión general (0.16.7)
+- **Error corregido (seguridad):** editar a un integrante sin mandar el campo de rol (`PUT /api/members/:id` sin `access`) lo **ascendía a Moderador**, porque quedaba un valor por omisión de cuando el rol por defecto era administrador. Ahora el rol no cambia (y una cuenta nueva sin rol es Miembro). El panel siempre manda el rol, así que no se había podido dar por la interfaz; prueba nueva.
+- **Código muerto eliminado:** `flushMonitoring` (nunca se usó), la regla CSS `.row.between` (ya sin uso tras el rediseño de las listas) y textos que seguían hablando de «administrador» (mensajes de error de roles, comentarios de modelos y de archivos).
+- **Revisión sin hallazgos:** sin dependencias sin usar (`concurrently` y `eslint` se usan por línea de comandos), sin archivos ni clases CSS huérfanas, sin secretos en el repositorio, `npm audit` en 0 vulnerabilidades, árbol de dependencias consistente y todas las rutas de la API comprobadas contra la tabla de permisos.
+- **Prueba de punta a punta sin simulaciones** (API real con MongoDB en memoria + sitio compilado + Chrome, 15 recorridos): buzón con imagen y código de seguimiento, respuesta firmada, alta de un Miembro, permisos de Miembro y Moderador, exportación a CSV, noticias y propuestas, perfil, scroll e idioma. Todos pasaron y sin errores de consola ni respuestas 4xx/5xx inesperadas.
+- El plazo para que arranque la MongoDB en memoria de las pruebas subió de 60 a 120 s: en equipos ocupados algunas pruebas fallaban por tiempo sin ser errores reales.
+- Pruebas: 146 de API y 61 de navegador (humo y accesibilidad).
+- Se actualizó el árbol de la arquitectura. Compatibilidad que se conserva: `GET /api/messages` sin `?page=` sigue devolviendo el arreglo de antes (lo usan las pruebas); y la API conserva `POST /api/auth/logout-all` y `GET /api/audit` aunque el panel ya no tenga pantalla para ellos.
+
+### 2026-11-07 — Idioma y corrector ortográfico (0.16.6)
+- La página declara **español de México** (`<html lang="es-MX">` y `content-language`, también en el HTML de las vistas previas al compartir) para que el navegador use ese idioma en el corrector ortográfico y la traducción. Los campos que no son texto en español (nombres, correo de acceso, código de seguimiento y contraseñas, incluida la contraseña visible) ya no se subrayan como errores ni se autocorrigen; los de texto libre (asunto, mensaje, respuestas, notas, noticias, propuestas) sí se corrigen.
+- **Si el navegador sigue marcando como error palabras bien escritas, falta su diccionario:** el corrector lo decide cada navegador con los idiomas que tenga activados. En Chrome: Configuración → Idiomas → Corrector ortográfico → activar «Español (México)» o «Español (Latinoamérica)» (y descargar el diccionario); en Edge: Configuración → Idiomas → Corrector ortográfico. La página solo puede indicar su idioma, no instalar el diccionario.
+- Prueba de navegador nueva (idioma de cada página y propiedades de corrección de los campos).
+
+### 2026-11-07 — Cada página empieza arriba (0.16.5)
+- Al cambiar de ruta, al **recargar** y al **volver atrás**, la página aparece siempre en su parte superior, sin importar dónde se quedó el scroll en la anterior. Antes el navegador restauraba la posición al recargar y el `scroll-behavior: smooth` global animaba el salto desde donde estaba y las páginas que cargan después lo cortaban a medias. Ahora se apaga `history.scrollRestoration` y el salto es inmediato y antes de pintar (`ScrollToTop` en `App.jsx`). Prueba de navegador nueva (falla con el código anterior).
 
 ### 2026-11-07 — El Miembro también edita noticias y propuestas (0.16.4)
 - El **Miembro** ahora puede **editar el contenido** de las noticias y propuestas (antes solo las publicaba nuevas y cambiaba su estado): `PUT /api/news/:id` y `PUT /api/proposals/:id` quedaron abiertos a Miembro y Moderador, con las mismas validaciones, y en el panel ve el botón de lápiz. **Eliminar** sigue siendo solo del Moderador. Las ediciones quedan en la bitácora con su nombre.

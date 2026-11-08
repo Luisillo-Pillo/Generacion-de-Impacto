@@ -37,7 +37,7 @@ export default function Login() {
         {expired && <p role="status"><strong>Tu sesión terminó (venció o se cerró desde otro dispositivo). Inicia sesión de nuevo.</strong></p>}
         <form className="form" onSubmit={submit}>
           <label>Correo
-            <input required type="email" value={form.email} onChange={set('email')} autoComplete="email" />
+            <input required type="email" value={form.email} onChange={set('email')} autoComplete="email" spellCheck={false} />
           </label>
           <label>Contraseña
             <PasswordInput required value={form.password} onChange={set('password')} autoComplete="current-password" />

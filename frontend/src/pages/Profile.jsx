@@ -33,7 +33,7 @@ function MyInfo({ member, onSaved }) {
     <>
       <h2 className="title small profile-title">Mi <mark>información</mark></h2>
       <form className="form card" onSubmit={save}>
-        {text('Nombre', form.name, set('name'), { required: true, minLength: 2, maxLength: 100 })}
+        {text('Nombre', form.name, set('name'), { required: true, minLength: 2, maxLength: 100, spellCheck: false })}
         {text('Cargo', form.role, set('role'), { maxLength: 100 })}
         <DegreeSelect value={form.degree} onChange={set('degree')} />
         <ImageField label="Foto" value={form.photo} onChange={set('photo')} />

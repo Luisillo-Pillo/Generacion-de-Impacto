@@ -61,7 +61,7 @@ export default function MessageCard({ m, trash, role, actions }) {
           ))}
         </ul>
       )}
-      {!m.anonymous && <p className="muted privacy-note">Contiene datos personales: úsalos solo para atender este mensaje y no los copies fuera del panel.</p>}
+      {/* {!m.anonymous && <p className="muted privacy-note">Contiene datos personales: úsalos solo para atender este mensaje y no los copies fuera del panel.</p>} */}
       <p className="muted">
         {m.anonymous ? 'Anónimo' : [m.name, m.degree, `${m.semester}° semestre`, m.group && `grupo ${m.group}`, `Tel. ${formatPhone(m.phone)}`].filter(Boolean).join(' · ')}
       </p>

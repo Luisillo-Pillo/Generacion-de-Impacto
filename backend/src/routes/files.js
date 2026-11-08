@@ -12,7 +12,7 @@ router.post('/', panelUserOnly, imageUpload.single('file'), async (req, res) => 
   res.status(201).json({ id: String(id), url: `/api/files/${id}` });
 });
 
-// Busca el archivo. Si es privado (imágenes de los mensajes del buzón) exige sesión de administrador o moderador; las imágenes de
+// Busca el archivo. Si es privado (imágenes de los mensajes del buzón) exige sesión de Miembro o Moderador; las imágenes de
 // noticias, propuestas y equipo son públicas.
 async function loadFile(req, res, next) {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).end();

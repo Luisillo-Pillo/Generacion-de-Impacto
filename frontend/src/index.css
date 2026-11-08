@@ -41,7 +41,6 @@ p { margin: 0 0 1em; }
 .lead.light { color: #e9e0d3; }
 .pre { white-space: pre-wrap; }
 .row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
-.row.between { justify-content: space-between; }
 /* ---------- Tipografía de títulos ---------- */
 .title {
   font-family: var(--font-display);

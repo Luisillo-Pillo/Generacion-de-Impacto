@@ -14,7 +14,8 @@ export default function PasswordInput(props) {
   const [visible, setVisible] = useState(false);
   return (
     <div className="password-field">
-      <input {...props} type={visible ? 'text' : 'password'} />
+      {/* Una contraseña visible no es texto en español: sin corrector ortográfico, mayúsculas ni autocorrección */}
+      <input {...props} type={visible ? 'text' : 'password'} spellCheck={false} autoCapitalize="off" autoCorrect="off" />
       <button
         type="button"
         className="password-toggle"

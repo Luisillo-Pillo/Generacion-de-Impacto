@@ -183,7 +183,7 @@ export default function Mailbox() {
           {!form.anonymous && (
             <div className="form-grid">
               <label className="full">Nombre completo
-                <input required value={form.name} onChange={set('name')} maxLength={120} autoComplete="name" />
+                <input required value={form.name} onChange={set('name')} maxLength={120} autoComplete="name" spellCheck={false} />
               </label>
               <label className="full">Teléfono
                 <input

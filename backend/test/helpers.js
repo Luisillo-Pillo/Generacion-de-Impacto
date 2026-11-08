@@ -28,7 +28,7 @@ export async function startServer(env = {}) {
   if (!external) {
     const { MongoMemoryServer } = await import('mongodb-memory-server');
     // Cada archivo de prueba levanta su propio mongod y corren en paralelo: el plazo por defecto (10 s) se queda corto en equipos lentos o con antivirus
-    mongod = await MongoMemoryServer.create({ instance: { launchTimeout: 60000 } });
+    mongod = await MongoMemoryServer.create({ instance: { launchTimeout: 120000 } });
     uri = mongod.getUri('gi_test');
   }
   const { hostname, pathname } = new URL(uri);

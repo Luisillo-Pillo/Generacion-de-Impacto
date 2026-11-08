@@ -58,4 +58,3 @@ export function reportError(err, requestId) {
   });
 }
 
-export const flushMonitoring = (ms = 2000) => (enabled ? Sentry.flush(ms) : Promise.resolve(true));

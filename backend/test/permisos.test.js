@@ -181,6 +181,25 @@ test('el Moderador cambia el rol de cualquiera, pero siempre queda al menos uno 
   assert.equal((await t.models.User.findOne({ email: 'ana@test.com' })).role, 'admin');
 });
 
+test('editar a un integrante sin mandar el rol no lo cambia (nunca se asciende por omisión)', async () => {
+  const sinRol = await t.call('POST', '/members', { token: mod, body: { name: 'Edito Sin Rol', email: 'sin-rol-edit@test.com', password: 'clave-edito-sin-rol-1' } });
+  assert.equal(sinRol.json.access, 'miembro');
+  const editado = await t.call('PUT', `/members/${sinRol.json._id}`, { token: mod, body: { name: 'Edito Sin Rol Renombrado', role: 'Vocal' } });
+  assert.equal(editado.status, 200, editado.text);
+  assert.equal(editado.json.access, 'miembro', 'sigue siendo Miembro');
+  assert.equal((await t.models.User.findOne({ email: 'sin-rol-edit@test.com' })).role, 'miembro');
+
+  // Un Moderador tampoco pierde el rol por editarlo sin mandarlo
+  const otro = await t.call('POST', '/members', { token: mod, body: { name: 'Otro Mod', email: 'otro-mod@test.com', password: 'clave-otro-mod-12345', access: 'admin' } });
+  assert.equal((await t.call('PUT', `/members/${otro.json._id}`, { token: mod, body: { name: 'Otro Mod Renombrado' } })).json.access, 'admin');
+
+  // Una ficha sin cuenta a la que se le da acceso sin elegir rol empieza como Miembro
+  const ficha = await t.models.Member.create({ name: 'Ficha Sin Cuenta' });
+  const conCuenta = await t.call('PUT', `/members/${ficha._id}`, { token: mod, body: { name: 'Ficha Sin Cuenta', email: 'ficha@test.com', password: 'clave-ficha-sin-cuenta-1' } });
+  assert.equal(conCuenta.status, 200, conCuenta.text);
+  assert.equal(conCuenta.json.access, 'miembro');
+});
+
 test('los roles que ya no existen cuentan como Miembro de inmediato y la migración 003 los convierte (sin tocar a los Moderadores)', async () => {
   const hash = await bcrypt.hash('clave-vieja-cuenta-1', 4);
   for (const role of ['presidente', 'moderador']) {

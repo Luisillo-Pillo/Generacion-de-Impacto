@@ -97,7 +97,7 @@ const memberSchema = new Schema(
     degree: { type: String, trim: true, maxlength: 120, default: '' },
     photo: { type: Schema.Types.ObjectId },
     order: { type: Number, default: 0 },
-    // Cuenta de acceso del integrante (administrador por defecto; puede ser moderador).
+    // Cuenta de acceso del integrante (rol Miembro o Moderador; ver User.role).
     user: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
