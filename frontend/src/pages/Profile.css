@@ -1,5 +1,10 @@
-.profile { display: flex; gap: 1.2rem; align-items: center; margin-bottom: 2.5rem; }
+.profile { display: flex; gap: 1.2rem; align-items: center; flex-wrap: wrap; }
+.profile-info { flex: 1 1 14rem; min-width: 0; }
 .profile h2 { margin: 0; }
 .profile p { margin: 0 0 .3rem; }
 .profile-photo { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 4px solid var(--red); flex: none; }
 .avatar.big { width: 96px; height: 96px; margin: 0; font-size: 2rem; flex: none; }
+/* «Cerrar sesión» abajo a la derecha del recuadro */
+.profile-logout { margin-left: auto; align-self: flex-end; }
+/* Espacio entre cada recuadro y el título de la sección siguiente (antes se encimaban) */
+.profile-title { margin: 2.5rem 0 .4rem; }

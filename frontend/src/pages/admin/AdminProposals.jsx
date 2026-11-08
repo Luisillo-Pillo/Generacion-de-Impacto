@@ -36,7 +36,7 @@ function ProposalState({ item, reload }) {
 
 export default function AdminProposals() {
   return (
-    <CrudPanel memberCanCreate memberActions={(item, reload) => <ProposalState item={item} reload={reload} />}
+    <CrudPanel memberCanCreate memberCanEdit memberActions={(item, reload) => <ProposalState item={item} reload={reload} />}
       listPath="/proposals/all" endpoint="/proposals" newLabel="Nueva propuesta"
       blank={(items) => ({ number: (items?.reduce((m, p) => Math.max(m, p.number), 0) || 0) + 1, title: '', objective: '', image: null, progress: 'planeada', progressNote: '', published: true })}
       summary={(p) => <><strong>#{p.number} · {p.title}</strong><br /><span className="muted">{PROGRESS_LABEL[p.progress ?? 'planeada']} · {p.published ? 'Visible' : 'Oculta'}</span></>}

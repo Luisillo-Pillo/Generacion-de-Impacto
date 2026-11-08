@@ -2,6 +2,13 @@
 .image-field img { max-height: 160px; width: auto; border-radius: 6px; }
 .image-field input { padding: .4rem; }
 .image-field > span { font-weight: 600; font-size: .92rem; }
+.crud-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.crud-card { margin: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: .8rem; flex-wrap: wrap; }
+.crud-summary { min-width: 0; flex: 1 1 10rem; overflow-wrap: anywhere; }
+.crud-actions { flex: none; flex-wrap: nowrap; }
+.icon-btn svg { width: 1.15rem; height: 1.15rem; flex: none; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; padding: 0; }
+@media (max-width: 760px) { .crud-grid { grid-template-columns: 1fr; } }
 .crud-new-end { margin-top: 1.2rem; }
 .gallery-thumbs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .8rem; }
 .gallery-thumbs li { display: grid; gap: .2rem; justify-items: start; }

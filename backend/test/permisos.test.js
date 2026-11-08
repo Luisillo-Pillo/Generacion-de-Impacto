@@ -71,7 +71,7 @@ test('Miembro: no ve la papelera ni puede eliminar, restaurar ni borrar definiti
   assert.equal((await t.models.Message.findById(msg._id)).deletedAt, undefined);
 });
 
-test('Miembro: ve noticias y propuestas (con borradores), las publica nuevas y cambia su estado, pero no edita lo ya publicado ni lo elimina', async () => {
+test('Miembro: ve noticias y propuestas (con borradores), las publica nuevas, las edita y cambia su estado, pero no las elimina', async () => {
   assert.ok((await t.call('GET', '/news/all', { token: mem })).json.some((n) => n.title === 'Borrador del moderador'));
   assert.ok((await t.call('GET', '/proposals/all', { token: mem })).json.some((p) => p.number === 40));
 
@@ -101,15 +101,26 @@ test('Miembro: ve noticias y propuestas (con borradores), las publica nuevas y c
   assert.deepEqual([estado.json.progress, estado.json.progressNote, estado.json.published], ['en_marcha', 'Ya hay fecha', true]);
   assert.equal(await status(mem, 'PATCH', `/proposals/${oculta._id}/state`, {}), 400);
   assert.equal(await status(mem, 'PATCH', `/proposals/${oculta._id}/state`, { progress: 'terminada' }), 400);
-  assert.equal((await t.models.Proposal.findById(oculta._id)).title, 'Propuesta del moderador', 'el estado no toca el contenido');
+  assert.equal((await t.models.Proposal.findById(oculta._id)).title, 'Propuesta del moderador', 'el estado por sí solo no toca el contenido');
 
-  // Lo demás es del Moderador
+  // Editar el contenido de lo ya publicado también puede hacerlo
   const id = borrador._id;
-  assert.equal(await status(mem, 'PUT', `/news/${id}`, { title: 'Cambiado', body: 'x' }), 403);
+  const editada = await t.call('PUT', `/news/${id}`, { token: mem, body: { title: 'Borrador corregido por un miembro', body: 'Texto corregido', published: false } });
+  assert.equal(editada.status, 200, editada.text);
+  assert.equal(editada.json.title, 'Borrador corregido por un miembro');
+  assert.equal(await status(mem, 'PUT', `/news/${id}`, { title: 'ab', body: '' }), 400, 'con las mismas validaciones');
+  const propEditada = await t.call('PUT', `/proposals/${oculta._id}`, { token: mem, body: { number: 40, title: 'Propuesta corregida por un miembro', objective: 'Objetivo corregido' } });
+  assert.equal(propEditada.status, 200, propEditada.text);
+  assert.equal((await t.models.Proposal.findById(oculta._id)).title, 'Propuesta corregida por un miembro');
+  assert.equal(await status(mem, 'PUT', `/news/000000000000000000000001`, { title: 'No existe', body: 'x' }), 404);
+  const log = JSON.stringify((await t.call('GET', '/audit', { token: mod })).json.items);
+  assert.ok(log.includes('noticia.editar') && log.includes('propuesta.editar'), 'queda en la bitácora');
+
+  // Eliminar sigue siendo solo del Moderador
   assert.equal(await status(mem, 'DELETE', `/news/${id}`), 403);
-  assert.equal(await status(mem, 'PUT', `/proposals/${oculta._id}`, { number: 40, title: 'Cambiada', objective: 'x' }), 403);
   assert.equal(await status(mem, 'DELETE', `/proposals/${oculta._id}`), 403);
   assert.equal(await status(mem, 'DELETE', `/files/${cover.json.id}`), 403);
+  assert.ok(await t.models.News.exists({ _id: id }) && await t.models.Proposal.exists({ _id: oculta._id }));
 });
 
 test('Miembro: ve correos, nombres y roles del equipo (nunca contraseñas) y edita solo su propia información', async () => {

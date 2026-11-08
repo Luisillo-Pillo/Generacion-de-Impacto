@@ -49,8 +49,8 @@ export function requireAdmin(req, res, next) {
 //   exportar mensajes a CSV                                          sí          sí
 //   ver la papelera, restaurar y eliminar mensajes                   no          sí
 //   ver noticias y propuestas (con borradores)                       sí          sí
-//   publicar noticias y propuestas nuevas y cambiar su estado        sí          sí
-//   editar el contenido de lo ya publicado y eliminarlo              no          sí
+//   publicar noticias y propuestas nuevas, editarlas y cambiar su estado   sí       sí
+//   eliminar noticias y propuestas                                   no          sí
 //   ver correos, nombres y roles del equipo (nunca contraseñas)      sí          sí
 //   editar su propia información                                     sí          sí
 //   editar a otros, dar de alta, eliminar, cambiar roles y orden     no          sí

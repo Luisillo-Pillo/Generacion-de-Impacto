@@ -71,8 +71,8 @@ router.post('/news', panelUserOnly, async (req, res) => {
   res.status(201).json(item);
 });
 
-// Cambiar el estado de una noticia (publicada, borrador o programada): lo puede hacer un Miembro. Editar su contenido, solo
-// el Moderador (PUT). La fecha de publicación sigue la misma regla que al editar.
+// Cambiar solo el estado de una noticia (publicada, borrador o programada), sin tocar su contenido. Editar el contenido (PUT) lo
+// pueden hacer el Miembro y el Moderador; eliminar, solo el Moderador. La fecha de publicación sigue la misma regla que al editar.
 router.patch('/news/:id/state', panelUserOnly, async (req, res) => {
   const { published, publishedAt } = z.object({
     published: z.boolean(),
@@ -90,7 +90,7 @@ router.patch('/news/:id/state', panelUserOnly, async (req, res) => {
   res.json(item);
 });
 
-router.put('/news/:id', adminOnly, async (req, res) => {
+router.put('/news/:id', panelUserOnly, async (req, res) => {
   const data = newsSchema.parse(req.body);
   const item = await News.findById(req.params.id);
   if (!item) return res.status(404).json({ error: 'Noticia no encontrada' });
@@ -163,7 +163,7 @@ router.patch('/proposals/:id/state', panelUserOnly, async (req, res) => {
   res.json(item);
 });
 
-router.put('/proposals/:id', adminOnly, async (req, res) => {
+router.put('/proposals/:id', panelUserOnly, async (req, res) => {
   const data = proposalSchema.parse(req.body);
   if (await Proposal.exists({ number: data.number, _id: { $ne: req.params.id } })) {
     return res.status(409).json({ error: `Ya existe la propuesta #${data.number}` });

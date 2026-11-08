@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, fileUrl, uploadImage } from '../../api.js';
 import { useAuth } from '../../auth.jsx';
+import { IconPencil, IconTrash } from '../../components/ActionIcons.jsx';
 import { canEdit } from '../../roles.js';
 import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
@@ -108,9 +109,9 @@ export function GalleryField({ value = [], onChange, label = 'Galería', max = 6
 
 // Editor genérico (noticias / propuestas / equipo)
 // `newAtEnd`: el botón de crear va debajo de la lista en vez de encima
-// `memberCanCreate`: un Miembro también puede crear (noticias, propuestas); `memberActions(item, reload)`: lo que un Miembro puede
-// hacer con lo ya publicado (cambiar su estado). Editar y eliminar son solo del Moderador.
-export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote, newAtEnd = false, memberCanCreate = false, memberActions = null }) {
+// `memberCanCreate`: un Miembro también puede crear (noticias, propuestas); `memberCanEdit`: y editar lo ya creado; `memberActions(item,
+// reload)`: otras acciones suyas (cambiar el estado). Eliminar es solo del Moderador.
+export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote, newAtEnd = false, memberCanCreate = false, memberCanEdit = false, memberActions = null }) {
   const { confirm, notify } = useDialog();
   const { user } = useAuth();
   const isMod = canEdit(user?.role);
@@ -164,17 +165,25 @@ export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel
       {canCreate && !newAtEnd && newButton}
       {error && <p className="error">{error}</p>}
       {loading && <Spinner />}
-      {items?.map((it) => (
-        <article key={it._id} className="card row between">
-          <div>{summary(it)}</div>
-          {isMod ? (
-            <div className="row">
-              <button className="btn btn-dark sm" onClick={() => setEditing({ ...it })}>Editar</button>
-              <button className="btn btn-red sm" onClick={() => remove(it)}>Eliminar</button>
-            </div>
-          ) : memberActions?.(it, reload)}
-        </article>
-      ))}
+      {/* Dos columnas (una en teléfono); editar y eliminar son botones con ícono */}
+      <div className="crud-grid">
+        {items?.map((it) => (
+          <article key={it._id} className="card crud-card">
+            <div className="crud-summary">{summary(it)}</div>
+            {isMod ? (
+              <div className="row crud-actions">
+                <button className="btn btn-dark sm icon-btn" aria-label="Editar" title="Editar" onClick={() => setEditing({ ...it })}><IconPencil /></button>
+                <button className="btn btn-red sm icon-btn" aria-label="Eliminar" title="Eliminar" onClick={() => remove(it)}><IconTrash /></button>
+              </div>
+            ) : (
+              <div className="row crud-actions">
+                {memberCanEdit && <button className="btn btn-dark sm icon-btn" aria-label="Editar" title="Editar" onClick={() => setEditing({ ...it })}><IconPencil /></button>}
+                {memberActions?.(it, reload)}
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
       {canCreate && newAtEnd && <div className="crud-new-end">{newButton}</div>}
     </div>
   );

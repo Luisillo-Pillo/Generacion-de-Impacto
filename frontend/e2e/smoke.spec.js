@@ -413,20 +413,21 @@ test('Miembro: lee y responde mensajes (con datos de contacto), exporta, y no ve
   await expect(page).toHaveURL(/\/admin\/mensajes$/); // los ajustes son solo del Moderador
 });
 
-test('Miembro: publica noticias y propuestas nuevas y cambia su estado, pero no las edita ni elimina', async ({ page }) => {
+test('Miembro: publica noticias y propuestas nuevas, las edita y cambia su estado, pero no las elimina', async ({ page }) => {
   const state = await mockApi(page, { loggedIn: true, role: 'miembro' });
   await withSession(page);
 
   await page.goto('/admin/noticias');
   await expect(page.getByRole('button', { name: 'Nueva noticia' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(1); // puede editar el contenido
+  await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(0); // pero no eliminar
   await page.getByRole('button', { name: 'Pasar a borrador' }).click();
   await expect.poll(() => state.sent.state).toEqual({ path: '/news/n1/state', body: { published: false } });
 
   await page.goto('/admin/propuestas');
   await expect(page.getByRole('button', { name: 'Nueva propuesta' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Actualizar estado' }).first().click();
   await page.getByRole('combobox', { name: /^Avance/ }).selectOption('cumplida');
   await page.getByRole('button', { name: 'Guardar', exact: true }).click();
@@ -496,5 +497,84 @@ test('si la licenciatura de alguien ya no está en Ajustes, se conserva como opc
   const menu = page.getByRole('combobox', { name: /^Licenciatura/ });
   await expect(menu).toHaveValue('Licenciatura en Física');
   await expect(menu.locator('option:checked')).toHaveText('Licenciatura en Física (ya no está en Ajustes)');
+});
+
+test('noticias, propuestas y equipo del panel van en dos columnas, con íconos de lápiz y bote de basura', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.news.push({ ...state.news[0], _id: 'n2', slug: 'segunda', title: 'Segunda noticia' });
+  await withSession(page);
+  for (const ruta of ['/admin/noticias', '/admin/propuestas', '/admin/equipo']) {
+    await page.goto(ruta);
+    const tarjetas = page.locator('.crud-card');
+    await expect(tarjetas).toHaveCount(2);
+    const [a, b] = [await tarjetas.nth(0).boundingBox(), await tarjetas.nth(1).boundingBox()];
+    expect(Math.abs(a.y - b.y), `${ruta}: misma fila`).toBeLessThan(5);
+    expect(b.x, `${ruta}: la segunda a la derecha`).toBeGreaterThan(a.x + a.width - 1);
+
+    const editar = tarjetas.first().getByRole('button', { name: 'Editar' });
+    const eliminar = tarjetas.first().getByRole('button', { name: 'Eliminar' });
+    await expect(editar.locator('svg')).toHaveCount(1); // ícono de lápiz
+    await expect(eliminar.locator('svg')).toHaveCount(1); // ícono de bote de basura
+    await expect(editar).toHaveText(''); // sin texto visible
+    await expect(eliminar).toHaveText('');
+    await expect(eliminar).toHaveAttribute('title', 'Eliminar');
+  }
+});
+
+test('en teléfono las tarjetas del panel pasan a una sola columna', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.news.push({ ...state.news[0], _id: 'n2', slug: 'segunda', title: 'Segunda noticia' });
+  await page.setViewportSize({ width: 390, height: 800 });
+  await withSession(page);
+  await page.goto('/admin/noticias');
+  const [a, b] = [await page.locator('.crud-card').nth(0).boundingBox(), await page.locator('.crud-card').nth(1).boundingBox()];
+  expect(b.y).toBeGreaterThan(a.y + a.height - 1);
+});
+
+test('el menú de usuario se ajusta al largo del correo: no se corta ni se parte', async ({ page }) => {
+  const correo = 'pepe.pecas130508.con.un.correo.largo@gmail.com';
+  await mockApi(page, { loggedIn: true, email: correo });
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  await page.getByRole('button', { name: /Ana/ }).click();
+  const linea = page.locator('.user-info small');
+  await expect(linea).toHaveText(correo);
+  expect((await linea.boundingBox()).height, 'el correo cabe en una sola línea').toBeLessThan(30);
+  const menu = await page.locator('.user-dropdown').boundingBox();
+  expect(menu.x).toBeGreaterThanOrEqual(0); // tampoco se sale de la pantalla
+  expect(menu.x + menu.width).toBeLessThanOrEqual(page.viewportSize().width);
+});
+
+test('Mi perfil: «Cerrar sesión» está abajo a la derecha del primer recuadro (ya no hay «Mis sesiones»)', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/perfil');
+  await expect(page.getByText('Mis sesiones')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Cerrar sesión en todos los dispositivos' })).toHaveCount(0);
+
+  const recuadro = await page.locator('.profile').boundingBox();
+  const boton = await page.locator('.profile').getByRole('button', { name: 'Cerrar sesión' }).boundingBox();
+  expect(boton.x + boton.width, 'a la derecha').toBeGreaterThan(recuadro.x + recuadro.width - 40);
+  expect(boton.y + boton.height, 'abajo').toBeGreaterThan(recuadro.y + recuadro.height - 40);
+
+  // Los títulos ya no se encimen con los recuadros
+  const [formInfo, tituloPass] = [await page.locator('.card').nth(1).boundingBox(), await page.getByRole('heading', { name: /Cambiar contraseña/ }).boundingBox()];
+  expect(tituloPass.y).toBeGreaterThan(formInfo.y + formInfo.height + 10);
+
+  await page.locator('.profile').getByRole('button', { name: 'Cerrar sesión' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cerrar sesión' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  expect(await page.evaluate(() => localStorage.getItem('gi_token'))).toBeNull();
+});
+
+test('Miembro: abre una noticia para editar su contenido y guarda los cambios', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true, role: 'miembro' });
+  await withSession(page);
+  await page.goto('/admin/noticias');
+  await page.getByRole('button', { name: 'Editar' }).click();
+  await page.getByLabel('Título').fill('Primera noticia corregida');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(page.getByText('Primera noticia corregida')).toBeVisible();
+  expect(state.sent.news).toMatchObject({ title: 'Primera noticia corregida' });
 });
 

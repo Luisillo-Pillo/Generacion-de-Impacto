@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { startTransition, useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import { api, fileUrl, setToken } from '../api.js';
 import { useDialog } from '../components/Dialog.jsx';
@@ -31,7 +31,7 @@ function MyInfo({ member, onSaved }) {
   }
   return (
     <>
-      <h2 className="title small">Mi <mark>información</mark></h2>
+      <h2 className="title small profile-title">Mi <mark>información</mark></h2>
       <form className="form card" onSubmit={save}>
         {text('Nombre', form.name, set('name'), { required: true, minLength: 2, maxLength: 100 })}
         {text('Cargo', form.role, set('role'), { maxLength: 100 })}
@@ -46,8 +46,9 @@ function MyInfo({ member, onSaved }) {
 }
 
 export default function Profile() {
-  const { user, member, loading, refresh } = useAuth();
-  const { confirm, notify } = useDialog();
+  const { user, member, loading, refresh, logout } = useAuth();
+  const navigate = useNavigate();
+  const { confirm } = useDialog();
   const [form, setForm] = useState(blank);
   const [status, setStatus] = useState({ busy: false, error: '', ok: false });
 
@@ -72,20 +73,19 @@ export default function Profile() {
     }
   }
 
-  async function logoutEverywhere() {
+  // Igual que en el menú de usuario: confirma y cierra la sesión de este dispositivo. Ambas actualizaciones van juntas porque
+  // React Router navega en una transición y, si la sesión se cerrara antes, el panel redirigiría a /acceso.
+  async function askLogout() {
     const ok = await confirm({
-      title: '¿Cerrar sesión en todos los dispositivos?',
-      message: 'Se cerrará tu sesión en tus demás computadoras y teléfonos. En este dispositivo seguirás con sesión.',
-      confirmLabel: 'Cerrar en los demás',
+      title: '¿Cerrar sesión?',
+      message: 'Tendrás que iniciar sesión de nuevo para entrar al panel.',
+      confirmLabel: 'Cerrar sesión',
     });
     if (!ok) return;
-    try {
-      const d = await api('/auth/logout-all', { method: 'POST' });
-      setToken(d.token);
-      await notify({ title: 'Listo', message: 'Se cerró la sesión en tus demás dispositivos.' });
-    } catch (err) {
-      await notify({ title: 'No se pudo cerrar las sesiones', message: err.message });
-    }
+    startTransition(() => {
+      navigate('/');
+      logout();
+    });
   }
 
   return (
@@ -95,18 +95,19 @@ export default function Profile() {
 
         <article className="card profile">
           {member?.photo ? <img className="profile-photo" src={fileUrl(member.photo, 640)} alt="" /> : <div className="avatar big">{initials(user.name)}</div>}
-          <div>
+          <div className="profile-info">
             <h2>{user.name}</h2>
             <p className="muted">{user.email}</p>
             {member?.role && <p className="role">{member.role}</p>}
             {member?.degree && <p className="muted">{member.degree}</p>}
             <span className="tag" title={ROLE_HELP[user.role]}>{ROLE_LABEL[user.role] ?? 'Sin rol'}</span>
           </div>
+          <button type="button" className="btn btn-dark profile-logout" onClick={askLogout}>Cerrar sesión</button>
         </article>
 
         {member && <MyInfo key={member._id} member={member} onSaved={refresh} />}
 
-        <h2 className="title small">Cambiar <mark>contraseña</mark></h2>
+        <h2 className="title small profile-title">Cambiar <mark>contraseña</mark></h2>
         <form className="form card" onSubmit={submit}>
           <label>Contraseña actual
             <PasswordInput required value={form.currentPassword} onChange={set('currentPassword')} autoComplete="current-password" />
@@ -121,12 +122,6 @@ export default function Profile() {
           {status.ok && <p role="status"><strong>Contraseña actualizada ✔</strong></p>}
           <button className="btn btn-red" disabled={status.busy}>{status.busy ? <><Spinner inline /> Guardando…</> : 'Guardar contraseña'}</button>
         </form>
-
-        <h2 className="title small">Mis <mark>sesiones</mark></h2>
-        <div className="card">
-          <p>Tu sesión se renueva sola mientras usas el panel y termina tras 12 horas sin actividad. Si usaste tu cuenta en una computadora ajena, ciérrala en todos lados.</p>
-          <button type="button" className="btn btn-dark" onClick={logoutEverywhere}>Cerrar sesión en todos los dispositivos</button>
-        </div>
       </div>
     </section>
   );

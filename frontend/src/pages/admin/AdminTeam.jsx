@@ -14,7 +14,7 @@ export default function AdminTeam() {
   return (
     <>
     {editable ? <MemberOrder onChange={() => setVersion((v) => v + 1)} /> : (
-      <p className="hint">Aquí ves a las personas de la planilla, con su correo y su rol. Para cambiar <strong>tu información</strong> (nombre, cargo, licenciatura y foto) ve a <Link to="/perfil">Mi perfil</Link>; a los demás los administra un Moderador.</p>
+      <p className="hint">Para cambiar <strong>tu información</strong> ve a <Link to="/perfil">Mi perfil</Link>. Si quieres sugerir algún cambio para otro compañero, contacta con un moderador.</p>
     )}
     <CrudPanel key={version}
       listPath="/members/all" endpoint="/members" newLabel="Nuevo integrante" newAtEnd

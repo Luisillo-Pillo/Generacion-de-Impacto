@@ -6,8 +6,8 @@ const ADMIN = { id: 'u1', name: 'Ana Prueba', email: 'ana@test.com', role: 'admi
 const MEMBER = { _id: 'm1', name: 'Ana Prueba', role: 'Presidencia' };
 
 // Simula las rutas de la API con un estado en memoria. Devuelve lo que la página envió, para poder comprobarlo.
-export async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
-  const admin = { ...ADMIN, role };
+export async function mockApi(page, { loggedIn = false, role = 'admin', email } = {}) {
+  const admin = { ...ADMIN, role, ...(email ? { email } : {}) };
   const state = {
     news: [{ _id: 'n1', slug: 'primera', title: 'Primera noticia', excerpt: 'Resumen', body: 'Cuerpo', published: true, createdAt: '2026-10-20T10:00:00Z', publishedAt: '2026-10-20T10:00:00Z' }],
     proposals: [
@@ -44,6 +44,12 @@ export async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
       const created = { _id: 'n2', slug: 'creada', createdAt: '2026-11-01T10:00:00Z', ...state.sent.news };
       state.news.unshift(created);
       return json(route, created, 201);
+    }
+    if (/^\/news\/[^/]+$/.test(path) && method === 'PUT') {
+      state.sent.news = req.postDataJSON();
+      const i = state.news.findIndex((x) => `/news/${x._id}` === path);
+      state.news[i] = { ...state.news[i], ...state.sent.news };
+      return json(route, state.news[i]);
     }
     if (path.startsWith('/news/') && method === 'GET') {
       const n = state.news.find((x) => `/news/${x.slug}` === path);

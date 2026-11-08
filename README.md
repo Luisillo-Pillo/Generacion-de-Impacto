@@ -100,7 +100,7 @@ Colecciones: `users`, `members`, `messages`, `news`, `proposals`, `settings`, `a
 - **Primer administrador**: `npm run create-admin` (interactivo; o con `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`). Crea cuenta + ficha. Si el correo ya tiene cuenta sin ficha de integrante, solo crea la ficha y la vincula sin tocar la contraseña. Para producción, ejecútalo en tu equipo con `MONGODB_URI` de Atlas.
 - **Sesión**: correo + contraseña (bcrypt), JWT de **12 horas** que se **renueva solo** mientras se usa el panel (cuando ya pasó la mitad de su vida, la API manda uno nuevo en la cabecera `X-Renewed-Token`). El token lleva la **versión de sesión** de la cuenta (`users.tokenVersion`): cambiar la contraseña o usar «Cerrar sesión en todos los dispositivos» la sube y deja de valer cualquier otro token. Si la API rechaza la sesión (401), el sitio la cierra y manda a `/acceso` con un aviso. El rol se consulta en la BD en cada petición.
 - **Freno de intentos**: 5 intentos fallidos **por correo** en 15 minutos bloquean esa cuenta (429 con `Retry-After`, incluso con la contraseña correcta). **No se limita por IP**: la comunidad estudiantil comparte red (misma IP) y un límite por IP bloquearía a todos por culpa de uno. El conteo vive en MongoDB (sobrevive a reinicios), con la llave en hash.
-- **Perfil** (`/perfil`): datos del usuario, cambio de contraseña (pide la actual; cierra las demás sesiones y deja esta con un token nuevo) y «Cerrar sesión en todos los dispositivos».
+- **Perfil** (`/perfil`): datos del usuario, «Mi información» (nombre, cargo, licenciatura y foto), cambio de contraseña (pide la actual; cierra las demás sesiones y deja esta con un token nuevo) y un botón **«Cerrar sesión»** abajo a la derecha del primer recuadro (con confirmación; cierra solo este dispositivo). La pantalla «Mis sesiones» con el botón de cerrar en todos los dispositivos se quitó el 2026-11-07; `POST /api/auth/logout-all` sigue existiendo en la API.
 - El header muestra, con sesión iniciada, un menú con **Ver perfil** y **Cerrar sesión** (con confirmación). Los campos de contraseña tienen botón de “ojo” para mostrarla.
 
 ### Roles y permisos
@@ -115,7 +115,8 @@ Solo hay **dos roles**, que elige un **Moderador** al dar de alta o editar al in
 | Ver la papelera, restaurar y eliminar mensajes | no | sí |
 | Ver noticias y propuestas (con borradores) | sí | sí |
 | **Publicar** noticias y propuestas nuevas y **cambiar su estado** (publicada/borrador/programada; avance, nota y visibilidad) | sí | sí |
-| Editar el contenido de lo ya creado y eliminarlo | no | sí |
+| Editar el contenido de noticias y propuestas ya creadas | sí | sí |
+| Eliminar noticias y propuestas | no | sí |
 | Ver correos, nombres y roles del equipo (**nunca contraseñas**) | sí | sí |
 | Editar su propia información (nombre, cargo, licenciatura, foto) y su contraseña | sí | sí |
 | Editar a otros, dar de alta, eliminar, cambiar roles y orden del equipo | no | sí |
@@ -261,6 +262,19 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - **Dependabot:** los PR de actualización mayor (React 19, ESLint 10, Vite 8, Mongoose 9, etc.) no se fusionan sin migrar y probar; los que fallen en el CI se pueden cerrar o dejar abiertos.
 
 ## 10. Registro de cambios
+
+### 2026-11-07 — El Miembro también edita noticias y propuestas (0.16.4)
+- El **Miembro** ahora puede **editar el contenido** de las noticias y propuestas (antes solo las publicaba nuevas y cambiaba su estado): `PUT /api/news/:id` y `PUT /api/proposals/:id` quedaron abiertos a Miembro y Moderador, con las mismas validaciones, y en el panel ve el botón de lápiz. **Eliminar** sigue siendo solo del Moderador. Las ediciones quedan en la bitácora con su nombre.
+- Pruebas: 145 de API y 59 de navegador.
+
+### 2026-11-07 — Perfil y menú de usuario (0.16.3)
+- **Mi perfil:** se quitó la sección «Mis sesiones» y en su lugar hay un botón «Cerrar sesión» abajo a la derecha del primer recuadro (con la misma confirmación que el menú de usuario). También se corrigió que los títulos de las secciones se encimaban con los recuadros. La API de «cerrar sesión en todos los dispositivos» no cambió.
+- **Menú de usuario:** el desplegable se ajusta al largo del correo (hasta 24 rem o el ancho de la pantalla) en vez de partirlo en dos líneas.
+- Pruebas: 58 de navegador.
+
+### 2026-11-07 — Listas del panel en dos columnas y con íconos (0.16.2)
+- Noticias, propuestas y equipo del panel se muestran en **dos columnas** (una en teléfono, por debajo de 760 px) en lugar de una lista vertical, y los botones «Editar» y «Eliminar» son **íconos** de lápiz y de bote de basura (con `aria-label` y texto emergente, así que los lectores de pantalla siguen leyendo «Editar» y «Eliminar»). Aplica a todas las listas que usan `CrudPanel`. Las tarjetas de mensajes no cambiaron.
+- Nuevo `components/ActionIcons.jsx`. Pruebas: 56 de navegador (dos columnas, íconos sin texto visible, una columna en teléfono).
 
 ### 2026-11-07 — Licenciatura en menú desplegable (0.16.1)
 - Todos los campos de licenciatura son ahora un menú con las licenciaturas definidas en Panel → Ajustes (las mismas del buzón): el formulario de Equipo y «Mi información» del perfil (antes eran texto libre). Si alguien ya tenía una licenciatura que luego se quitó de Ajustes, se conserva como opción «(ya no está en Ajustes)» para no perderla al guardar. La API sigue aceptando texto en `degree` de la ficha, sin validarlo contra Ajustes, para no bloquear fichas antiguas.

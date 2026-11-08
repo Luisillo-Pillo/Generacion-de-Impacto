@@ -9,7 +9,9 @@
 .user-btn img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid var(--red); }
 .caret { font-size: .75rem; }
 .user-dropdown {
-  position: absolute; right: 0; top: calc(100% + .6rem); min-width: 230px; z-index: 30;
+  position: absolute; right: 0; top: calc(100% + .6rem); z-index: 30;
+  /* Se ajusta al largo del correo para que no se corte; solo en correos larguísimos se parte (tope: el ancho de la pantalla) */
+  width: max-content; min-width: 230px; max-width: min(24rem, calc(100vw - 1.5rem));
   background: var(--paper); color: var(--ink); border-radius: 4px 14px 4px 14px;
   box-shadow: 5px 5px 0 var(--red); padding: .4rem; display: grid;
 }

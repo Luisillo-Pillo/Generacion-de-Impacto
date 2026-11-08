@@ -29,7 +29,7 @@ function NewsStateButton({ item, reload }) {
 
 export default function AdminNews() {
   return (
-    <CrudPanel memberCanCreate memberActions={(item, reload) => <NewsStateButton item={item} reload={reload} />}
+    <CrudPanel memberCanCreate memberCanEdit memberActions={(item, reload) => <NewsStateButton item={item} reload={reload} />}
       listPath="/news/all" endpoint="/news" newLabel="Nueva noticia"
       blank={() => ({ title: '', excerpt: '', body: '', coverImage: null, gallery: [], publishedAt: null, published: true })}
       summary={(n) => <><strong>{n.title}</strong><br /><span className="muted">{status(n)} · {formatDate(n.createdAt)}</span></>}
