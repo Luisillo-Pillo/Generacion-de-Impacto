@@ -1,5 +1,7 @@
 import { formatDate } from '../../api.js';
 import MarkdownEditor from '../../components/MarkdownEditor.jsx';
+import { api } from '../../api.js';
+import { useDialog } from '../../components/Dialog.jsx';
 import { CrudPanel, GalleryField, ImageField, text } from './shared.jsx';
 
 // <input type="datetime-local"> trabaja con la hora local sin zona; la API guarda ISO
@@ -11,9 +13,23 @@ const toLocalInput = (iso) => {
 const fromLocalInput = (value) => (value ? new Date(value).toISOString() : null);
 const status = (n) => (!n.published ? 'Borrador' : n.publishedAt && new Date(n.publishedAt) > new Date() ? `Programada para el ${formatDate(n.publishedAt)}` : 'Publicada');
 
+// Lo que un Miembro puede hacer con una noticia ya creada: publicarla o pasarla a borrador
+function NewsStateButton({ item, reload }) {
+  const { notify } = useDialog();
+  async function toggle() {
+    try {
+      await api(`/news/${item._id}/state`, { method: 'PATCH', body: { published: !item.published } });
+      reload();
+    } catch (err) {
+      await notify({ title: 'No se pudo cambiar el estado', message: err.message });
+    }
+  }
+  return <button className="btn btn-dark sm" onClick={toggle}>{item.published ? 'Pasar a borrador' : 'Publicar'}</button>;
+}
+
 export default function AdminNews() {
   return (
-    <CrudPanel
+    <CrudPanel memberCanCreate memberActions={(item, reload) => <NewsStateButton item={item} reload={reload} />}
       listPath="/news/all" endpoint="/news" newLabel="Nueva noticia"
       blank={() => ({ title: '', excerpt: '', body: '', coverImage: null, gallery: [], publishedAt: null, published: true })}
       summary={(n) => <><strong>{n.title}</strong><br /><span className="muted">{status(n)} · {formatDate(n.createdAt)}</span></>}

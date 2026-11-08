@@ -7,13 +7,13 @@ const userSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 80 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
-    // Roles del sitio (ver auth.js):
-    //  admin      = «Técnico»: ve y edita todo.
-    //  presidente = «Presidente»: ve todo (datos de contacto incluidos), no edita nada.
-    //  miembro    = «Miembro»: edita su propia información y ve la no crítica de los demás integrantes.
-    //  moderador  = lee y clasifica mensajes sin ver datos de contacto ni borrar.
-    // El valor guardado del Técnico sigue siendo `admin` (así las cuentas existentes no cambian).
-    role: { type: String, enum: ['admin', 'presidente', 'miembro', 'moderador', 'user'], default: 'user' },
+    // Roles del sitio (ver la tabla de permisos en auth.js). Solo hay dos:
+    //  admin   = «Moderador»: puede hacer todo, sin restricciones.
+    //  miembro = «Miembro»: lee, responde y actualiza mensajes, exporta a CSV, publica noticias y propuestas y actualiza su
+    //            estado, ve correos, nombres y roles del equipo y edita su propia información.
+    // El valor guardado del Moderador sigue siendo `admin` (así las cuentas existentes no cambian). Los valores
+    // `presidente` y `moderador` (limitado) existieron un día y se convierten en `miembro` (migración 003).
+    role: { type: String, enum: ['admin', 'miembro', 'presidente', 'moderador', 'user'], default: 'user' },
     // Se suma al cambiar la contraseña o al cerrar sesión en todos los dispositivos: los tokens con otra versión dejan de valer.
     tokenVersion: { type: Number, default: 0 },
   },
@@ -47,6 +47,8 @@ const messageSchema = new Schema(
     codeHash: { type: String, select: false, index: { unique: true, sparse: true } },
     publicReply: { type: String, trim: true, maxlength: 1000 }, // respuesta del equipo que ve quien escribe con su código
     publicReplyAt: { type: Date },
+    // Quién escribió la respuesta pública (nombre y cargo en el momento de responder)
+    publicReplyBy: { name: { type: String, maxlength: 100 }, role: { type: String, maxlength: 100 } },
     // Notas internas del equipo: nunca las ve quien escribió
     notes: [{ authorName: { type: String, maxlength: 80 }, text: { type: String, required: true, maxlength: 1000 }, at: { type: Date, default: Date.now } }],
     consentAt: { type: Date }, // cuándo aceptó el aviso de privacidad (solo mensajes con datos personales)

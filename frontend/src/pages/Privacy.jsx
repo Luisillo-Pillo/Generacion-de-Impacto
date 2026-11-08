@@ -46,9 +46,8 @@ export default function Privacy() {
 
         <h2>¿Quién puede verlos?</h2>
         <p>
-          Solo integrantes de la planilla con una cuenta en el panel. Algunos integrantes tienen un acceso limitado como
-          moderadores: leen y clasifican los mensajes, pero <strong>no ven los datos de contacto</strong>. Las imágenes adjuntas
-          son privadas y no se pueden abrir sin iniciar sesión. Las acciones del panel se registran (quién hizo qué), sin copiar
+          Solo integrantes de la planilla con una cuenta en el panel (miembros y moderadores). Las imágenes adjuntas son
+          privadas y no se pueden abrir sin iniciar sesión. Las acciones del panel se registran (quién hizo qué), sin copiar
           el contenido de los mensajes.
         </p>
 

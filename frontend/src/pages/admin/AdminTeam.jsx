@@ -13,13 +13,13 @@ export default function AdminTeam() {
   return (
     <>
     {editable ? <MemberOrder onChange={() => setVersion((v) => v + 1)} /> : (
-      <p className="hint">Aquí ves a las personas de la planilla. Para cambiar <strong>tu información</strong> (nombre, cargo, licenciatura y foto) ve a <Link to="/perfil">Mi perfil</Link>; el resto lo administra un Técnico.</p>
+      <p className="hint">Aquí ves a las personas de la planilla, con su correo y su rol. Para cambiar <strong>tu información</strong> (nombre, cargo, licenciatura y foto) ve a <Link to="/perfil">Mi perfil</Link>; a los demás los administra un Moderador.</p>
     )}
     <CrudPanel key={version}
       listPath="/members/all" endpoint="/members" newLabel="Nuevo integrante" newAtEnd
       deleteNote="También se eliminará su cuenta de acceso."
       blank={(items) => ({ name: '', role: '', degree: '', photo: null, order: items?.length || 0, email: '', password: '', access: 'miembro' })}
-      summary={(m) => <><strong>{m.name}</strong><br /><span className="muted">{m.role ? `${m.role} · ` : ''}{m.email ?? m.degree}{m.access ? ` · ${ROLE_LABEL[m.access]}` : ''}</span></>}
+      summary={(m) => <><strong>{m.name}</strong><br /><span className="muted">{m.role ? `${m.role} · ` : ''}{m.email}{m.access ? ` · ${ROLE_LABEL[m.access]}` : ''}</span></>}
       fields={(m, set) => (
         <>
           {text('Nombre', m.name, set('name'), { required: true, maxLength: 100 })}

@@ -4,10 +4,11 @@ import mongoose from 'mongoose';
 import { connectDb } from './db.js';
 import * as privateImages from './migrations/001-private-message-images.js';
 import * as thumbnails from './migrations/002-thumbnails.js';
+import * as roles from './migrations/003-roles.js';
 
 await connectDb();
 try {
-  for (const migration of [privateImages, thumbnails]) console.log(`${migration.name}: ${await migration.run()}`);
+  for (const migration of [privateImages, thumbnails, roles]) console.log(`${migration.name}: ${await migration.run()}`);
 } finally {
   await mongoose.disconnect();
 }

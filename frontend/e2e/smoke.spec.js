@@ -167,24 +167,6 @@ test('el aviso de privacidad es público y se enlaza desde el pie de página', a
   await expect(page.getByText(/No guardamos ningún dato personal/)).toBeVisible();
 });
 
-test('un moderador solo ve los mensajes, sin eliminar ni papelera, y no puede abrir otras secciones', async ({ page }) => {
-  const state = await mockApi(page, { loggedIn: true, role: 'moderador' });
-  state.messages[0].anonymous = false;
-  state.messages[0].hasContact = true;
-  await withSession(page);
-  await page.goto('/admin/mensajes');
-
-  await expect(page.getByText('Un asunto')).toBeVisible();
-  await expect(page.getByText(/solo los ven el Técnico y el Presidente/)).toBeVisible();
-  const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
-  await expect(pestañas.getByRole('link')).toHaveText([/^Mensajes/]);
-  await expect(page.getByRole('button', { name: 'Papelera' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Eliminar', exact: true })).toHaveCount(0);
-
-  await page.goto('/admin/noticias');
-  await expect(page).toHaveURL(/\/admin\/mensajes$/);
-});
-
 test('con el código de seguimiento se consulta el estado y la respuesta del equipo', async ({ page }) => {
   const state = await mockApi(page);
   await page.goto('/seguimiento');
@@ -193,6 +175,7 @@ test('con el código de seguimiento se consulta el estado y la respuesta del equ
   await expect(page.getByRole('heading', { name: 'Baños sin agua' })).toBeVisible();
   await expect(page.getByText('En proceso')).toBeVisible();
   await expect(page.getByText('Ya mandamos arreglarlos.')).toBeVisible();
+  await expect(page.getByText(/Respondió/)).toContainText('Ana Prueba (Presidencia)');
   expect(state.sent.track).toEqual({ code: 'gi abcde fghjk' });
 
   await page.getByLabel('Código de seguimiento').fill('GI-00000-00000');
@@ -207,7 +190,8 @@ test('el panel pagina, busca, muestra contadores y exporta a CSV', async ({ page
   await page.goto('/admin/mensajes');
   await expect(page.getByLabel('Resumen de mensajes')).toContainText('1 nuevos');
   await expect(page.getByRole('link', { name: /Mensajes/ })).toContainText('1'); // insignia de la pestaña
-  expect(state.sent.query).toMatchObject({ page: '1', limit: '20', status: 'nuevo' });
+  expect(state.sent.query).toMatchObject({ page: '1', limit: '20' });
+  for (const filtro of ['status', 'type', 'review', 'urgency']) expect(state.sent.query).not.toHaveProperty(filtro); // todos los filtros empiezan en «Todos»
 
   await page.getByLabel('Buscar').fill('no-existe');
   await page.getByRole('button', { name: 'Buscar', exact: true }).click();
@@ -230,6 +214,7 @@ test('en el panel se escribe la respuesta pública y se agregan notas internas',
   await page.getByLabel(/La verá quien consulte el código/).fill('Gracias, ya lo estamos viendo.');
   await page.getByRole('button', { name: 'Guardar respuesta' }).click();
   await expect(page.getByText('Respuesta guardada ✔')).toBeVisible();
+  await expect(page.getByText(/Respondió/)).toContainText('Ana Prueba (Presidencia)'); // quién respondió
   expect(state.sent.patch).toEqual({ publicReply: 'Gracias, ya lo estamos viendo.' });
 
   await page.getByText(/Notas internas/).click();
@@ -377,51 +362,87 @@ test('los ajustes ya no piden Facebook ni TikTok', async ({ page }) => {
   await expect(page.getByText(/Facebook|TikTok/)).toHaveCount(0);
 });
 
-test('Presidente: ve todo el panel, con datos de contacto, pero sin ningún control para editar', async ({ page }) => {
-  const state = await mockApi(page, { loggedIn: true, role: 'presidente' });
+test('los filtros del panel empiezan en «Todos» y los mensajes van de lo más reciente a lo más antiguo', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.messages = [
+    // La API los entrega del más reciente al más antiguo (lo prueban las pruebas de la API); la pantalla respeta ese orden
+    { ...state.messages[0], _id: 'g3', subject: 'Mensaje del viernes', createdAt: '2026-11-06T10:00:00Z', status: 'archivado' },
+    { ...state.messages[0], _id: 'g2', subject: 'Mensaje del miércoles', createdAt: '2026-11-04T10:00:00Z', status: 'leido' },
+    { ...state.messages[0], _id: 'g1', subject: 'Mensaje del lunes', createdAt: '2026-11-02T10:00:00Z' },
+  ];
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  for (const etiqueta of ['Tipo', 'Estado', 'Revisión', 'Urgencia']) {
+    await expect(page.locator('.filters').getByRole('combobox', { name: new RegExp(`^${etiqueta}`) })).toHaveValue('');
+  }
+  await expect(page.locator('.filters').getByRole('combobox', { name: /^Estado/ }).locator('option:checked')).toHaveText('Todos');
+  await expect(page.locator('.msg h3')).toHaveText(['Mensaje del viernes', 'Mensaje del miércoles', 'Mensaje del lunes']);
+});
+
+test('Ajustes: semestres y grupos van uno al lado del otro', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/admin/ajustes');
+  const semestres = await page.getByLabel(/^Semestres/).boundingBox();
+  const grupos = await page.getByLabel(/^Grupos/).boundingBox();
+  expect(Math.abs(semestres.y - grupos.y)).toBeLessThan(5); // misma fila
+  expect(grupos.x).toBeGreaterThan(semestres.x + semestres.width - 1); // grupos a la derecha
+});
+
+test('Miembro: lee y responde mensajes (con datos de contacto), exporta, y no ve papelera, eliminar ni Ajustes', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true, role: 'miembro' });
   Object.assign(state.messages[0], { anonymous: false, name: 'Luis Pérez', degree: 'Primaria', semester: '3', phone: '5512345678' });
   await withSession(page);
   await page.goto('/admin/mensajes');
 
   const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
-  await expect(pestañas.getByRole('link')).toHaveText([/^Mensajes/, 'Noticias', 'Propuestas', 'Equipo', 'Ajustes']);
-  await expect(page.getByText(/Luis Pérez · Primaria/)).toBeVisible(); // datos de contacto completos
-  await expect(page.getByText('Papelera', { exact: true })).toBeVisible();
+  await expect(pestañas.getByRole('link')).toHaveText([/^Mensajes/, 'Noticias', 'Propuestas', 'Equipo']);
+  await expect(page.getByText(/Luis Pérez · Primaria/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exportar CSV' })).toBeVisible();
-  for (const nombre of ['Marcar leído', 'Archivar', 'Eliminar']) await expect(page.getByRole('button', { name: nombre, exact: true })).toHaveCount(0);
-  await expect(page.locator('.msg').getByLabel('Revisión')).toHaveCount(0); // el filtro de la lista sí está, el de cada tarjeta no
+  await expect(page.getByRole('button', { name: 'Marcar leído', exact: true })).toBeVisible();
+  await expect(page.getByText('Papelera', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Eliminar', exact: true })).toHaveCount(0);
 
-  await pestañas.getByRole('link', { name: 'Noticias' }).click();
-  await expect(page.getByText('Primera noticia')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Nueva noticia' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
+  await page.getByText('Respuesta para quien escribió').click();
+  await page.getByLabel(/La verá quien consulte/).fill('Gracias, ya lo vemos.');
+  await page.getByRole('button', { name: 'Guardar respuesta' }).click();
+  await expect(page.getByText('Respuesta guardada ✔')).toBeVisible();
+  expect(state.sent.patch).toEqual({ publicReply: 'Gracias, ya lo vemos.' });
 
-  await pestañas.getByRole('link', { name: 'Equipo' }).click();
-  await expect(page.getByText('Ana Prueba').first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Nuevo integrante' })).toHaveCount(0);
-  await expect(page.getByText('Ordenar el equipo')).toHaveCount(0);
-
-  await pestañas.getByRole('link', { name: 'Ajustes' }).click();
-  await expect(page.getByLabel('Instagram (URL)')).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Guardar ajustes' })).toHaveCount(0);
+  await page.goto('/admin/ajustes');
+  await expect(page).toHaveURL(/\/admin\/mensajes$/); // los ajustes son solo del Moderador
 });
 
-test('Miembro: solo ve el equipo (sin correos ni roles) y edita su propia información en Mi perfil', async ({ page }) => {
+test('Miembro: publica noticias y propuestas nuevas y cambia su estado, pero no las edita ni elimina', async ({ page }) => {
   const state = await mockApi(page, { loggedIn: true, role: 'miembro' });
   await withSession(page);
-  await page.goto('/admin/mensajes');
 
-  await expect(page).toHaveURL(/\/admin\/equipo$/); // no tiene acceso a mensajes: lo regresa a lo suyo
-  const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
-  await expect(pestañas.getByRole('link')).toHaveText(['Equipo']);
-  await expect(page.getByText('Beto Segundo')).toBeVisible();
-  await expect(page.getByText(/@test\.com/)).toHaveCount(0);
+  await page.goto('/admin/noticias');
+  await expect(page.getByRole('button', { name: 'Nueva noticia' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Pasar a borrador' }).click();
+  await expect.poll(() => state.sent.state).toEqual({ path: '/news/n1/state', body: { published: false } });
+
+  await page.goto('/admin/propuestas');
+  await expect(page.getByRole('button', { name: 'Nueva propuesta' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Actualizar estado' }).first().click();
+  await page.getByRole('combobox', { name: /^Avance/ }).selectOption('cumplida');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect.poll(() => state.sent.state).toMatchObject({ path: '/proposals/p1/state', body: { progress: 'cumplida' } });
+});
+
+test('Miembro: ve correos y roles del equipo, no puede administrarlo y edita su propia información en Mi perfil', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true, role: 'miembro' });
+  await withSession(page);
+  await page.goto('/admin/equipo');
+
+  await expect(page.getByText(/beto|m2@test\.com/).first()).toBeVisible(); // correos del equipo
+  await expect(page.getByText(/Moderador|Miembro/).first()).toBeVisible(); // su rol
   await expect(page.getByRole('button', { name: 'Nuevo integrante' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
-  for (const ruta of ['/admin/noticias', '/admin/ajustes']) {
-    await page.goto(ruta);
-    await expect(page).toHaveURL(/\/admin\/equipo$/);
-  }
+  await expect(page.getByText('Ordenar el equipo')).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Mi perfil' }).click();
   await expect(page.getByText('Miembro', { exact: true })).toBeVisible();
@@ -430,5 +451,18 @@ test('Miembro: solo ve el equipo (sin correos ni roles) y edita su propia inform
   await expect(page.getByText('Información actualizada ✔')).toBeVisible();
   expect(state.sent.me).toMatchObject({ name: 'Ana Prueba', role: 'Vocal de eventos' });
   expect(state.sent.me).not.toHaveProperty('email');
+});
+
+test('Moderador: ve todo el panel, incluida la papelera y los ajustes, y puede editar y eliminar', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  const pestañas = page.getByRole('navigation', { name: 'Secciones del panel' });
+  await expect(pestañas.getByRole('link')).toHaveText([/^Mensajes/, 'Noticias', 'Propuestas', 'Equipo', 'Ajustes']);
+  await expect(page.getByText('Papelera', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Eliminar', exact: true })).toBeVisible();
+  await pestañas.getByRole('link', { name: 'Noticias' }).click();
+  await expect(page.getByRole('button', { name: 'Editar' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Eliminar' }).first()).toBeVisible();
 });
 

@@ -178,8 +178,8 @@ test('urgencia: media por defecto, acepta baja/media/alta/urgente, rechaza otros
   assert.ok((await lista('?urgency=media')).some((m) => m.subject === 'De antes'));
   assert.ok(!(await lista('?urgency=alta')).some((m) => m.subject === 'De antes'));
 
-  // Los moderadores también la ven
-  const mod = await t.models.User.create({ name: 'Mod', email: 'm@test.com', passwordHash: await (await import('bcryptjs')).default.hash('clave-de-mod-1234', 4), role: 'moderador' });
+  // Los miembros también la ven
+  const mod = await t.models.User.create({ name: 'Mod', email: 'm@test.com', passwordHash: await (await import('bcryptjs')).default.hash('clave-de-mod-1234', 4), role: 'miembro' });
   const tokenMod = (await t.call('POST', '/auth/login', { body: { email: mod.email, password: 'clave-de-mod-1234' } })).json.token;
   assert.equal((await lista('?urgency=urgente', tokenMod)).length, 1);
 });

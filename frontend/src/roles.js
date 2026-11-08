@@ -1,24 +1,17 @@
-// Roles del sitio. El valor que guarda la API del Técnico es `admin` (así las cuentas existentes no cambian).
+// Roles del sitio: solo dos. El valor que guarda la API del Moderador es `admin` (así las cuentas de siempre conservan todo).
 // La tabla completa de permisos vive en backend/src/auth.js; aquí solo lo que decide qué muestra el panel.
-export const ROLE_LABEL = { admin: 'Técnico', presidente: 'Presidente', miembro: 'Miembro', moderador: 'Moderador' };
+export const ROLE_LABEL = { admin: 'Moderador', miembro: 'Miembro' };
 
 export const ROLE_HELP = {
-  admin: 've y edita todo',
-  presidente: 've todo, no edita',
-  miembro: 'edita su información y ve la no crítica del equipo',
-  moderador: 'solo lee y clasifica mensajes, sin datos de contacto',
+  admin: 'puede hacer todo',
+  miembro: 'lee, responde y actualiza mensajes, exporta a CSV, publica noticias y propuestas y cambia su estado, y edita su propia información',
 };
 
 export const hasPanel = (role) => role in ROLE_LABEL; // quién ve el enlace «Panel»
-export const canEdit = (role) => role === 'admin'; // edita contenido, ajustes y equipo
-export const canSeeAll = (role) => role === 'admin' || role === 'presidente'; // datos de contacto, papelera, bitácora, exportación
-export const canManageMessages = (role) => role === 'admin' || role === 'moderador'; // estado, revisión, respuesta y notas
-export const canReadMessages = (role) => role === 'admin' || role === 'presidente' || role === 'moderador';
+export const canEdit = (role) => role === 'admin'; // el Moderador: editar a otros, eliminar, ajustes, papelera
 
 // Secciones del panel que ve cada rol (la primera es a la que se llega al entrar)
 export const SECTIONS_BY_ROLE = {
   admin: ['mensajes', 'noticias', 'propuestas', 'equipo', 'ajustes'],
-  presidente: ['mensajes', 'noticias', 'propuestas', 'equipo', 'ajustes'],
-  moderador: ['mensajes'],
-  miembro: ['equipo'],
+  miembro: ['mensajes', 'noticias', 'propuestas', 'equipo'],
 };

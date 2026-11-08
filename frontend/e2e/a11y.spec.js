@@ -61,7 +61,7 @@ test('accesibilidad: diálogo de confirmación abierto', async ({ page }) => {
   await sinViolaciones(page, 'diálogo');
 });
 
-for (const rol of ['presidente', 'miembro', 'moderador']) {
+for (const rol of ['miembro']) {
   test(`accesibilidad del panel con el rol ${rol}`, async ({ page }) => {
     await mockApi(page, { loggedIn: true, role: rol });
     await withSession(page);

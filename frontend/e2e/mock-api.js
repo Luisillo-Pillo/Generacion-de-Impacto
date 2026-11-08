@@ -16,7 +16,7 @@ export async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
     ],
     messages: [{ _id: 'g1', type: 'queja', anonymous: true, subject: 'Un asunto', body: 'Un mensaje', status: 'nuevo', review: 'pendiente', images: [], createdAt: '2026-10-28T20:35:00Z' }],
     trash: [],
-    sent: { message: null, news: null, patch: null, note: null, track: null, query: null, order: null, me: null },
+    sent: { message: null, news: null, patch: null, note: null, track: null, query: null, order: null, me: null, state: null },
     fileRequests: [],
     members: [MEMBER, { _id: 'm2', name: 'Beto Segundo', role: 'Secretaría' }],
     loggedIn,
@@ -60,10 +60,8 @@ export async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
       state.sent.me = req.postDataJSON();
       return json(route, { user: { ...admin, name: state.sent.me.name }, member: { ...MEMBER, ...state.sent.me } });
     }
-    if (path === '/members/all') {
-      // El Miembro solo ve lo no crítico de los demás: sin correo ni rol de acceso
-      return json(route, state.members.map((m) => (role === 'miembro' ? m : { ...m, email: `${m._id}@test.com`, access: 'admin' })));
-    }
+    // Correo y rol de cada integrante (nunca contraseñas): lo ven el Miembro y el Moderador
+    if (path === '/members/all') return json(route, state.members.map((m) => ({ ...m, email: `${m._id}@test.com`, access: m._id === 'm1' ? role : 'miembro' })));
     if (path === '/members') return json(route, state.members);
     if (path === '/messages' && method === 'POST') {
       state.sent.message = req.postData() || '';
@@ -72,7 +70,7 @@ export async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
     if (path === '/messages/track') {
       state.sent.track = req.postDataJSON();
       return state.sent.track.code.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === CODE.replace(/-/g, '')
-        ? json(route, { type: 'queja', subject: 'Baños sin agua', status: 'leido', review: 'en_proceso', createdAt: '2026-10-28T20:35:00Z', updatedAt: '2026-10-30T09:00:00Z', publicReply: 'Ya mandamos arreglarlos.', publicReplyAt: '2026-10-30T09:00:00Z' })
+        ? json(route, { type: 'queja', subject: 'Baños sin agua', status: 'leido', review: 'en_proceso', createdAt: '2026-10-28T20:35:00Z', updatedAt: '2026-10-30T09:00:00Z', publicReply: 'Ya mandamos arreglarlos.', publicReplyAt: '2026-10-30T09:00:00Z', publicReplyBy: { name: 'Ana Prueba', role: 'Presidencia' } })
         : json(route, { error: 'No encontramos un mensaje con ese código. Revisa que esté completo.' }, 404);
     }
     if (path === '/messages/stats') return json(route, { nuevos: state.messages.length, pendientes: state.messages.length, total: state.messages.length, porTipo: { queja: state.messages.length, propuesta: 0, pregunta: 0, problema: 0 } });
@@ -82,9 +80,14 @@ export async function mockApi(page, { loggedIn = false, role = 'admin' } = {}) {
       state.messages[0].notes = [...(state.messages[0].notes ?? []), { authorName: 'Ana Prueba', text: state.sent.note.text, at: '2026-11-02T12:00:00Z' }];
       return json(route, state.messages[0], 201);
     }
+    if (/^\/(news|proposals)\/[^/]+\/state$/.test(path) && method === 'PATCH') {
+      state.sent.state = { path, body: req.postDataJSON() };
+      return json(route, { ok: true });
+    }
     if (path === '/messages/g1' && method === 'PATCH') {
       state.sent.patch = req.postDataJSON();
       Object.assign(state.messages[0], state.sent.patch);
+      if (state.sent.patch.publicReply) state.messages[0].publicReplyBy = { name: admin.name, role: MEMBER.role };
       return json(route, state.messages[0]);
     }
     if (path === '/messages') {

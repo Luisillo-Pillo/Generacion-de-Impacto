@@ -12,7 +12,7 @@ import './Profile.css';
 
 const blank = { currentPassword: '', newPassword: '', confirm: '' };
 
-// Cada persona edita su propia información; el correo y el rol los cambia un Técnico
+// Cada persona edita su propia información; el correo y el rol los cambia un Moderador
 function MyInfo({ member, onSaved }) {
   const [form, setForm] = useState({ name: member.name ?? '', role: member.role ?? '', degree: member.degree ?? '', photo: member.photo ?? null });
   const [status, setStatus] = useState({ busy: false, error: '', ok: false });

@@ -16,7 +16,7 @@ before(async () => {
   t = await startServer();
   await t.createAdmin();
   token = await t.login();
-  await t.call('POST', '/members', { token, body: { name: 'Mora', email: 'mod@test.com', password: 'clave-de-moderadora-1', access: 'moderador' } });
+  await t.call('POST', '/members', { token, body: { name: 'Mora', role: 'Vocal de eventos', email: 'mod@test.com', password: 'clave-de-moderadora-1', access: 'miembro' } });
   mod = await t.login('mod@test.com', 'clave-de-moderadora-1');
 });
 after(() => t.stop());
@@ -49,7 +49,7 @@ test('consultar con el código devuelve el estado, sin el texto del mensaje ni d
   const code = await enviar({ subject: 'Asunto consultable', body: 'Texto privado que nunca debe salir por aquí' });
   const res = await rastrear(code);
   assert.equal(res.status, 200);
-  assert.deepEqual(Object.keys(res.json).sort(), ['createdAt', 'publicReply', 'publicReplyAt', 'review', 'status', 'subject', 'type', 'updatedAt']);
+  assert.deepEqual(Object.keys(res.json).sort(), ['createdAt', 'publicReply', 'publicReplyAt', 'publicReplyBy', 'review', 'status', 'subject', 'type', 'updatedAt']);
   assert.equal(res.json.subject, 'Asunto consultable');
   assert.equal(res.json.status, 'nuevo');
   assert.equal(res.json.review, 'pendiente');
@@ -101,6 +101,9 @@ test('la respuesta pública del equipo aparece en la consulta; vaciarla la quita
   assert.equal(consulta.publicReply, 'Ya mandamos a arreglarlos, gracias por avisar.');
   assert.ok(consulta.publicReplyAt);
   assert.equal(consulta.review, 'en_proceso');
+  assert.deepEqual(consulta.publicReplyBy, { name: 'Mora', role: 'Vocal de eventos' }, 'se indica quién responde (nombre y cargo)');
+  assert.ok(!/@test\.com/.test(JSON.stringify(consulta)), 'nunca su correo');
+  assert.deepEqual((await t.call('GET', '/messages', { token })).json.find((m) => m._id === String(msg._id)).publicReplyBy, { name: 'Mora', role: 'Vocal de eventos' });
 
   const log = JSON.stringify((await t.call('GET', '/audit', { token })).json.items);
   assert.ok(log.includes('escribió la respuesta pública') && !log.includes('Ya mandamos'));
@@ -109,6 +112,7 @@ test('la respuesta pública del equipo aparece en la consulta; vaciarla la quita
   const quitada = (await rastrear(code)).json;
   assert.equal(quitada.publicReply, null);
   assert.equal(quitada.publicReplyAt, null);
+  assert.equal(quitada.publicReplyBy, null);
   assert.equal((await t.call('PATCH', `/messages/${msg._id}`, { token, body: { publicReply: 'x'.repeat(1001) } })).status, 400);
 });
 

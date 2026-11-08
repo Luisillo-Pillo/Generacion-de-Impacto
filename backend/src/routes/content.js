@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { News, Proposal, Setting, PROPOSAL_PROGRESS } from '../models.js';
-import { adminOnly, viewerOnly } from '../auth.js';
+import { adminOnly, panelUserOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { loadSettings } from '../settings.js';
 import { objectId } from '../validators.js';
@@ -48,7 +48,7 @@ router.get('/news', async (_req, res) => {
   res.json(await News.find(visibleNow()).sort({ publishedAt: -1 }).select('-body -gallery'));
 });
 
-router.get('/news/all', viewerOnly, async (_req, res) => {
+router.get('/news/all', panelUserOnly, async (_req, res) => {
   res.json(await News.find().sort({ createdAt: -1 }));
 });
 
@@ -58,7 +58,7 @@ router.get('/news/:slug', async (req, res) => {
   res.json(item);
 });
 
-router.post('/news', adminOnly, async (req, res) => {
+router.post('/news', panelUserOnly, async (req, res) => {
   const data = newsSchema.parse(req.body);
   const item = await News.create({
     ...data,
@@ -69,6 +69,25 @@ router.post('/news', adminOnly, async (req, res) => {
   });
   await audit(req, 'noticia.crear', 'noticia', item._id, `Creó la noticia «${item.title}»`);
   res.status(201).json(item);
+});
+
+// Cambiar el estado de una noticia (publicada, borrador o programada): lo puede hacer un Miembro. Editar su contenido, solo
+// el Moderador (PUT). La fecha de publicación sigue la misma regla que al editar.
+router.patch('/news/:id/state', panelUserOnly, async (req, res) => {
+  const { published, publishedAt } = z.object({
+    published: z.boolean(),
+    publishedAt: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha de publicación inválida').nullable().optional(),
+  }).parse(req.body);
+  const item = await News.findById(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Noticia no encontrada' });
+  item.published = published;
+  if (published) {
+    if (publishedAt) item.publishedAt = new Date(publishedAt);
+    else if (!item.publishedAt) item.publishedAt = new Date();
+  }
+  await item.save();
+  await audit(req, 'noticia.estado', 'noticia', item._id, `${published ? 'Publicó' : 'Pasó a borrador'} la noticia «${item.title}»`);
+  res.json(item);
 });
 
 router.put('/news/:id', adminOnly, async (req, res) => {
@@ -115,11 +134,11 @@ router.get('/proposals', async (_req, res) => {
   res.json(await Proposal.find({ published: true }).sort({ number: 1 }));
 });
 
-router.get('/proposals/all', viewerOnly, async (_req, res) => {
+router.get('/proposals/all', panelUserOnly, async (_req, res) => {
   res.json(await Proposal.find().sort({ number: 1 }));
 });
 
-router.post('/proposals', adminOnly, async (req, res) => {
+router.post('/proposals', panelUserOnly, async (req, res) => {
   const data = proposalSchema.parse(req.body);
   if (await Proposal.exists({ number: data.number })) {
     return res.status(409).json({ error: `Ya existe la propuesta #${data.number}` });
@@ -127,6 +146,21 @@ router.post('/proposals', adminOnly, async (req, res) => {
   const item = await Proposal.create({ ...data, image: data.image || undefined });
   await audit(req, 'propuesta.crear', 'propuesta', item._id, `Creó la propuesta #${item.number}`);
   res.status(201).json(item);
+});
+
+// Actualizar el estado de una propuesta (avance, nota del avance y si es visible): lo puede hacer un Miembro.
+router.patch('/proposals/:id/state', panelUserOnly, async (req, res) => {
+  const changes = z.object({
+    progress: z.enum(PROPOSAL_PROGRESS),
+    progressNote: z.string().trim().max(200),
+    published: z.boolean(),
+  }).partial().refine((c) => Object.keys(c).length > 0, 'Indica el avance, la nota o la visibilidad').parse(req.body);
+  const item = await Proposal.findById(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Propuesta no encontrada' });
+  Object.assign(item, changes);
+  await item.save();
+  await audit(req, 'propuesta.estado', 'propuesta', item._id, `Actualizó el estado de la propuesta #${item.number}`);
+  res.json(item);
 });
 
 router.put('/proposals/:id', adminOnly, async (req, res) => {

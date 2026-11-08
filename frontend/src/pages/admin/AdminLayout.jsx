@@ -3,7 +3,7 @@ import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { api } from '../../api.js';
 import { useAuth } from '../../auth.jsx';
 import Spinner from '../../components/Spinner.jsx';
-import { SECTIONS_BY_ROLE, canReadMessages } from '../../roles.js';
+import { SECTIONS_BY_ROLE } from '../../roles.js';
 import './AdminLayout.css';
 
 const TABS = [
@@ -19,7 +19,7 @@ export default function AdminLayout() {
   const { user, loading } = useAuth();
   const { pathname } = useLocation();
   const [stats, setStats] = useState(null); // contadores de mensajes (insignia de la pestaña y resumen de la lista)
-  const staff = canReadMessages(user?.role);
+  const staff = user?.role in SECTIONS_BY_ROLE; // Miembro o Moderador: ambos leen mensajes
   const refreshStats = useCallback(() => api('/messages/stats').then(setStats).catch(() => {}), []);
   useEffect(() => {
     if (staff) refreshStats();
@@ -33,7 +33,7 @@ export default function AdminLayout() {
       <section className="section paper page-min">
         <div className="container narrow">
           <h1 className="title">Sin <mark>acceso</mark></h1>
-          <p className="lead">Tu cuenta no tiene permisos para el panel. Pide a un Técnico que te asigne un rol.</p>
+          <p className="lead">Tu cuenta no tiene permisos para el panel. Pide a un Moderador que te asigne un rol.</p>
         </div>
       </section>
     );

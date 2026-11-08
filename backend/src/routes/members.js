@@ -8,8 +8,9 @@ import { objectId } from '../validators.js';
 import { hashPassword, passwordSchema } from '../passwords.js';
 import { audit } from '../audit.js';
 
-// Cada integrante de la planilla tiene una cuenta de acceso con un rol (ver la tabla de permisos en auth.js): Técnico (`admin`),
-// Presidente, Miembro (por defecto) o Moderador. Solo el Técnico da de alta, edita roles y elimina; cada quien edita su propia ficha.
+// Cada integrante de la planilla tiene una cuenta de acceso con un rol (ver la tabla de permisos en auth.js): Moderador (`admin`,
+// puede todo) o Miembro (por defecto). Solo el Moderador da de alta, edita a otros, cambia roles y orden y elimina; cada quien
+// edita su propia ficha y todos ven correos, nombres y roles (nunca contraseñas).
 const router = Router();
 
 const base = {
@@ -19,7 +20,7 @@ const base = {
   photo: objectId,
   order: z.number().int().optional().default(0),
 };
-const ACCESS = ['admin', 'presidente', 'miembro', 'moderador'];
+const ACCESS = ['admin', 'miembro']; // admin = «Moderador» (todo), miembro = «Miembro»
 // El mensaje personalizado solo aplica cuando el campo falta; otros errores de tipo usan el de zod.
 const missing = (message) => ({ error: (issue) => (issue.input === undefined ? message : undefined) });
 
@@ -31,22 +32,21 @@ const createSchema = z.object({ ...base, email, password, access: z.enum(ACCESS)
 // Al editar, correo y contraseña son opcionales: solo se cambian si se envían.
 const updateSchema = z.object({ ...base, email: blankToUndefined(email), password: blankToUndefined(password), access: z.enum(ACCESS).optional() });
 
-const toAdminJson = (member, user) => ({ ...member.toObject(), user: undefined, email: user?.email || '', access: ACCESS.includes(user?.role) ? user.role : 'miembro' });
+const toAdminJson = (member, user) => ({ ...member.toObject(), user: undefined, email: user?.email || '', access: user?.role === 'admin' ? 'admin' : 'miembro' });
 
 router.get('/', async (_req, res) => {
   res.json(await Member.find().sort({ order: 1, createdAt: 1 }).select('-user'));
 });
 
-// Directorio del panel. Técnico y Presidente lo ven completo (con correo y rol de acceso); un Miembro solo ve lo no crítico
-// de los demás: nombre, cargo, licenciatura, foto y orden.
-router.get('/all', panelUserOnly, async (req, res) => {
+// Directorio del panel: nombre, cargo, licenciatura, foto, correo y rol de cada integrante, para el Miembro y el Moderador.
+// Nunca contraseñas.
+router.get('/all', panelUserOnly, async (_req, res) => {
   const members = await Member.find().sort({ order: 1, createdAt: 1 }).populate('user', 'email role');
-  if (['admin', 'presidente'].includes(req.user.role)) return res.json(members.map((m) => toAdminJson(m, m.user)));
-  res.json(members.map((m) => ({ _id: m._id, name: m.name, role: m.role, degree: m.degree, photo: m.photo, order: m.order })));
+  res.json(members.map((m) => toAdminJson(m, m.user)));
 });
 
 // Cada persona edita su propia información (nombre, cargo, licenciatura y foto). El correo, el rol de acceso y el orden
-// los cambia solo el Técnico, y la contraseña cada quien en su perfil. Va antes de `/:id`.
+// los cambia solo el Moderador, y la contraseña cada quien en su perfil. Va antes de `/:id`.
 router.put('/me', requireAuth, async (req, res) => {
   const { name, role, degree, photo } = z.object({ name: base.name, role: base.role, degree: base.degree, photo: base.photo }).parse(req.body);
   const member = await Member.findOne({ user: req.user._id });

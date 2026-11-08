@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Message, MESSAGE_TYPES, MESSAGE_STATUS, MESSAGE_REVIEW, MESSAGE_URGENCY } from '../models.js';
-import { adminOnly, staffOnly, readerOnly, viewerOnly } from '../auth.js';
+import { Message, Member, MESSAGE_TYPES, MESSAGE_STATUS, MESSAGE_REVIEW, MESSAGE_URGENCY } from '../models.js';
+import { adminOnly, panelUserOnly } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { imageUpload, saveImage } from '../uploads.js';
 import { loadSettings } from '../settings.js';
@@ -100,19 +100,9 @@ router.post('/track', async (req, res) => {
     updatedAt: msg.updatedAt,
     publicReply: msg.publicReply || null,
     publicReplyAt: msg.publicReplyAt || null,
+    publicReplyBy: msg.publicReply ? { name: msg.publicReplyBy?.name || null, role: msg.publicReplyBy?.role || null } : null,
   });
 });
-
-// Solo el moderador no ve quién escribió: los datos de contacto se quitan de la respuesta (solo se indica que los hay).
-// El Técnico y el Presidente ven los mensajes completos.
-const CONTACT_FIELDS = ['name', 'degree', 'semester', 'group', 'phone'];
-function forRole(msg, role) {
-  const json = msg.toObject ? msg.toObject() : msg;
-  if (role === 'admin' || role === 'presidente') return json;
-  const out = { ...json, hasContact: !json.anonymous };
-  for (const field of CONTACT_FIELDS) delete out[field];
-  return out;
-}
 
 // Marca de orden de bytes UTF-8: sin ella Excel abre el CSV con los acentos rotos
 const BOM = String.fromCharCode(0xfeff);
@@ -143,25 +133,25 @@ function buildFilter(query, { trash = false } = {}) {
 
 // Con `?page=` responde { items, total, page, pages } (de `limit` en `limit`, 20 por defecto, máximo 100); sin él, la lista
 // completa hasta 500 como antes (compatibilidad con pestañas abiertas con el sitio anterior).
-router.get('/', readerOnly, async (req, res) => {
+router.get('/', panelUserOnly, async (req, res) => {
   const trash = req.query.trash === '1';
-  if (trash && !['admin', 'presidente'].includes(req.user.role)) return res.status(403).json({ error: 'No tienes permiso para ver la papelera' });
+  if (trash && req.user.role !== 'admin') return res.status(403).json({ error: 'No tienes permiso para ver la papelera' });
   const filter = buildFilter(req.query, { trash });
   const sort = trash ? { deletedAt: -1 } : { createdAt: -1 };
   if (req.query.page === undefined) {
     const items = await Message.find(filter).sort(sort).limit(500);
-    return res.json(items.map((m) => forRole(m, req.user.role)));
+    return res.json(items.map((m) => m.toObject()));
   }
   const limit = Math.min(100, Math.max(1, Math.floor(Number(req.query.limit)) || 20));
   const total = await Message.countDocuments(filter);
   const pages = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(pages, Math.max(1, Math.floor(Number(req.query.page)) || 1));
   const items = await Message.find(filter).sort(sort).skip((page - 1) * limit).limit(limit);
-  res.json({ items: items.map((m) => forRole(m, req.user.role)), total, page, pages });
+  res.json({ items: items.map((m) => m.toObject()), total, page, pages });
 });
 
 // Contadores para la insignia del panel y el resumen sobre la lista (solo mensajes que no están en la papelera).
-router.get('/stats', readerOnly, async (_req, res) => {
+router.get('/stats', panelUserOnly, async (_req, res) => {
   const live = { deletedAt: null };
   const [nuevos, pendientes, total, tipos] = await Promise.all([
     Message.countDocuments({ ...live, status: 'nuevo' }),
@@ -173,9 +163,9 @@ router.get('/stats', readerOnly, async (_req, res) => {
   res.json({ nuevos, pendientes, total, porTipo });
 });
 
-// Exporta a CSV (UTF-8 con BOM para que Excel respete los acentos) con los mismos filtros del listado. Técnico y Presidente:
+// Exporta a CSV (UTF-8 con BOM para que Excel respete los acentos) con los mismos filtros del listado. Miembro y Moderador:
 // incluye datos personales. Las celdas que Excel interpretaría como fórmula se neutralizan (ver csv.js). Queda en la bitácora.
-router.get('/export', viewerOnly, async (req, res) => {
+router.get('/export', panelUserOnly, async (req, res) => {
   const items = await Message.find(buildFilter(req.query)).sort({ createdAt: -1 }).limit(10000);
   const date = (d) => (d ? new Date(d).toISOString().replace('T', ' ').slice(0, 19) : '');
   const rows = items.map((m) => [
@@ -191,7 +181,7 @@ router.get('/export', viewerOnly, async (req, res) => {
   res.send(`${BOM}${csv}`);
 });
 
-router.patch('/:id', staffOnly, async (req, res) => {
+router.patch('/:id', panelUserOnly, async (req, res) => {
   const changes = z
     .object({
       status: z.enum(MESSAGE_STATUS),
@@ -204,10 +194,14 @@ router.patch('/:id', staffOnly, async (req, res) => {
     .parse(req.body);
   const update = { ...changes };
   if (changes.publicReply !== undefined) {
-    if (changes.publicReply) update.publicReplyAt = new Date();
-    else {
+    if (changes.publicReply) {
+      // Se guarda quién responde (nombre y cargo) para mostrarlo junto a la respuesta, también a quien la consulta
+      const ficha = await Member.findOne({ user: req.user._id }).select('role');
+      update.publicReplyAt = new Date();
+      update.publicReplyBy = { name: req.user.name, role: ficha?.role || '' };
+    } else {
       delete update.publicReply;
-      update.$unset = { publicReply: 1, publicReplyAt: 1 };
+      update.$unset = { publicReply: 1, publicReplyAt: 1, publicReplyBy: 1 };
     }
   }
   const msg = await Message.findOneAndUpdate({ _id: req.params.id, deletedAt: null }, update, { new: true });
@@ -217,11 +211,11 @@ router.patch('/:id', staffOnly, async (req, res) => {
     .map(([k, v]) => (k === 'status' ? `estado: ${v}` : k === 'review' ? `revisión: ${v}` : v ? 'escribió la respuesta pública' : 'quitó la respuesta pública'))
     .join(', ');
   await audit(req, 'mensaje.actualizar', 'mensaje', msg._id, `Cambió ${detail}`);
-  res.json(forRole(msg, req.user.role));
+  res.json(msg.toObject());
 });
 
 // Nota interna del equipo: nunca la ve quien escribió.
-router.post('/:id/notes', staffOnly, async (req, res) => {
+router.post('/:id/notes', panelUserOnly, async (req, res) => {
   const { text } = z.object({ text: z.string().trim().min(1, 'Escribe la nota').max(1000) }).parse(req.body);
   const msg = await Message.findOneAndUpdate(
     { _id: req.params.id, deletedAt: null },
@@ -230,7 +224,7 @@ router.post('/:id/notes', staffOnly, async (req, res) => {
   );
   if (!msg) return res.status(404).json({ error: 'Mensaje no encontrado' });
   await audit(req, 'mensaje.nota', 'mensaje', msg._id, 'Agregó una nota interna');
-  res.status(201).json(forRole(msg, req.user.role));
+  res.status(201).json(msg.toObject());
 });
 
 // Eliminar manda el mensaje a la papelera; a los 30 días se borra de verdad (ver maintenance.js).

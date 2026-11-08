@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { AuditLog } from '../models.js';
-import { viewerOnly } from '../auth.js';
+import { adminOnly } from '../auth.js';
 
 const router = Router();
 const PAGE_SIZE = 50;
 
-// Bitácora de acciones del panel (solo lectura; la ven Técnico y Presidente), de la más reciente a la más antigua.
-router.get('/', viewerOnly, async (req, res) => {
+// Bitácora de acciones del panel (solo lectura; la ve el Moderador), de la más reciente a la más antigua.
+router.get('/', adminOnly, async (req, res) => {
   const page = Math.max(1, Math.floor(Number(req.query.page)) || 1);
   const [items, total] = await Promise.all([
     AuditLog.find().sort({ at: -1 }).skip((page - 1) * PAGE_SIZE).limit(PAGE_SIZE),

@@ -56,7 +56,10 @@ export default function Track() {
               <div className="track-reply">
                 <h3>Respuesta del equipo</h3>
                 <p className="pre">{result.publicReply}</p>
-                <p className="muted">{formatDate(result.publicReplyAt)}</p>
+                <p className="muted">
+                  {result.publicReplyBy?.name ? <>Respondió <strong>{result.publicReplyBy.name}</strong>{result.publicReplyBy.role ? ` (${result.publicReplyBy.role})` : ''} · </> : null}
+                  {formatDate(result.publicReplyAt)}
+                </p>
               </div>
             ) : (
               <p className="muted">Todavía no hay una respuesta del equipo. Vuelve a consultar más adelante.</p>

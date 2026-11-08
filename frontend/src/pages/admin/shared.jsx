@@ -108,10 +108,13 @@ export function GalleryField({ value = [], onChange, label = 'Galería', max = 6
 
 // Editor genérico (noticias / propuestas / equipo)
 // `newAtEnd`: el botón de crear va debajo de la lista en vez de encima
-export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote, newAtEnd = false }) {
+// `memberCanCreate`: un Miembro también puede crear (noticias, propuestas); `memberActions(item, reload)`: lo que un Miembro puede
+// hacer con lo ya publicado (cambiar su estado). Editar y eliminar son solo del Moderador.
+export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote, newAtEnd = false, memberCanCreate = false, memberActions = null }) {
   const { confirm, notify } = useDialog();
   const { user } = useAuth();
-  const readOnly = !canEdit(user?.role); // solo el Técnico crea, edita y elimina; los demás roles solo ven
+  const isMod = canEdit(user?.role);
+  const canCreate = isMod || memberCanCreate;
   const { items, loading, error, reload, setError } = useList(listPath);
   const [editing, setEditing] = useState(null);
 
@@ -158,21 +161,21 @@ export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel
   }
   return (
     <div>
-      {!readOnly && !newAtEnd && newButton}
+      {canCreate && !newAtEnd && newButton}
       {error && <p className="error">{error}</p>}
       {loading && <Spinner />}
       {items?.map((it) => (
         <article key={it._id} className="card row between">
           <div>{summary(it)}</div>
-          {!readOnly && (
+          {isMod ? (
             <div className="row">
               <button className="btn btn-dark sm" onClick={() => setEditing({ ...it })}>Editar</button>
               <button className="btn btn-red sm" onClick={() => remove(it)}>Eliminar</button>
             </div>
-          )}
+          ) : memberActions?.(it, reload)}
         </article>
       ))}
-      {!readOnly && newAtEnd && <div className="crud-new-end">{newButton}</div>}
+      {canCreate && newAtEnd && <div className="crud-new-end">{newButton}</div>}
     </div>
   );
 }

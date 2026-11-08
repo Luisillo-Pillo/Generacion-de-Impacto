@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../../api.js';
 import { useAuth } from '../../auth.jsx';
-import { canSeeAll } from '../../roles.js';
+import { canEdit } from '../../roles.js';
 import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { useList } from './shared.jsx';
@@ -27,8 +27,9 @@ export default function AdminMessages() {
   const { user } = useAuth();
   const { stats, refreshStats } = useOutletContext();
   const role = user?.role;
-  const seesAll = canSeeAll(role); // Técnico y Presidente: datos de contacto, papelera y exportación; el Moderador no
-  const [filters, setFilters] = useState({ type: '', status: 'nuevo', review: '', urgency: '' });
+  const isMod = canEdit(role); // el Moderador además ve la papelera y elimina; el Miembro lee, responde, actualiza y exporta
+  // Todos los filtros empiezan en «Todos»; la lista siempre va en orden cronológico, lo más reciente arriba
+  const [filters, setFilters] = useState({ type: '', status: '', review: '', urgency: '' });
   const [typed, setTyped] = useState(''); // lo que se escribe en el buscador
   const [search, setSearch] = useState(''); // la búsqueda aplicada
   const [page, setPage] = useState(1);
@@ -110,8 +111,8 @@ export default function AdminMessages() {
           </>
         )}
         <span className="filters-end">
-          {seesAll && !trash && <button type="button" className="btn btn-dark sm" disabled={exporting} onClick={exportCsv}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>}
-          {seesAll && (
+          {!trash && <button type="button" className="btn btn-dark sm" disabled={exporting} onClick={exportCsv}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>}
+          {isMod && (
             <button type="button" className="btn btn-dark sm" aria-pressed={trash} onClick={() => { setTrash(!trash); setPage(1); }}>
               {trash ? '← Volver a los mensajes' : 'Papelera'}
             </button>

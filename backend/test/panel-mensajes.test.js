@@ -15,7 +15,7 @@ before(async () => {
   await t.createAdmin();
   token = await t.login();
   await t.call('PUT', '/settings/degrees', { token, body: { value: ['Licenciatura en Primaria'] } });
-  await t.call('POST', '/members', { token, body: { name: 'Mora', email: 'mod@test.com', password: 'clave-de-moderadora-1', access: 'moderador' } });
+  await t.call('POST', '/members', { token, body: { name: 'Mora', email: 'mod@test.com', password: 'clave-de-moderadora-1', access: 'miembro' } });
   mod = await t.login('mod@test.com', 'clave-de-moderadora-1');
 
   // 130 mensajes: de 4 tipos, con escalas de tiempo distintas (los más nuevos al final)
@@ -69,7 +69,7 @@ test('búsqueda por palabra en el asunto o en el mensaje, sin importar mayúscul
   assert.equal(r.items[0].subject, 'Asunto número 7');
   assert.equal((await lista('?page=1&q=n%C3%BAmero%20129')).total, 1);
   assert.equal((await lista('?page=1&q=no-existe-nada')).total, 0);
-  assert.equal((await lista('?page=1&q=sillas', mod)).total, 1, 'el moderador también busca');
+  assert.equal((await lista('?page=1&q=sillas', mod)).total, 1, 'un Miembro también busca');
 });
 
 test('la búsqueda trata lo escrito como texto, nunca como patrón (sin inyección)', async () => {
@@ -108,9 +108,9 @@ test('csvCell neutraliza las fórmulas y escapa comillas, comas y saltos de lín
   assert.equal(toCsv(['a', 'b'], [['1', '2']]), '"a","b"\r\n"1","2"');
 });
 
-test('exportar a CSV: solo administradores, con BOM, filtros, fórmulas neutralizadas y queda en la bitácora', async () => {
+test('exportar a CSV: Miembro y Moderador, con BOM, filtros, fórmulas neutralizadas y queda en la bitácora', async () => {
   await t.call('POST', '/messages', { body: { type: 'queja', anonymous: true, subject: '=HYPERLINK("http://malo.com")', body: '@SUM(1+1) de prueba, con coma' } });
-  assert.equal((await t.call('GET', '/messages/export', { token: mod })).status, 403);
+  assert.equal((await t.call('GET', '/messages/export', { token: mod })).status, 200, 'un Miembro también exporta');
   assert.equal((await t.call('GET', '/messages/export')).status, 401);
 
   const res = await t.call('GET', '/messages/export?q=HYPERLINK', { token });
