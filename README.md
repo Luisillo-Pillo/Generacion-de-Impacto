@@ -262,6 +262,10 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 
 ## 10. Registro de cambios
 
+### 2026-11-07 — Licenciatura en menú desplegable (0.16.1)
+- Todos los campos de licenciatura son ahora un menú con las licenciaturas definidas en Panel → Ajustes (las mismas del buzón): el formulario de Equipo y «Mi información» del perfil (antes eran texto libre). Si alguien ya tenía una licenciatura que luego se quitó de Ajustes, se conserva como opción «(ya no está en Ajustes)» para no perderla al guardar. La API sigue aceptando texto en `degree` de la ficha, sin validarlo contra Ajustes, para no bloquear fichas antiguas.
+- Pruebas: 54 de navegador.
+
 ### 2026-11-07 — Dos roles, filtros en «Todos», firma de quien responde y ajustes en dos columnas (0.16.0)
 - **Roles redefinidos: solo Miembro y Moderador** (reemplazan a Técnico, Presidente, Miembro y el Moderador limitado de la 0.15.0). El **Miembro** lee mensajes (con datos de contacto), cambia su estado, responde, deja notas y exporta a CSV; publica noticias y propuestas nuevas y cambia su estado; ve correos, nombres y roles del equipo (nunca contraseñas) y edita solo su información. El **Moderador** puede todo. Tabla en «Roles y permisos».
 - **API:** nuevos `PATCH /api/news/:id/state` y `PATCH /api/proposals/:id/state` (el Miembro cambia el estado sin tocar el contenido); `POST /api/news`, `POST /api/proposals` y `POST /api/files` abiertos al Miembro; `GET /api/members/all` devuelve correo y rol a ambos; la papelera, eliminar, editar lo ya creado, ajustes, bitácora y administrar el equipo siguen siendo solo del Moderador. Se quitó el ocultamiento de datos de contacto.

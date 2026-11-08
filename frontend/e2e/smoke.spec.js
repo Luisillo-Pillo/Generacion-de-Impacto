@@ -466,3 +466,35 @@ test('Moderador: ve todo el panel, incluida la papelera y los ajustes, y puede e
   await expect(page.getByRole('button', { name: 'Eliminar' }).first()).toBeVisible();
 });
 
+test('la licenciatura de un integrante se elige en un menú con las licenciaturas de Ajustes', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await withSession(page);
+
+  // Panel → Equipo → editar
+  await page.goto('/admin/equipo');
+  await page.getByRole('button', { name: 'Editar' }).first().click();
+  const menu = page.getByRole('combobox', { name: /^Licenciatura/ });
+  await expect(menu.locator('option')).toHaveText(['Sin especificar', 'Licenciatura en Primaria']);
+  await expect(page.getByRole('textbox', { name: 'Licenciatura' })).toHaveCount(0); // ya no es un campo libre
+
+  // Mi perfil
+  await page.goto('/perfil');
+  const menuPerfil = page.getByRole('combobox', { name: /^Licenciatura/ });
+  await expect(menuPerfil.locator('option')).toHaveText(['Sin especificar', 'Licenciatura en Primaria']);
+  await menuPerfil.selectOption('Licenciatura en Primaria');
+  await page.getByRole('button', { name: 'Guardar mi información' }).click();
+  await expect(page.getByText('Información actualizada ✔')).toBeVisible();
+  expect(state.sent.me).toMatchObject({ degree: 'Licenciatura en Primaria' });
+});
+
+test('si la licenciatura de alguien ya no está en Ajustes, se conserva como opción', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.members[1].degree = 'Licenciatura en Física';
+  await withSession(page);
+  await page.goto('/admin/equipo');
+  await page.getByRole('button', { name: 'Editar' }).nth(1).click();
+  const menu = page.getByRole('combobox', { name: /^Licenciatura/ });
+  await expect(menu).toHaveValue('Licenciatura en Física');
+  await expect(menu.locator('option:checked')).toHaveText('Licenciatura en Física (ya no está en Ajustes)');
+});
+

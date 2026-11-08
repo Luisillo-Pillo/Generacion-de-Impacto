@@ -4,6 +4,7 @@ import { useAuth } from '../auth.jsx';
 import { api, fileUrl, setToken } from '../api.js';
 import { useDialog } from '../components/Dialog.jsx';
 import { initials } from '../utils.js';
+import DegreeSelect from '../components/DegreeSelect.jsx';
 import PasswordInput from '../components/PasswordInput.jsx';
 import Spinner from '../components/Spinner.jsx';
 import { ImageField, text } from './admin/shared.jsx';
@@ -34,7 +35,7 @@ function MyInfo({ member, onSaved }) {
       <form className="form card" onSubmit={save}>
         {text('Nombre', form.name, set('name'), { required: true, minLength: 2, maxLength: 100 })}
         {text('Cargo', form.role, set('role'), { maxLength: 100 })}
-        {text('Licenciatura', form.degree, set('degree'), { maxLength: 120 })}
+        <DegreeSelect value={form.degree} onChange={set('degree')} />
         <ImageField label="Foto" value={form.photo} onChange={set('photo')} />
         {status.error && <p className="error" role="alert">{status.error}</p>}
         {status.ok && <p role="status"><strong>Información actualizada ✔</strong></p>}

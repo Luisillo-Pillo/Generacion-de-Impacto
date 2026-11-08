@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth.jsx';
-import { ROLE_LABEL, ROLE_HELP, canEdit } from '../../roles.js';
+import { ROLE_LABEL, canEdit } from '../../roles.js';
+import DegreeSelect from '../../components/DegreeSelect.jsx';
 import PasswordInput from '../../components/PasswordInput.jsx';
 import MemberOrder from './MemberOrder.jsx';
 import { CrudPanel, ImageField, text } from './shared.jsx';
@@ -24,14 +25,14 @@ export default function AdminTeam() {
         <>
           {text('Nombre', m.name, set('name'), { required: true, maxLength: 100 })}
           {text('Cargo', m.role, set('role'), { maxLength: 100 })}
-          {text('Licenciatura', m.degree, set('degree'), { maxLength: 120 })}
+          <DegreeSelect value={m.degree} onChange={set('degree')} />
           {text('Correo de acceso', m.email, set('email'), { type: 'email', required: true, autoComplete: 'off' })}
           <label>{m._id ? 'Nueva contraseña (déjala vacía para no cambiarla)' : 'Contraseña (mínimo 10 caracteres)'}
             <PasswordInput required={!m._id} minLength={10} value={m.password ?? ''} onChange={(e) => set('password')(e.target.value)} autoComplete="new-password" />
           </label>
           <label>Rol
             <select value={m.access ?? 'miembro'} onChange={(e) => set('access')(e.target.value)}>
-              {Object.entries(ROLE_LABEL).map(([value, label]) => <option key={value} value={value}>{label} ({ROLE_HELP[value]})</option>)}
+              {Object.entries(ROLE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
           <ImageField label="Foto" value={m.photo} onChange={set('photo')} />
