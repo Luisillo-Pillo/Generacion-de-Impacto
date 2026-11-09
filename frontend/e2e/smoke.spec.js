@@ -1242,3 +1242,26 @@ test('buzón: la decoración se mueve solo si el sistema lo permite', async ({ p
   expect(await animacion('.mailbox-ambient .bit')).toBe('mailbox-drift');
   await expect(page.locator('.mailbox-ambient .bit').first()).toBeVisible();
 });
+
+test('Equipo (panel): el Moderador ve la última conexión de cada integrante y el Miembro no', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.members.push({ _id: 'm3', name: 'Carla Tercera', role: 'Vocal', lastSeenAt: '2026-11-07T12:00:00Z' });
+  await withSession(page);
+  await page.goto('/admin/equipo');
+  const tarjeta = (nombre) => page.locator('.crud-grid li, .crud-grid > *', { hasText: nombre }).first();
+
+  await expect(tarjeta('Ana Prueba')).toContainText(/Última conexión: 9 de noviembre de 2026 · \d{1,2}:\d{2}/);
+  await expect(tarjeta('Carla Tercera')).toContainText(/Última conexión: 7 de noviembre de 2026/);
+  await expect(tarjeta('Beto Segundo')).toContainText('Última conexión: sin registro todavía'); // nunca ha entrado
+  await expect(page.locator('.last-seen')).toHaveCount(3);
+});
+
+test('Equipo (panel): el Miembro ve el directorio pero ninguna última conexión', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true, role: 'miembro' });
+  state.members.push({ _id: 'm3', name: 'Carla Tercera', role: 'Vocal', lastSeenAt: '2026-11-07T12:00:00Z' }); // aunque el dato exista, la API no lo manda
+  await withSession(page);
+  await page.goto('/admin/equipo');
+  await expect(page.getByText('Carla Tercera')).toBeVisible();
+  await expect(page.getByText('m3@test.com')).toBeVisible(); // sí ve correos
+  await expect(page.getByText('Última conexión')).toHaveCount(0);
+});

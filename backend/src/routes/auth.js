@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { User, Member } from '../models.js';
-import { signToken, publicUser, requireAuth } from '../auth.js';
+import { signToken, publicUser, requireAuth, touchLastSeen } from '../auth.js';
 import { BCRYPT_COST, hashPassword, needsRehash, passwordSchema } from '../passwords.js';
 import { hit, peek, reset, retryAfter } from '../rateLimit.js';
 import { audit } from '../audit.js';
@@ -47,6 +47,7 @@ router.post('/login', async (req, res) => {
     user.passwordHash = await hashPassword(password);
     await user.save();
   }
+  await touchLastSeen(user, true);
   res.json({ token: signToken(user), ...(await session(user)) });
 });
 

@@ -128,3 +128,46 @@ test('cada integrante edita su propio semestre y grupo en /members/me, con la mi
   assert.deepEqual([sinAplicar.json.member.semester, sinAplicar.json.member.group], ['6', '']);
   assert.equal((await t.call('PUT', '/members/me', { token: miToken, body: { name: 'Con Grupo', group: 'x'.repeat(21) } })).status, 400);
 });
+
+test('última conexión: se anota al iniciar sesión y al usar el panel (máximo cada 5 minutos), y solo la ve el Moderador', async () => {
+  const lista = async (tk) => (await t.call('GET', '/members/all', { token: tk })).json;
+  const visto = (arr, correo) => arr.find((m) => m.email === correo);
+
+  // Una cuenta que nunca ha entrado aparece con `null` para el Moderador
+  const alta = await t.call('POST', '/members', { token, body: integrante({ name: 'Nunca Entra', email: 'nunca@test.com' }) });
+  assert.equal(alta.status, 201, alta.text);
+  assert.equal(alta.json.lastSeenAt, null);
+  assert.equal(visto(await lista(token), 'nunca@test.com').lastSeenAt, null);
+
+  // Al iniciar sesión se anota la fecha y la hora
+  const antes = Date.now();
+  const tokenMiembro = await t.login('nunca@test.com', 'clave-de-integrante-1');
+  const registrada = visto(await lista(token), 'nunca@test.com').lastSeenAt;
+  assert.ok(registrada, 'se anotó al iniciar sesión');
+  assert.ok(new Date(registrada).getTime() >= antes - 1000 && new Date(registrada).getTime() <= Date.now() + 1000);
+
+  // Usar el panel solo la actualiza si pasaron más de 5 minutos
+  const User = t.models.User;
+  const reciente = new Date(Date.now() - 60 * 1000);
+  await User.updateOne({ email: 'nunca@test.com' }, { $set: { lastSeenAt: reciente } }, { timestamps: false });
+  assert.equal((await t.call('GET', '/auth/me', { token: tokenMiembro })).status, 200);
+  assert.equal((await User.findOne({ email: 'nunca@test.com' })).lastSeenAt.getTime(), reciente.getTime(), 'hace 1 minuto: no se reescribe');
+  const vieja = new Date(Date.now() - 10 * 60 * 1000);
+  await User.updateOne({ email: 'nunca@test.com' }, { $set: { lastSeenAt: vieja } }, { timestamps: false });
+  assert.equal((await t.call('GET', '/auth/me', { token: tokenMiembro })).status, 200);
+  assert.ok((await User.findOne({ email: 'nunca@test.com' })).lastSeenAt.getTime() > vieja.getTime() + 9 * 60 * 1000, 'hace 10 minutos: se actualiza');
+
+  // Un Miembro ve el directorio, pero sin la última conexión de nadie (ni la suya)
+  const paraMiembro = await lista(tokenMiembro);
+  assert.ok(paraMiembro.length > 1);
+  assert.ok(paraMiembro.every((m) => !('lastSeenAt' in m)), 'el Miembro no recibe lastSeenAt');
+  // Tampoco sale en la lista pública ni en la sesión
+  assert.ok((await t.call('GET', '/members')).json.every((m) => !('lastSeenAt' in m)));
+  assert.ok(!('lastSeenAt' in (await t.call('GET', '/auth/me', { token: tokenMiembro })).json.user));
+  assert.ok(!(await t.call('GET', '/members/all')).text.includes('lastSeenAt')); // sin sesión: 401
+
+  // Una edición del Moderador también devuelve la última conexión
+  const editado = await t.call('PUT', `/members/${alta.json._id}`, { token, body: { name: 'Nunca Entra', role: 'Vocal' } });
+  assert.equal(editado.status, 200, editado.text);
+  assert.ok(editado.json.lastSeenAt);
+});

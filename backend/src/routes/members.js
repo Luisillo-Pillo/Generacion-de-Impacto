@@ -42,17 +42,25 @@ async function withoutInapplicableGroup(data) {
   return groupDegrees.includes(data.degree) ? data : { ...data, group: '' };
 }
 
-const toAdminJson = (member, user) => ({ ...member.toObject(), user: undefined, email: user?.email || '', access: user?.role === 'admin' ? 'admin' : 'miembro' });
+// `lastSeenAt` (última conexión) solo se incluye para el Moderador; `null` si la cuenta aún no ha entrado desde que existe el dato
+const toAdminJson = (member, user, { withLastSeen = true } = {}) => ({
+  ...member.toObject(),
+  user: undefined,
+  email: user?.email || '',
+  access: user?.role === 'admin' ? 'admin' : 'miembro',
+  ...(withLastSeen && { lastSeenAt: user?.lastSeenAt ?? null }),
+});
 
 router.get('/', async (_req, res) => {
   res.json(await Member.find().sort({ order: 1, createdAt: 1 }).select('-user'));
 });
 
 // Directorio del panel: nombre, cargo, licenciatura, semestre, grupo, foto, correo y rol de cada integrante, para el Miembro y el Moderador.
-// Nunca contraseñas.
-router.get('/all', panelUserOnly, async (_req, res) => {
-  const members = await Member.find().sort({ order: 1, createdAt: 1 }).populate('user', 'email role');
-  res.json(members.map((m) => toAdminJson(m, m.user)));
+// Nunca contraseñas. Solo el Moderador recibe además la última conexión (`lastSeenAt`).
+router.get('/all', panelUserOnly, async (req, res) => {
+  const members = await Member.find().sort({ order: 1, createdAt: 1 }).populate('user', 'email role lastSeenAt');
+  const withLastSeen = req.user.role === 'admin';
+  res.json(members.map((m) => toAdminJson(m, m.user, { withLastSeen })));
 });
 
 // Cada persona edita su propia información (nombre, cargo, licenciatura, semestre, grupo y foto). El correo, el rol de acceso y el orden

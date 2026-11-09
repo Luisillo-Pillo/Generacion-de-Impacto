@@ -122,6 +122,7 @@ Solo hay **dos roles**, que elige un **Moderador** al dar de alta o editar al in
 | Eliminar noticias y propuestas | no | sí |
 | Ver correos, nombres y roles del equipo (**nunca contraseñas**) | sí | sí |
 | Editar su propia información (nombre, cargo, licenciatura, semestre, grupo, foto) y su contraseña | sí | sí |
+| Ver la **última conexión** de cada integrante (Panel → Equipo; `lastSeenAt` en `GET /api/members/all`) | no | sí |
 | Editar a otros, dar de alta, eliminar, cambiar roles y orden del equipo | no | sí |
 | Ajustes del sitio y bitácora (`GET /api/audit`) | no | sí |
 
@@ -265,6 +266,12 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - **Dependabot:** los PR de actualización mayor (React 19, ESLint 10, Vite 8, Mongoose 9, etc.) no se fusionan sin migrar y probar; los que fallen en el CI se pueden cerrar o dejar abiertos.
 
 ## 10. Registro de cambios
+
+### 2026-11-09 — Última conexión de cada integrante, para el Moderador (0.22.0)
+- En **Panel → Equipo** cada integrante muestra ahora **«Última conexión: 9 de noviembre de 2026 · 3:20 p. m.»**, y **solo el Moderador la ve**. Las cuentas que todavía no han entrado desde que existe este dato dicen «sin registro todavía» (se llenan solas la próxima vez que cada persona inicie sesión o use el panel; no hace falta migración).
+- **Cómo se registra:** nuevo campo `lastSeenAt` en la cuenta (`User`). Se anota al **iniciar sesión** y cada vez que la cuenta **usa el sitio con sesión** (cualquier petición autenticada, incluida la renovación de la sesión), pero con **una sola escritura cada 5 minutos por cuenta**, para no escribir en la base en cada petición. Es solo la fecha y la hora: **no se guarda ninguna IP, dispositivo ni página visitada**.
+- **Quién lo recibe:** `GET /api/members/all` incluye `lastSeenAt` (fecha o `null` si nunca) **solo si quien pregunta es Moderador**; el Miembro sigue viendo el directorio (correos, nombres, roles) sin ese dato, y tampoco aparece en la lista pública del equipo ni en la sesión (`/auth/me`). Las respuestas de alta y edición del Moderador también lo traen.
+- Pruebas nuevas: 1 de API (se anota al iniciar sesión y al usar el panel, no se reescribe antes de 5 minutos, el Miembro no lo recibe y no sale en la lista pública ni en la sesión) y 2 de navegador (el Moderador ve la fecha, incluido «sin registro todavía»; el Miembro no ve nada). Total: 155 de API y 88 de navegador.
 
 ### 2026-11-09 — Decoración animada en el buzón (0.21.0)
 - La página `/buzon` ahora lleva decoración en los **costados** (el formulario es una columna de 760 px y en pantallas anchas quedaban márgenes vacíos), con el mismo estilo que la del equipo y con animaciones leves. Es solo CSS y `aria-hidden` (no se lee con lector de pantalla ni recibe clics), con posiciones fijas. Mezcla los adornos del equipo (**estrellas** que titilan, **cruces** que giran, **líneas de marcador** que se dibujan y **retazos de puntos**) con piezas del tema del buzón: **aviones de papel** con su estela que planean, **burbujas** de «¿?» (roja) y «!» (negra) y un **sobre** que flotan, **rótulos a mano** («Tu opinión cuenta», «¡Escríbenos!») y **papelitos** rojos y crema que suben despacio.

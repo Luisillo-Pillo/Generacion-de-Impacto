@@ -67,7 +67,13 @@ export async function mockApi(page, { loggedIn = false, role = 'admin', email } 
       return json(route, { user: { ...admin, name: state.sent.me.name }, member: { ...MEMBER, ...state.sent.me } });
     }
     // Correo y rol de cada integrante (nunca contraseñas): lo ven el Miembro y el Moderador
-    if (path === '/members/all') return json(route, state.members.map((m) => ({ ...m, email: `${m._id}@test.com`, access: m._id === 'm1' ? role : 'miembro' })));
+    // Igual que la API: solo el Moderador recibe la última conexión (`null` si la cuenta aún no ha entrado)
+    if (path === '/members/all') {
+      return json(route, state.members.map(({ lastSeenAt, ...m }) => ({
+        ...m, email: `${m._id}@test.com`, access: m._id === 'm1' ? role : 'miembro',
+        ...(role === 'admin' && { lastSeenAt: lastSeenAt ?? (m._id === 'm1' ? '2026-11-09T12:00:00Z' : null) }),
+      })));
+    }
     if (path === '/members') return json(route, state.members);
     if (path === '/messages' && method === 'POST') {
       state.sent.message = req.postData() || '';

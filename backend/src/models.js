@@ -16,6 +16,9 @@ const userSchema = new Schema(
     role: { type: String, enum: ['admin', 'miembro', 'presidente', 'moderador', 'user'], default: 'user' },
     // Se suma al cambiar la contraseña o al cerrar sesión en todos los dispositivos: los tokens con otra versión dejan de valer.
     tokenVersion: { type: Number, default: 0 },
+    // Última vez que la cuenta inició sesión o usó el panel (como máximo una escritura cada 5 minutos; ver auth.js). Solo lo ve el
+    // Moderador. No se guarda ninguna IP ni dispositivo: solo la fecha y la hora.
+    lastSeenAt: { type: Date },
   },
   { timestamps: true }
 );

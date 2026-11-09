@@ -14,6 +14,16 @@ export const signToken = (user) =>
 
 const LEGACY_ROLES = ['presidente', 'moderador'];
 
+// «Última conexión»: se anota al iniciar sesión y cuando la cuenta usa el panel, pero con una escritura como máximo cada 5 minutos
+// por cuenta (para no escribir en la base en cada petición). Va sin `timestamps` para no mover `updatedAt`.
+const SEEN_EVERY_MS = 5 * 60 * 1000;
+export async function touchLastSeen(user, force = false) {
+  const now = Date.now();
+  if (!force && user.lastSeenAt && now - new Date(user.lastSeenAt).getTime() < SEEN_EVERY_MS) return;
+  user.lastSeenAt = new Date(now);
+  await User.updateOne({ _id: user._id }, { $set: { lastSeenAt: user.lastSeenAt } }, { timestamps: false });
+}
+
 export const publicUser = (u) => ({ id: String(u._id), name: u.name, email: u.email, role: u.role });
 
 export async function requireAuth(req, res, next) {
@@ -28,6 +38,7 @@ export async function requireAuth(req, res, next) {
     // Valores de rol que ya no existen (presidente, moderador limitado) cuentan como Miembro hasta que corra la migración 003
     if (LEGACY_ROLES.includes(user.role)) user.role = 'miembro';
     req.user = user;
+    await touchLastSeen(user);
     // Renovación transparente: cuando ya pasó más de la mitad de su vida, se entrega un token nuevo en una cabecera.
     if (Date.now() / 1000 - iat > (TOKEN_HOURS * 3600) / 2) res.set('X-Renewed-Token', signToken(user));
     next();
@@ -53,6 +64,7 @@ export function requireAdmin(req, res, next) {
 //   eliminar noticias y propuestas                                   no          sí
 //   ver correos, nombres y roles del equipo (nunca contraseñas)      sí          sí
 //   editar su propia información                                     sí          sí
+//   ver la última conexión de cada integrante                       no          sí
 //   editar a otros, dar de alta, eliminar, cambiar roles y orden     no          sí
 //   ajustes del sitio y bitácora                                     no          sí
 //
