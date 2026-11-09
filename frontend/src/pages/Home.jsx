@@ -5,6 +5,20 @@ import ProposalCard from '../components/ProposalCard.jsx';
 import NewsCard from '../components/NewsCard.jsx';
 import './Home.css';
 
+// Papelitos decorativos del héroe: posición horizontal (%), tamaño (px), duración y retraso (s), deriva lateral y giro.
+// Valores fijos (no aleatorios) para que la página se dibuje igual en cada visita.
+const CONFETTI = [
+  { x: 5, s: 16, t: 15, d: 0, dx: 30, r: 260, paper: false },
+  { x: 14, s: 10, t: 19, d: 4, dx: -24, r: -200, paper: true },
+  { x: 26, s: 14, t: 17, d: 9, dx: 40, r: 320, paper: false },
+  { x: 38, s: 9, t: 21, d: 2, dx: -30, r: -280, paper: true },
+  { x: 52, s: 15, t: 16, d: 6, dx: 26, r: 240, paper: false },
+  { x: 63, s: 10, t: 20, d: 11, dx: -36, r: -220, paper: true },
+  { x: 76, s: 13, t: 18, d: 3, dx: 34, r: 300, paper: false },
+  { x: 86, s: 9, t: 22, d: 8, dx: -22, r: -260, paper: true },
+  { x: 94, s: 15, t: 16, d: 12, dx: -28, r: -300, paper: false },
+];
+
 export default function Home() {
   const proposals = useFetch('/proposals');
   const news = useFetch('/news');
@@ -12,6 +26,15 @@ export default function Home() {
   return (
     <>
       <section className="hero">
+        <div className="hero-confetti" aria-hidden="true">
+          {CONFETTI.map((c) => (
+            <span
+              key={c.x}
+              className={`bit${c.paper ? ' paper' : ''}`}
+              style={{ '--x': `${c.x}%`, '--s': `${c.s}px`, '--t': `${c.t}s`, '--d': `${c.d}s`, '--dx': `${c.dx}px`, '--r': `${c.r}deg` }}
+            />
+          ))}
+        </div>
         <div className="container hero-inner">
           <h1 className="hero-title">
             <img className="hero-logo" src="/brand/logo-planilla.svg" alt="Generación de Impacto" />

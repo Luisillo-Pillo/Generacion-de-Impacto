@@ -145,6 +145,37 @@ legend { padding: 0; margin-bottom: .5rem; }
 @media (max-width: 820px) {
   .section { padding: 3.5rem 0; }
 }
+
+/* ---------- Movimiento ligero (solo decoración) ----------
+   Todo va dentro de `no-preference`: quien pide reducir el movimiento en su sistema no ve nada animado. Las animaciones
+   usan `opacity` y las propiedades individuales `translate`/`scale`, así que no chocan con los `transform` de los
+   efectos al pasar el cursor y no mueven el diseño (no hay saltos de contenido). */
+@keyframes page-in { from { opacity: 0; } }
+@keyframes reveal { from { opacity: 0; translate: 0 28px; } }
+@keyframes marker { from { scale: 0 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  /* Cada página nueva aparece con un fundido suave */
+  main > * { animation: page-in .4s ease-out; }
+  .btn:active { transform: scale(.97); }
+  /* Subrayado rojo que crece en el menú */
+  .nav a { background: linear-gradient(var(--red), var(--red)) no-repeat 0 100% / 0 3px; transition: background-size .2s ease-out, color .15s; }
+  .nav a:hover { background-size: 100% 3px; }
+  /* Al bajar, títulos, tarjetas y bloques suben y aparecen; el resaltado rojo de los títulos se «pinta» de izquierda a derecha.
+     Solo en navegadores con animaciones ligadas al scroll; en los demás todo se ve de una vez, sin perder nada. */
+  @supports (animation-timeline: view()) {
+    .section .title, .grid > *, .about > *, .cta-band .container > * {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+    .title mark {
+      transform-origin: left center;
+      animation: marker linear both;
+      animation-timeline: view();
+      animation-range: entry 15% entry 65%;
+    }
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .btn { transition: none; }

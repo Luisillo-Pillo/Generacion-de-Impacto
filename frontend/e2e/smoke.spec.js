@@ -883,3 +883,20 @@ test('«Exportar CSV» se deshabilita cuando no hay mensajes con los filtros ele
   expect(state.messages).toHaveLength(1);
 });
 
+
+test('las animaciones decorativas se apagan si el sistema pide reducir el movimiento', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/'); // la configuración de las pruebas pide «reducir movimiento»
+  await expect(page.locator('.hero-confetti')).toBeHidden();
+  expect(await page.locator('.hero-logo').evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+  expect(await page.locator('.nav a').first().evaluate((el) => getComputedStyle(el).backgroundSize)).not.toContain('3px');
+
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(page.locator('.hero-confetti')).toBeVisible();
+  expect(await page.locator('.hero-confetti .bit').first().evaluate((el) => getComputedStyle(el).animationName)).toBe('hero-drift');
+  expect(await page.locator('.hero-logo').evaluate((el) => getComputedStyle(el).animationName)).toContain('hero-bob');
+  // lo decorativo no se anuncia ni recibe clics
+  await expect(page.locator('.hero-confetti')).toHaveAttribute('aria-hidden', 'true');
+  expect(await page.locator('.hero-confetti').evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
+  await expect(page.getByRole('link', { name: 'Escríbenos en el buzón' })).toBeVisible();
+});
