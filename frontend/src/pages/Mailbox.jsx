@@ -26,7 +26,9 @@ const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export default function Mailbox() {
   usePageMeta({ title: 'Buzón digital', description: 'Cuéntanos tus quejas, propuestas, preguntas o problemas, de forma anónima o con tus datos.' });
-  const { data: settings } = useFetch('/settings');
+  // `retry` cambia la dirección para volver a pedir los ajustes (licenciaturas, semestres y grupos) si fallaron, sin perder lo escrito
+  const [retry, setRetry] = useState(0);
+  const { data: settings, error: settingsError, loading: settingsLoading } = useFetch(`/settings${retry ? `?r=${retry}` : ''}`);
   const [form, setForm] = useState(empty);
   const [status, setStatus] = useState({ sending: false, error: '', done: false, code: '' });
   const [attachments, setAttachments] = useState([]); // [{ file, url }] con vista previa local
@@ -182,6 +184,17 @@ export default function Mailbox() {
 
           {!form.anonymous && (
             <div className="form-grid">
+              {settingsError && (
+                <p className="full error settings-error" role="alert">
+                  No se pudieron cargar las licenciaturas, los semestres y los grupos ({settingsError}).{' '}
+                  <button type="button" className="retry-btn" onClick={() => setRetry((r) => r + 1)}>Reintentar</button>
+                </p>
+              )}
+              {!settingsError && !settingsLoading && !settings?.degrees?.length && (
+                <p className="full error settings-error" role="alert">
+                  Todavía no hay licenciaturas configuradas. Avisa a un moderador (Panel → Ajustes) o envía tu mensaje de forma anónima.
+                </p>
+              )}
               <label className="full">Nombre completo
                 <input required value={form.name} onChange={set('name')} maxLength={120} autoComplete="name" spellCheck={false} />
               </label>
@@ -194,7 +207,7 @@ export default function Mailbox() {
               </label>
               <label className="full">Licenciatura
                 <select required value={form.degree} onChange={setDegree}>
-                  <option value="">Selecciona…</option>
+                  <option value="">{settingsLoading ? 'Cargando…' : 'Selecciona…'}</option>
                   {options(settings?.degrees)}
                 </select>
               </label>

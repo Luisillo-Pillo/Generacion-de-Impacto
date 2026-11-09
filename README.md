@@ -266,6 +266,16 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 
 ## 10. Registro de cambios
 
+### 2026-11-09 — Filtros por defecto de mensajes (0.16.10)
+- Al abrir la pestaña de mensajes del panel, el estado empieza en **«Nuevos»** y la revisión en **«Pendiente»** (lo que hay por atender); tipo y urgencia siguen en «Todos». Todos se pueden volver a poner en «Todos». Esto reemplaza lo de la 0.16.0 («todos los filtros empiezan en Todos»); la lista sigue en orden cronológico, lo más reciente arriba.
+
+### 2026-11-09 — Barra de búsqueda del panel y licenciaturas del buzón (0.16.9)
+- **Mensajes del panel:** el botón de buscar es una **lupa** (con nombre accesible «Buscar»). Los filtros van en una fila y debajo una barra: la búsqueda a la izquierda y «Exportar CSV» y «Papelera» alineados a la derecha (en pantallas angostas se acomodan en dos filas).
+- **Buzón:** si las licenciaturas, semestres y grupos no cargan (la API tarda en despertar —Render gratuito—, está caída o falló la red), ahora se avisa con «No se pudieron cargar…» y un botón **Reintentar** que no borra lo escrito; mientras cargan, el menú dice «Cargando…»; y si no hay licenciaturas configuradas se explica qué hacer. Antes quedaba un menú vacío sin explicación.
+- **Ajustes:** la API ya no acepta dejar vacías las licenciaturas ni los semestres (400 «Debe haber al menos una licenciatura»), porque el buzón no tendría qué ofrecer; los grupos sí pueden quedar vacíos.
+- Comprobado contra la API real que el menú carga tanto con licenciaturas guardadas como con las de por defecto.
+- Pruebas: 146 de API y 64 de navegador.
+
 ### 2026-11-07 — Escáner de secretos del CI (0.16.8)
 - El trabajo «Búsqueda de secretos» (gitleaks) marcó como posibles secretos las contraseñas inventadas de las pruebas de permisos (las mismas que ya lo habían hecho fallar en la Fase 3): no eran secretos reales. Se agregó `.gitleaks.toml`, que suma las reglas por defecto e ignora únicamente los valores que empiezan con `clave-`. Convención: toda contraseña falsa de una prueba empieza con `clave-`.
 

@@ -191,10 +191,12 @@ test('el panel pagina, busca, muestra contadores y exporta a CSV', async ({ page
   await expect(page.getByLabel('Resumen de mensajes')).toContainText('1 nuevos');
   await expect(page.getByRole('link', { name: /Mensajes/ })).toContainText('1'); // insignia de la pestaña
   expect(state.sent.query).toMatchObject({ page: '1', limit: '20' });
-  for (const filtro of ['status', 'type', 'review', 'urgency']) expect(state.sent.query).not.toHaveProperty(filtro); // todos los filtros empiezan en «Todos»
+  // Por defecto: estado «Nuevos» y revisión «Pendiente»; tipo y urgencia en «Todos» (no se mandan)
+  expect(state.sent.query).toMatchObject({ status: 'nuevo', review: 'pendiente' });
+  for (const filtro of ['type', 'urgency']) expect(state.sent.query).not.toHaveProperty(filtro);
 
-  await page.getByLabel('Buscar').fill('no-existe');
-  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await page.getByRole('searchbox').fill('no-existe');
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click(); // la lupa
   await expect(page.getByText('No hay mensajes con estos filtros.')).toBeVisible();
   expect(state.sent.query).toMatchObject({ q: 'no-existe', page: '1' });
   await page.getByRole('button', { name: 'Limpiar' }).click();
@@ -362,7 +364,7 @@ test('los ajustes ya no piden Facebook ni TikTok', async ({ page }) => {
   await expect(page.getByText(/Facebook|TikTok/)).toHaveCount(0);
 });
 
-test('los filtros del panel empiezan en «Todos» y los mensajes van de lo más reciente a lo más antiguo', async ({ page }) => {
+test('los filtros del panel empiezan en Nuevos y Pendiente, y los mensajes van de lo más reciente a lo más antiguo', async ({ page }) => {
   const state = await mockApi(page, { loggedIn: true });
   state.messages = [
     // La API los entrega del más reciente al más antiguo (lo prueban las pruebas de la API); la pantalla respeta ese orden
@@ -372,10 +374,16 @@ test('los filtros del panel empiezan en «Todos» y los mensajes van de lo más 
   ];
   await withSession(page);
   await page.goto('/admin/mensajes');
-  for (const etiqueta of ['Tipo', 'Estado', 'Revisión', 'Urgencia']) {
-    await expect(page.locator('.filters').getByRole('combobox', { name: new RegExp(`^${etiqueta}`) })).toHaveValue('');
-  }
-  await expect(page.locator('.filters').getByRole('combobox', { name: /^Estado/ }).locator('option:checked')).toHaveText('Todos');
+  const filtro = (etiqueta) => page.locator('.filters').getByRole('combobox', { name: new RegExp(`^${etiqueta}`) });
+  await expect(filtro('Estado')).toHaveValue('nuevo');
+  await expect(filtro('Estado').locator('option:checked')).toHaveText('Nuevos');
+  await expect(filtro('Revisión')).toHaveValue('pendiente');
+  await expect(filtro('Revisión').locator('option:checked')).toHaveText('Pendiente');
+  await expect(filtro('Tipo')).toHaveValue('');
+  await expect(filtro('Urgencia')).toHaveValue('');
+  // Se pueden volver a poner en «Todos»
+  await filtro('Estado').selectOption('');
+  await expect.poll(() => state.sent.query).not.toHaveProperty('status');
   await expect(page.locator('.msg h3')).toHaveText(['Mensaje del viernes', 'Mensaje del miércoles', 'Mensaje del lunes']);
 });
 
@@ -629,5 +637,30 @@ test('todo el sitio está en español de México: idioma de la página y correct
   const contraseña = page.locator('.password-field input').first();
   await page.getByRole('button', { name: 'Mostrar contraseña' }).first().click(); // visible: sería texto normal
   expect(await contraseña.evaluate((e) => [e.type, e.spellcheck])).toEqual(['text', false]);
+});
+
+test('buzón: si no cargan las licenciaturas se avisa y se puede reintentar sin perder lo escrito', async ({ page }) => {
+  await mockApi(page);
+  let fallar = true;
+  await page.route('**/api/settings**', (route) => (fallar ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Error interno del servidor' }) }) : route.fallback()));
+  await page.goto('/buzon');
+  await page.getByLabel('Asunto').fill('Algo que escribí antes del error');
+  await page.getByText('Con mis datos').click();
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las licenciaturas' })).toBeVisible();
+
+  fallar = false;
+  await page.getByRole('button', { name: 'Reintentar' }).click();
+  const menu = page.getByRole('combobox', { name: /^Licenciatura/ });
+  await expect(menu.locator('option')).toHaveText(['Selecciona…', 'Licenciatura en Primaria']);
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudieron cargar' })).toHaveCount(0);
+  await expect(page.getByLabel('Asunto')).toHaveValue('Algo que escribí antes del error');
+});
+
+test('buzón: si no hay licenciaturas configuradas se explica qué hacer', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/settings**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ degrees: [], groups: [], semesters: ['1'], groupDegrees: [], social: {} }) }));
+  await page.goto('/buzon');
+  await page.getByText('Con mis datos').click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Todavía no hay licenciaturas configuradas' })).toBeVisible();
 });
 

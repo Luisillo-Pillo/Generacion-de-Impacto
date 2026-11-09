@@ -197,10 +197,10 @@ const url = z
   .refine((v) => v === '' || /^https?:\/\/[^\s]+$/i.test(v), 'Las redes deben ser un enlace que empiece con http:// o https://')
   .default('');
 const settingSchemas = {
-  degrees: list,
+  degrees: list.min(1, 'Debe haber al menos una licenciatura'), // sin ellas el buzón no deja elegir licenciatura
   groups: list,
   groupDegrees: list,
-  semesters: list,
+  semesters: list.min(1, 'Debe haber al menos un semestre'),
   social: z.object({
     instagram: url,
     email: z.union([z.literal(''), z.string().trim().toLowerCase().max(200).email('Correo de contacto no válido')]).default(''),

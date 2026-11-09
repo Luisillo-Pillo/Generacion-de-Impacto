@@ -106,6 +106,13 @@ test('ajustes: valores por defecto, lectura pública y validación', async () =>
   assert.equal((await t.call('PUT', '/settings/social', { token })).status, 400, 'sin cuerpo');
   assert.equal((await t.call('PUT', '/settings/degrees', { token, body: { value: ['', 'A'] } })).status, 400, 'elemento vacío');
   assert.equal((await t.call('PUT', '/settings/degrees', { token, body: { value: 'no es lista' } })).status, 400);
+  // Las licenciaturas y los semestres no pueden quedar vacíos (el buzón no tendría qué ofrecer); los grupos sí
+  const sinLicenciaturas = await t.call('PUT', '/settings/degrees', { token, body: { value: [] } });
+  assert.equal(sinLicenciaturas.status, 400);
+  assert.match(sinLicenciaturas.json.error, /al menos una licenciatura/);
+  assert.equal((await t.call('PUT', '/settings/semesters', { token, body: { value: [] } })).status, 400);
+  assert.equal((await t.call('PUT', '/settings/groups', { token, body: { value: [] } })).status, 200);
+  await t.call('PUT', '/settings/groups', { token, body: { value: ['A', 'B', 'C', 'D'] } });
 });
 
 test('ajustes: las redes solo aceptan enlaces http(s) y el correo debe ser válido', async () => {

@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { api } from '../../api.js';
 import { useAuth } from '../../auth.jsx';
 import { canEdit } from '../../roles.js';
+import { IconSearch } from '../../components/ActionIcons.jsx';
 import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { useList } from './shared.jsx';
@@ -28,8 +29,9 @@ export default function AdminMessages() {
   const { stats, refreshStats } = useOutletContext();
   const role = user?.role;
   const isMod = canEdit(role); // el Moderador además ve la papelera y elimina; el Miembro lee, responde, actualiza y exporta
-  // Todos los filtros empiezan en «Todos»; la lista siempre va en orden cronológico, lo más reciente arriba
-  const [filters, setFilters] = useState({ type: '', status: '', review: '', urgency: '' });
+  // Al abrir: estado «Nuevos» y revisión «Pendiente» (lo que hay por atender); tipo y urgencia en «Todos». La lista siempre va
+  // en orden cronológico, lo más reciente arriba
+  const [filters, setFilters] = useState({ type: '', status: 'nuevo', review: 'pendiente', urgency: '' });
   const [typed, setTyped] = useState(''); // lo que se escribe en el buscador
   const [search, setSearch] = useState(''); // la búsqueda aplicada
   const [page, setPage] = useState(1);
@@ -94,30 +96,31 @@ export default function AdminMessages() {
           <span className="muted"> ({Object.entries(stats.porTipo).map(([t, n]) => `${n} ${TYPE_LABEL[t].toLowerCase()}s`).join(', ')})</span>
         </p>
       )}
-      <div className="filters">
+      {!trash && (
+        <div className="filters">
+          <Filter label="Tipo" options={TYPES} value={filters.type} onChange={setFilter('type')} />
+          <Filter label="Estado" options={STATUS} value={filters.status} onChange={setFilter('status')} />
+          <Filter label="Revisión" options={[['', 'Todas'], ...REVIEW]} value={filters.review} onChange={setFilter('review')} />
+          <Filter label="Urgencia" options={[['', 'Todas'], ...URGENCY]} value={filters.urgency} onChange={setFilter('urgency')} />
+        </div>
+      )}
+      {/* Búsqueda a la izquierda y acciones a la derecha, en una misma fila (se acomodan en varias en pantallas angostas) */}
+      <div className="toolbar">
         {!trash && (
-          <>
-            <Filter label="Tipo" options={TYPES} value={filters.type} onChange={setFilter('type')} />
-            <Filter label="Estado" options={STATUS} value={filters.status} onChange={setFilter('status')} />
-            <Filter label="Revisión" options={[['', 'Todas'], ...REVIEW]} value={filters.review} onChange={setFilter('review')} />
-            <Filter label="Urgencia" options={[['', 'Todas'], ...URGENCY]} value={filters.urgency} onChange={setFilter('urgency')} />
-            <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); applySearch(typed.trim()); }}>
-              <label>Buscar
-                <input type="search" value={typed} maxLength={100} placeholder="En el asunto o el mensaje" onChange={(e) => setTyped(e.target.value)} />
-              </label>
-              <button className="btn btn-dark sm">Buscar</button>
-              {search && <button type="button" className="btn btn-dark sm" onClick={() => { setTyped(''); applySearch(''); }}>Limpiar</button>}
-            </form>
-          </>
+          <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); applySearch(typed.trim()); }}>
+            <input type="search" value={typed} maxLength={100} placeholder="Buscar en el asunto o el mensaje" aria-label="Buscar en el asunto o el mensaje" onChange={(e) => setTyped(e.target.value)} />
+            <button className="btn btn-dark icon-btn search-btn" aria-label="Buscar" title="Buscar"><IconSearch /></button>
+            {search && <button type="button" className="btn btn-dark sm" onClick={() => { setTyped(''); applySearch(''); }}>Limpiar</button>}
+          </form>
         )}
-        <span className="filters-end">
+        <div className="toolbar-actions">
           {!trash && <button type="button" className="btn btn-dark sm" disabled={exporting} onClick={exportCsv}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>}
           {isMod && (
             <button type="button" className="btn btn-dark sm" aria-pressed={trash} onClick={() => { setTrash(!trash); setPage(1); }}>
               {trash ? '← Volver a los mensajes' : 'Papelera'}
             </button>
           )}
-        </span>
+        </div>
       </div>
       {trash && <p className="muted">Los mensajes eliminados se quedan aquí 30 días y después se borran solos.</p>}
       {error && <p className="error">{error}</p>}
