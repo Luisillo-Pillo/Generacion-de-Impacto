@@ -11,7 +11,7 @@ const rateLimitSchema = new mongoose.Schema({
 });
 export const RateLimit = mongoose.model('RateLimit', rateLimitSchema);
 
-export const hashKey = (scope, id) => createHash('sha256').update(`${scope}:${id}`).digest('hex');
+const hashKey = (scope, id) => createHash('sha256').update(`${scope}:${id}`).digest('hex');
 
 // Suma un intento a la llave y devuelve cuántos lleva en la ventana vigente. Es atómico (una sola operación en la
 // base): si la ventana venció o no existe, abre una nueva con cuenta 1.

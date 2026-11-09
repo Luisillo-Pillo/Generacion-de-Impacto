@@ -7,7 +7,7 @@
 // ajustar los niveles; no se guarda nada en la base de datos.
 const normalize = (text) => String(text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-export function levelOf(role) {
+function levelOf(role) {
   const r = normalize(role);
   if (/^vice[\s-]*presiden/.test(r) || /^tesorer/.test(r)) return 2;
   if (/^presiden/.test(r)) return 1;

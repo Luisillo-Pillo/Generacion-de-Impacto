@@ -1,8 +1,8 @@
 // Imagen descargable del código de seguimiento (PNG de 1080 × 720, pensada para guardarla en la galería del teléfono o
 // mandársela por WhatsApp). Lleva el código, el aviso de que no se debe perder y el enlace para consultarlo; NUNCA el
 // asunto ni el texto del mensaje: por eso esta función ni siquiera los recibe. Se dibuja en el navegador (canvas).
-export const IMAGE_WIDTH = 1080;
-export const IMAGE_HEIGHT = 720;
+const IMAGE_WIDTH = 1080;
+const IMAGE_HEIGHT = 720;
 
 const PAPER = '#f1e8db';
 const BLACK = '#121212';

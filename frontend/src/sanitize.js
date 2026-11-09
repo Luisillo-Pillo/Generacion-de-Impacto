@@ -1,6 +1,7 @@
 // Filtro de privacidad para los reportes de error del navegador (Sentry). Este sitio recibe mensajes y datos personales:
 // a un tercero solo debe viajar el tipo de error y su pila, nunca lo que la persona escribió, su URL con consulta, sus
 // cabeceras ni su IP. Mismo criterio que backend/src/monitoring.js. Sin dependencias para poder probarlo en Node.
+// Se exporta para que la prueba de monitoreo compruebe que aplica el mismo criterio que el del servidor
 export function sanitizeMessage(text) {
   return String(text ?? '')
     .replace(/(["'`])(?:(?!\1)[^\n])*\1/g, '$1…$1')

@@ -252,6 +252,8 @@ Segunda revisión (2026-10-29): ESLint sin avisos, `npm audit` en 0 vulnerabilid
 
 Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite build` correcto, 55 pruebas de API (base aparte, eliminada), búsqueda de CSS/exports/archivos sin uso y 62 capturas idénticas a la versión anterior. Único hallazgo: el sobre del buzón ignoraba “reducir movimiento” (corregido).
 
+Cuarta revisión (2026-11-09), tras el rediseño del equipo, la decoración, el buzón, semestre y grupo, la última conexión y la verificación de Google: ESLint sin avisos, `vite build` correcto, 155 pruebas de API y 90 de navegador (con axe) en verde, y un recorrido de 23 pasos en Chrome **contra la API real** (MongoDB en memoria, base `gi_test`, sitio compilado, sin simulaciones; se actualizó el guion con lo nuevo) sin errores de consola ni respuestas inesperadas: buzón (Con mis datos y Pregunta por defecto, datos escritos y luego anónimo no se guardan), filtros por defecto del panel, alta con semestre y grupo (el grupo se borra al pasar a una licenciatura sin grupos), tarjetas del panel, última conexión (solo el Moderador; el Miembro y la lista pública no la reciben), organigrama público, decoración, archivo de Google y scroll al pulsar la página actual. Hallazgos: ningún error funcional ni de seguridad; se quitó el `export` de 7 funciones y constantes que solo se usan dentro de su archivo (`IMAGE_WIDTH`, `IMAGE_HEIGHT`, `levelOf`, `STAR_PATH`, `px`, `requireAdmin`, `hashKey`); no hay CSS ni archivos sin uso (las clases «sin uso aparente» se arman dinámicamente) y un archivo de pruebas tenía saltos de línea mezclados (normalizado). Una corrida de la API mostró 7 fallos por lentitud de la máquina (pruebas de 8 a 29 s) y volvió a pasar completa al repetirla. **No se pudo correr `npm audit`** desde este equipo: algunos días el registro de npm llega con el certificado de un firewall que Node no reconoce (nunca se desactiva `strict-ssl`; basta reintentar desde otra red). Se cubre con el CI, que lo ejecuta en cada push.
+
 ## 9. Pendientes y decisiones abiertas
 
 - Propuesta **#7**: aún no definida; agregarla desde Panel → Propuestas.
@@ -268,6 +270,9 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - **Dependabot:** los PR de actualización mayor (React 19, ESLint 10, Vite 8, Mongoose 9, etc.) no se fusionan sin migrar y probar; los que fallen en el CI se pueden cerrar o dejar abiertos.
 
 ## 10. Registro de cambios
+
+### 2026-11-09 — Revisión general (0.22.3)
+- Cuarta revisión de calidad (detalle en la sección 8): sin errores funcionales ni de seguridad; limpieza de exportaciones que no se usaban fuera de su archivo y de saltos de línea mezclados en un archivo de pruebas; el guion de la prueba contra la API real se actualizó con las funciones nuevas. Pruebas: 155 de API y 90 de navegador.
 
 ### 2026-11-09 — Verificación de Google Search Console (0.22.2)
 - Se agregó `frontend/public/google32d12d8963a381d6.html` para verificar la propiedad del sitio en Google Search Console (método «archivo HTML»), paso previo a enviar el sitemap y pedir la indexación para que la página aparezca al buscarla en Google. Prueba de navegador nueva (se sirve tal cual, con 200 y el contenido exacto). Total: 155 de API y 90 de navegador.

@@ -4,8 +4,8 @@ import './DecorShapes.css';
 // colocarse con CSS (ver DecorShapes.css). Siempre se usa dentro de un contenedor `aria-hidden`.
 //   k: tipo · side: 'l' izquierda / 'r' derecha · top: % de alto · o: distancia al borde (px o %) · s: tamaño (px)
 //   r: giro (grados) · d: retraso de la animación (s) · wide: solo cuando hay muchísimo espacio · color: 'black' (por defecto, rojo)
-export const STAR_PATH = 'M12 0C13 8 16 11 24 12 16 13 13 16 12 24 11 16 8 13 0 12 8 11 11 8 12 0Z';
-export const px = (v) => (typeof v === 'number' ? `${v}px` : v);
+const STAR_PATH = 'M12 0C13 8 16 11 24 12 16 13 13 16 12 24 11 16 8 13 0 12 8 11 11 8 12 0Z';
+const px = (v) => (typeof v === 'number' ? `${v}px` : v);
 
 // Variables CSS de posición, tamaño, giro y retraso
 export const decorStyle = ({ top, o, s, r, d }) => ({
