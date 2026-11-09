@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth.jsx';
-import { formatDate, formatTime } from '../../api.js';
 import { ROLE_LABEL, canEdit } from '../../roles.js';
 import AcademicFields from '../../components/AcademicFields.jsx';
 import PasswordInput from '../../components/PasswordInput.jsx';
 import MemberOrder from './MemberOrder.jsx';
+import MemberSummary from './MemberSummary.jsx';
 import { CrudPanel, ImageField, text } from './shared.jsx';
 
 export default function AdminTeam() {
@@ -21,14 +21,7 @@ export default function AdminTeam() {
       listPath="/members/all" endpoint="/members" newLabel="Nuevo integrante" newAtEnd
       deleteNote="También se eliminará su cuenta de acceso."
       blank={(items) => ({ name: '', role: '', degree: '', semester: '', group: '', photo: null, order: items?.length || 0, email: '', password: '', access: 'miembro' })}
-      summary={(m) => (
-        <>
-          <strong>{m.name}</strong><br />
-          <span className="muted">{m.role ? `${m.role} · ` : ''}{m.email}{m.access ? ` · ${ROLE_LABEL[m.access]}` : ''}</span>
-          {/* La API solo manda `lastSeenAt` al Moderador: el Miembro no ve esta línea */}
-          {'lastSeenAt' in m && <><br /><span className="muted last-seen">Última conexión: {m.lastSeenAt ? `${formatDate(m.lastSeenAt)} · ${formatTime(m.lastSeenAt)}` : 'sin registro todavía'}</span></>}
-        </>
-      )}
+      summary={(m) => <MemberSummary m={m} />}
       fields={(m, set) => (
         <>
           {text('Nombre', m.name, set('name'), { required: true, maxLength: 100, spellCheck: false })}

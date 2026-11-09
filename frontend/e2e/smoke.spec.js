@@ -1250,10 +1250,11 @@ test('Equipo (panel): el Moderador ve la última conexión de cada integrante y 
   await page.goto('/admin/equipo');
   const tarjeta = (nombre) => page.locator('.crud-grid li, .crud-grid > *', { hasText: nombre }).first();
 
-  await expect(tarjeta('Ana Prueba')).toContainText(/Última conexión: 9 de noviembre de 2026 · \d{1,2}:\d{2}/);
-  await expect(tarjeta('Carla Tercera')).toContainText(/Última conexión: 7 de noviembre de 2026/);
-  await expect(tarjeta('Beto Segundo')).toContainText('Última conexión: sin registro todavía'); // nunca ha entrado
-  await expect(page.locator('.last-seen')).toHaveCount(3);
+  await expect(tarjeta('Ana Prueba').locator('.ms-seen')).toContainText(/9 de noviembre de 2026 · \d{1,2}:\d{2}/);
+  await expect(tarjeta('Carla Tercera').locator('.ms-seen')).toContainText(/7 de noviembre de 2026/);
+  await expect(tarjeta('Beto Segundo').locator('.ms-seen')).toContainText('Sin registro todavía'); // nunca ha entrado
+  await expect(tarjeta('Beto Segundo')).toContainText('Última conexión');
+  await expect(page.locator('.ms-seen')).toHaveCount(3);
 });
 
 test('Equipo (panel): el Miembro ve el directorio pero ninguna última conexión', async ({ page }) => {
@@ -1264,4 +1265,42 @@ test('Equipo (panel): el Miembro ve el directorio pero ninguna última conexión
   await expect(page.getByText('Carla Tercera')).toBeVisible();
   await expect(page.getByText('m3@test.com')).toBeVisible(); // sí ve correos
   await expect(page.getByText('Última conexión')).toHaveCount(0);
+});
+
+test('Equipo (panel): cada dato de la tarjeta va en su propia fila, con etiqueta, ícono y estilo distintos', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.members.length = 0;
+  state.members.push({ _id: 'm1', name: 'Amaury Villanueva', role: 'Presidente', degree: 'Licenciatura en Primaria', semester: '5', group: 'A', lastSeenAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString() });
+  state.members.push({ _id: 'm2', name: 'Beto Segundo', role: '', lastSeenAt: null });
+  await withSession(page);
+  await page.goto('/admin/equipo');
+  const tarjeta = page.locator('.crud-card', { hasText: 'Amaury Villanueva' });
+
+  // Rol de acceso junto al nombre: Moderador (el de la sesión) en rojo
+  await expect(tarjeta.locator('.ms-access')).toHaveText('Moderador');
+  await expect(tarjeta.locator('.ms-access')).toHaveClass(/ms-access-admin/);
+  // Cada dato en su fila, con su etiqueta
+  await expect(tarjeta.locator('.ms-fact .ms-label')).toHaveText(['Cargo', 'Correo', 'Estudios', 'Última conexión']);
+  await expect(tarjeta.locator('.ms-role .ms-value')).toHaveText('Presidente');
+  await expect(tarjeta.locator('.ms-email .ms-value')).toHaveText('m1@test.com');
+  await expect(tarjeta.locator('.ms-study .ms-degree')).toHaveText('Licenciatura en Primaria');
+  await expect(tarjeta.locator('.ms-study .ms-chip')).toHaveText(['Semestre 5', 'Grupo A']);
+  await expect(tarjeta.locator('.ms-when')).toHaveClass(/ms-when-today/); // se conectó hace 2 horas
+  await expect(tarjeta.locator('.ms-hint')).toHaveText('en las últimas 24 horas');
+  // Cada fila tiene su ícono y estos son decorativos (el nombre de la etiqueta ya dice lo mismo)
+  await expect(tarjeta.locator('.ms-icon svg')).toHaveCount(4);
+  expect(await tarjeta.locator('.ms-icon svg').first().getAttribute('aria-hidden')).toBe('true');
+  // Los colores distinguen los datos: ícono rojo (cargo), negro (correo) y papel con borde (estudios)
+  const fondo = (sel) => tarjeta.locator(sel).evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await fondo('.ms-role .ms-icon')).toBe('rgb(212, 20, 28)');
+  expect(await fondo('.ms-email .ms-icon')).toBe('rgb(18, 18, 18)');
+  expect(await fondo('.ms-study .ms-icon')).toBe('rgb(232, 220, 203)');
+
+  // Sin cargo, sin estudios y sin conexión: se dice con claridad y no sobran filas
+  const otra = page.locator('.crud-card', { hasText: 'Beto Segundo' });
+  await expect(otra.locator('.ms-role .ms-empty')).toHaveText('Sin cargo');
+  await expect(otra.locator('.ms-study')).toHaveCount(0);
+  await expect(otra.locator('.ms-when')).toHaveClass(/ms-when-none/);
+  await expect(otra.locator('.ms-when')).toContainText('Sin registro todavía');
+  await expect(otra.locator('.ms-access')).toHaveText('Miembro');
 });
