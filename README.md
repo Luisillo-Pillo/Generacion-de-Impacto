@@ -169,6 +169,8 @@ El sitio es una app de una sola página y los rastreadores de WhatsApp, Facebook
 - `/sitemap.xml` (`api/sitemap.js`, rutas públicas + noticias publicadas con su fecha) y `/robots.txt` (`api/robots.js`; bloquea `/admin`, `/acceso` y `/perfil` y apunta al sitemap) son dinámicos para usar el dominio actual.
 - Las funciones leen la URL de la API de `API_URL` o `VITE_API_URL` (variable de Vercel) y, si la API no responde, caen a los valores por defecto. **Después de desplegar, comprueba una noticia real** con el depurador de enlaces de Facebook (developers.facebook.com/tools/debug) y compartiendo un enlace por WhatsApp; la lógica está probada (`backend/test/seo.test.js`), pero el reenvío por User-Agent solo se puede verificar ya publicado.
 
+- **Google Search Console:** el sitio se verifica con el archivo `frontend/public/google32d12d8963a381d6.html` (su contenido es solo `google-site-verification: google32d12d8963a381d6.html`; no es un secreto). Vercel sirve los archivos de `public` antes de aplicar las reescrituras de `vercel.json`, así que no lo captura la app. **No lo borres**: si se quita, Google pierde la verificación. Pasos para aparecer en las búsquedas: verificar la propiedad (`https://generacion-de-impacto.vercel.app`), enviar `sitemap.xml` en «Sitemaps» y pedir la indexación de las páginas principales en «Inspección de URL».
+
 ### Accesibilidad
 
 - **Revisión automática:** `frontend/e2e/a11y.spec.js` pasa axe (reglas WCAG 2.1 A y AA) por cada página pública, cada sección del panel, el buzón con datos, el editor de noticias y el diálogo de confirmación; corre en el CI, así que una violación nueva rompe la compilación.
@@ -266,6 +268,9 @@ Tercera revisión (2026-11-04), tras dividir el CSS: ESLint sin avisos, `vite bu
 - **Dependabot:** los PR de actualización mayor (React 19, ESLint 10, Vite 8, Mongoose 9, etc.) no se fusionan sin migrar y probar; los que fallen en el CI se pueden cerrar o dejar abiertos.
 
 ## 10. Registro de cambios
+
+### 2026-11-09 — Verificación de Google Search Console (0.22.2)
+- Se agregó `frontend/public/google32d12d8963a381d6.html` para verificar la propiedad del sitio en Google Search Console (método «archivo HTML»), paso previo a enviar el sitemap y pedir la indexación para que la página aparezca al buscarla en Google. Prueba de navegador nueva (se sirve tal cual, con 200 y el contenido exacto). Total: 155 de API y 90 de navegador.
 
 ### 2026-11-09 — Tarjetas de integrantes del panel con más estilo (0.22.1)
 - Las tarjetas de **Panel → Equipo** ya no son un párrafo corrido («Presidente · correo · Miembro · Última conexión…»): cada dato va en **su propia fila**, con una **etiqueta chica** y un **ícono de color** distinto. Arriba, el **nombre** en Anton y el **rol de acceso** como insignia (Moderador en rojo, Miembro en negro). Debajo: **Cargo** (ícono rojo y texto rojo en negritas; «Sin cargo» en cursiva si no hay), **Correo** (ícono negro y letra de máquina), **Estudios** (ícono de papel con borde; licenciatura y, si los hay, **Semestre** y **Grupo** como etiquetas con borde; la fila no aparece si no hay ninguno) y, solo para el Moderador, **Última conexión** con un **punto de color** —verde si fue en las últimas 24 horas, ámbar si fue esta semana, gris si fue antes o si no hay registro— y una nota debajo («en las últimas 24 horas», «esta semana», «hace más de una semana»). El texto dice lo mismo que el color, que solo lo refuerza.

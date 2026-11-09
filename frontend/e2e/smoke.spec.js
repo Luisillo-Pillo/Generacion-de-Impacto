@@ -1304,3 +1304,9 @@ test('Equipo (panel): cada dato de la tarjeta va en su propia fila, con etiqueta
   await expect(otra.locator('.ms-when')).toContainText('Sin registro todavía');
   await expect(otra.locator('.ms-access')).toHaveText('Miembro');
 });
+
+test('el archivo de verificación de Google Search Console se sirve tal cual, no como la app', async ({ request }) => {
+  const res = await request.get('/google32d12d8963a381d6.html');
+  expect(res.status()).toBe(200);
+  expect((await res.text()).trim()).toBe('google-site-verification: google32d12d8963a381d6.html');
+});
