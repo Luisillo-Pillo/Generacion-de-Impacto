@@ -664,3 +664,169 @@ test('buzón: si no hay licenciaturas configuradas se explica qué hacer', async
   await expect(page.getByRole('alert').filter({ hasText: 'Todavía no hay licenciaturas configuradas' })).toBeVisible();
 });
 
+async function enviarMensaje(page, asunto = 'Fuga de agua en el edificio B') {
+  await page.goto('/buzon');
+  await page.getByLabel('Asunto').fill(asunto);
+  await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.getByRole('heading', { name: /Gracias por/ })).toBeVisible();
+}
+const guardados = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('gi_mis_mensajes') || '[]'));
+
+test('el código se descarga como imagen (PNG) con el código y el aviso de no perderlo, y no trae el asunto', async ({ page }) => {
+  await mockApi(page);
+  await enviarMensaje(page, 'Asunto que NO debe aparecer en la imagen');
+  await expect(page.getByRole('button', { name: 'Compartir' })).toHaveCount(0); // ya no hay compartir ni correo
+  await expect(page.getByRole('link', { name: 'Enviármelo por correo' })).toHaveCount(0);
+
+  const descarga = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Descargar imagen' }).click();
+  const archivo = await descarga;
+  expect(archivo.suggestedFilename()).toBe(`codigo-seguimiento-${CODE}.png`);
+  const bytes = await (await import('node:fs/promises')).readFile(await archivo.path());
+
+  // Es un PNG de 1080 × 720
+  expect([...bytes.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([1080, 720]);
+  expect(bytes.length).toBeGreaterThan(15_000); // lleva texto dibujado, no es un fondo liso
+
+  // Se revisa lo dibujado: fondo negro, el recuadro rojo del aviso y letras claras donde va el código
+  const dibujo = await page.evaluate(async (base64) => {
+    const img = new Image();
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = `data:image/png;base64,${base64}`; });
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const px = (x, y) => [...ctx.getImageData(x, y, 1, 1).data].slice(0, 3);
+    const claros = (x, y, w, h) => { const d = ctx.getImageData(x, y, w, h).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 190 && d[i + 2] > 170) n++; return n; };
+    return { fondo: px(10, 300), aviso: px(100, 400), codigo: claros(150, 220, 780, 140), textoAviso: claros(90, 400, 900, 100), enlace: claros(200, 595, 680, 40) };
+  }, bytes.toString('base64'));
+  expect(dibujo.fondo).toEqual([18, 18, 18]); // #121212
+  expect(dibujo.aviso).toEqual([212, 20, 28]); // #d4141c: recuadro del aviso
+  expect(dibujo.codigo).toBeGreaterThan(3000); // el código en letras grandes
+  expect(dibujo.textoAviso).toBeGreaterThan(500); // «¡No lo pierdas!…» en blanco sobre el rojo
+  expect(dibujo.enlace).toBeGreaterThan(300); // el enlace a /seguimiento
+});
+
+test('el código se recuerda en este dispositivo (se puede desmarcar) y aparece en «Mis mensajes» con su situación', async ({ page }) => {
+  await mockApi(page);
+  await enviarMensaje(page);
+
+  const recordar = page.getByRole('checkbox', { name: /Recordar este código en este dispositivo/ });
+  await expect(recordar).toBeChecked(); // por defecto sí
+  expect(await guardados(page)).toMatchObject([{ code: CODE, subject: 'Fuga de agua en el edificio B' }]);
+  await recordar.uncheck(); // computadora compartida
+  expect(await guardados(page)).toEqual([]);
+  await recordar.check();
+  expect(await guardados(page)).toHaveLength(1);
+
+  await page.getByRole('link', { name: 'Seguimiento', exact: true }).first().click();
+  await expect(page).toHaveURL(/\/seguimiento$/);
+  const lista = page.getByRole('region', { name: /Mis mensajes/ });
+  await expect(lista.getByText('Fuga de agua en el edificio B')).toBeVisible();
+  await expect(lista.getByText('Leído', { exact: true })).toBeVisible(); // situación consultada con el código
+  await expect(lista.getByText('En proceso')).toBeVisible();
+  await expect(lista.getByText('Con respuesta del equipo')).toBeVisible();
+
+  // Ver: llena el campo y muestra el detalle
+  await lista.getByRole('button', { name: 'Ver' }).click();
+  await expect(page.getByLabel('Código de seguimiento')).toHaveValue(CODE);
+  await expect(page.getByRole('heading', { name: 'Baños sin agua' })).toBeVisible();
+
+  // Quitar
+  await lista.getByRole('button', { name: /^Quitar/ }).click();
+  await expect(page.getByRole('region', { name: /Mis mensajes/ })).toHaveCount(0);
+  expect(await guardados(page)).toEqual([]);
+});
+
+test('«Mis mensajes»: un código que ya no existe se avisa, y «Borrar todos» vacía la lista', async ({ page }) => {
+  await page.addInitScript(([code]) => {
+    localStorage.setItem('gi_mis_mensajes', JSON.stringify([
+      { code, subject: 'Mensaje vivo', savedAt: '2026-11-01T10:00:00Z' },
+      { code: 'GI-22222-33333', subject: 'Mensaje eliminado', savedAt: '2026-10-30T10:00:00Z' },
+    ]));
+  }, [CODE]);
+  await mockApi(page);
+  await page.goto('/seguimiento');
+  const lista = page.getByRole('region', { name: /Mis mensajes/ });
+  await expect(lista.getByText('Mensaje vivo')).toBeVisible();
+  await expect(lista.getByText('Este mensaje ya no existe')).toBeVisible();
+  await expect(lista.getByRole('button', { name: 'Ver' })).toHaveCount(1); // el que ya no existe no se puede abrir
+
+  await lista.getByRole('button', { name: 'Borrar todos de este dispositivo' }).click();
+  await expect(page.getByRole('region', { name: /Mis mensajes/ })).toHaveCount(0);
+  expect(await guardados(page)).toEqual([]);
+});
+
+test('sin nada guardado no aparece «Mis mensajes»; y si el almacenamiento está bloqueado todo sigue funcionando', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/seguimiento');
+  await expect(page.getByRole('region', { name: /Mis mensajes/ })).toHaveCount(0);
+
+  await page.addInitScript(() => {
+    const bloqueado = () => { throw new Error('almacenamiento bloqueado'); };
+    Object.defineProperty(window, 'localStorage', { get: bloqueado, configurable: true });
+  });
+  await mockApi(page);
+  await page.goto('/buzon');
+  await page.getByLabel('Asunto').fill('Con el almacenamiento bloqueado');
+  await page.locator('textarea').fill('Aun así el mensaje se envía y se muestra el código.');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.getByText(CODE)).toBeVisible();
+});
+
+test('la pantalla de gracias no lleva pie de página y todo el contenido cabe sin scroll en pantallas de escritorio', async ({ page }) => {
+  await mockApi(page);
+  for (const [ancho, alto] of [[1920, 950], [1440, 800], [1366, 650], [1280, 600]]) {
+    await page.setViewportSize({ width: ancho, height: alto });
+    await page.goto('/buzon');
+    await page.getByLabel('Asunto').fill('Fuga de agua en el edificio B');
+    await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
+    await page.getByRole('button', { name: /Enviar mensaje/ }).scrollIntoViewIfNeeded();
+    await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+    await expect(page.locator('.tracking-code')).toBeVisible();
+
+    const medida = await page.evaluate(() => ({ y: window.scrollY, alto: document.documentElement.scrollHeight, ventana: window.innerHeight }));
+    expect(medida.y, `${ancho}×${alto}: se muestra desde arriba`).toBe(0);
+    expect(medida.alto, `${ancho}×${alto}: la página completa cabe en la pantalla (sin scroll)`).toBeLessThanOrEqual(medida.ventana);
+    await expect(page.locator('footer.footer')).toBeHidden(); // sin pie: ese espacio es para el contenido
+    await expect(page.locator('header.header')).toBeVisible(); // el encabezado sí
+    for (const nombre of ['Copiar código', 'Descargar imagen']) await expect(page.getByText(nombre, { exact: true })).toBeInViewport();
+    await expect(page.getByRole('link', { name: 'Inicio', exact: true }).last()).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Enviar otro mensaje' })).toBeInViewport();
+  }
+});
+
+test('el pie de página vuelve al salir de la pantalla de gracias', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/buzon');
+  await page.getByLabel('Asunto').fill('Fuga de agua en el edificio B');
+  await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.locator('footer.footer')).toBeHidden();
+  await page.getByRole('button', { name: 'Enviar otro mensaje' }).click(); // vuelve el formulario
+  await expect(page.getByLabel('Asunto')).toBeVisible();
+  await expect(page.locator('footer.footer')).toBeVisible();
+
+  await page.getByLabel('Asunto').fill('Otro mensaje distinto del anterior');
+  await page.locator('textarea').fill('Texto del segundo mensaje, suficientemente largo.');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.locator('footer.footer')).toBeHidden();
+  await page.getByRole('link', { name: 'Inicio', exact: true }).last().click(); // otra página
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('footer.footer')).toBeVisible();
+});
+
+test('en teléfono la pantalla de gracias sigue de corrido, sin desbordar de lado', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('/buzon');
+  await page.getByLabel('Asunto').fill('Fuga de agua en el edificio B');
+  await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  const [cabecera, codigo] = [await page.locator('.thanks-head').boundingBox(), await page.locator('.tracking-code').boundingBox()];
+  expect(codigo.y).toBeGreaterThan(cabecera.y + cabecera.height - 1); // el código debajo del agradecimiento
+  expect(codigo.x + codigo.width).toBeLessThanOrEqual(390); // sin desbordar
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});

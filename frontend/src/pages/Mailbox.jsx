@@ -85,6 +85,16 @@ export default function Mailbox() {
     setAttachments([]);
   }
 
+  // Pantalla de agradecimiento: se muestra desde arriba (el formulario era largo y el scroll se habría quedado donde estaba el
+  // botón de enviar) y sin pie de página, para aprovechar todo el alto y que el contenido quepa sin scroll. La clase del <body>
+  // oculta el pie (App.css) y se quita al salir de la pantalla o de la página.
+  useEffect(() => {
+    if (!status.done) return undefined;
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.body.classList.add('sin-pie');
+    return () => document.body.classList.remove('sin-pie');
+  }, [status.done]);
+
   async function submit(e) {
     e.preventDefault();
     setStatus({ sending: true, error: '', done: false });
@@ -105,7 +115,7 @@ export default function Mailbox() {
       setTrap('');
       shownAt.current = Date.now();
       clearFiles();
-      setStatus({ sending: false, error: '', done: true, code: res?.code ?? '' });
+      setStatus({ sending: false, error: '', done: true, code: res?.code ?? '', subject: form.subject });
     } catch (err) {
       setStatus({ sending: false, error: err.message, done: false });
     }
@@ -113,12 +123,15 @@ export default function Mailbox() {
 
   if (status.done) {
     return (
-      <section className="section paper page-min">
-        <div className="container narrow center">
-          <CheckStamp />
-          <h1 className="title">¡Gracias por <mark>escribirnos</mark>!</h1>
-          <p className="lead">Tu mensaje fue recibido. Lo revisaremos y le daremos seguimiento.</p>
-          {status.code && <TrackingCode code={status.code} />}
+      // Una sola columna (sello, título, texto, código y botones), repartida para ocupar justo el alto de la pantalla sin pie de página
+      <section className={`section paper thanks${status.code ? ' with-code' : ''}`}>
+        <div className="container thanks-grid center">
+          <div className="thanks-head">
+            <CheckStamp />
+            <h1 className="title">¡Gracias por <mark>escribirnos</mark>!</h1>
+            <p className="lead">Tu mensaje fue recibido. Lo revisaremos y le daremos seguimiento.</p>
+          </div>
+          {status.code && <TrackingCode code={status.code} subject={status.subject} />}
           <div className="btn-row">
             <Link to="/" className="btn btn-red">Inicio</Link>
             <button className="btn btn-dark" onClick={() => setStatus({ sending: false, error: '', done: false })}>

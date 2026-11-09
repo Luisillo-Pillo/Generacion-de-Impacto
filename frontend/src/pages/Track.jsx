@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, formatDate, formatTime } from '../api.js';
 import Spinner from '../components/Spinner.jsx';
+import SavedMessages from '../components/SavedMessages.jsx';
 import './Track.css';
 import { usePageMeta } from '../pageMeta.js';
 
@@ -15,15 +16,24 @@ export default function Track() {
   const [code, setCode] = useState('');
   const [state, setState] = useState({ loading: false, error: '', result: null });
 
-  async function submit(e) {
-    e.preventDefault();
+  async function consult(value) {
     setState({ loading: true, error: '', result: null });
     try {
-      setState({ loading: false, error: '', result: await api('/messages/track', { method: 'POST', body: { code } }) });
+      setState({ loading: false, error: '', result: await api('/messages/track', { method: 'POST', body: { code: value } }) });
     } catch (err) {
       setState({ loading: false, error: err.message, result: null });
     }
   }
+  const submit = (e) => {
+    e.preventDefault();
+    consult(code);
+  };
+  // Desde «Mis mensajes»: se llena el campo y se consulta, y se baja al resultado
+  const view = (saved) => {
+    setCode(saved);
+    consult(saved);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const { loading, error, result } = state;
   return (
@@ -66,6 +76,8 @@ export default function Track() {
             )}
           </article>
         )}
+
+        <SavedMessages onView={view} />
       </div>
     </section>
   );

@@ -35,6 +35,11 @@ export default function Privacy() {
             semestre y, en su caso, grupo, además del contenido del mensaje. Antes de enviarlos te pedimos aceptar este aviso y
             guardamos la fecha en que lo aceptaste.
           </li>
+          <li>
+            <strong>En tu dispositivo:</strong> si lo decides, el código de seguimiento de tu mensaje y su asunto se recuerdan solo en
+            tu navegador, para que no pierdas el código. Nosotros no los recibimos y puedes borrarlos cuando quieras en la página de
+            Seguimiento.
+          </li>
           <li><strong>Integrantes de la planilla:</strong> nombre, correo y contraseña (guardada cifrada) para entrar al panel.</li>
         </ul>
 

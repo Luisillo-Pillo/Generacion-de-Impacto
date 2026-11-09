@@ -1,5 +1,14 @@
 .tracking-code { background: var(--black); color: var(--paper); border-radius: 6px; padding: 1.2rem 1rem; margin: 1.5rem auto; max-width: 30rem; }
 .tracking-title { margin: 0 0 .3rem; font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; }
 .tracking-value { font-family: var(--font-display); font-size: clamp(1.6rem, 7vw, 2.4rem); letter-spacing: .08em; margin: .2rem 0 .8rem; user-select: all; word-break: break-all; }
+/* Los dos botones, del mismo tamaño y en una fila */
+.tracking-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+/* Los botones oscuros no se verían sobre el recuadro negro: aquí van con borde y letra de papel */
+.tracking-actions .btn { display: flex; align-items: center; justify-content: center; text-align: center; width: 100%; background: transparent; color: var(--paper); border: 2px solid var(--paper); text-decoration: none; }
+.tracking-actions .btn:hover, .tracking-actions .btn:focus-visible { background: var(--paper); color: var(--black); }
+.tracking-error { margin: .6rem 0 0; font-size: .85rem; color: #ffd3d5; }
+.tracking-remember { display: flex; gap: .6rem; align-items: flex-start; text-align: left; margin: 1rem 0 0; font-size: .85rem; line-height: 1.4; cursor: pointer; }
+.tracking-remember input { width: auto; margin-top: .2rem; accent-color: var(--red); }
+.tracking-remember small { display: block; color: #cfc6b8; }
 .tracking-warning { font-size: .85rem; margin: .9rem 0 0; line-height: 1.5; }
 .tracking-warning a { color: #fff; font-weight: 700; }

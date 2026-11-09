@@ -1,4 +1,6 @@
 main { overflow-x: clip; }
+/* Pantallas que ocupan todo el alto (p. ej. el agradecimiento del buzón) ocultan el pie de página */
+body.sin-pie .footer { display: none; }
 main:focus { outline: none; } /* el foco llega al contenido al cambiar de página; no hace falta marcarlo */
 .skip-link { position: absolute; left: .5rem; top: -4rem; z-index: 100; background: var(--paper); color: var(--black); padding: .6rem 1rem; border: 3px solid var(--red); border-radius: 4px; font-weight: 700; text-decoration: none; }
 .skip-link:focus { top: .5rem; }

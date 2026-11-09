@@ -70,3 +70,18 @@ for (const rol of ['miembro']) {
     await sinViolaciones(page, `panel (${rol})`);
   });
 }
+
+test('accesibilidad: pantalla de gracias con el código y seguimiento con «Mis mensajes»', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/buzon');
+  await page.getByLabel('Asunto').fill('Fuga de agua en el edificio B');
+  await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await page.locator('.tracking-code').waitFor();
+  await sinViolaciones(page, 'pantalla de gracias con el código');
+
+  await page.getByRole('link', { name: 'Seguimiento', exact: true }).first().click();
+  await page.getByText('Con respuesta del equipo').waitFor();
+  await sinViolaciones(page, 'seguimiento con Mis mensajes');
+});
+
