@@ -1,9 +1,13 @@
 import { useFetch } from '../hooks.js';
 import Spinner from '../components/Spinner.jsx';
 import { fileUrl } from '../api.js';
-import { initials } from '../utils.js';
+import { initials, semesterGroupLine } from '../utils.js';
+import { groupByLevel } from '../hierarchy.js';
+import { OrgAmbient, TierDecor } from '../components/TeamDecor.jsx';
 import './Team.css';
 import { usePageMeta } from '../pageMeta.js';
+
+const TIER_LABEL = { 1: 'Presidencia', 2: 'Vicepresidencia y tesorería', 3: 'Integrantes' };
 
 export default function Team() {
   usePageMeta({ title: 'Equipo', description: 'Conoce a las personas de la planilla Generación de Impacto y cómo contactarlas.' });
@@ -17,18 +21,31 @@ export default function Team() {
   return (
     <section className="section paper page-min">
       <div className="container">
-        <h1 className="title">Nuestro <mark>equipo</mark></h1>
+        <div className="team-head">
+          <h1 className="title">Nuestro <mark>equipo</mark></h1>
+          <p className="team-slogan" aria-hidden="true">Nuestra voz, nuestras ideas, nuestro impacto.</p>
+        </div>
         {members.loading && <Spinner />}
         {members.error && <p className="error">{members.error}</p>}
         {members.data?.length === 0 && <p className="muted">Pronto presentaremos a los integrantes de la planilla.</p>}
-        <div className="grid members">
-          {members.data?.map((m) => (
-            <article key={m._id} className="member">
-              {m.photo ? <img src={fileUrl(m.photo, 640)} alt={m.name} loading="lazy" /> : <div className="avatar">{initials(m.name)}</div>}
-              <h3>{m.name}</h3>
-              {m.role && <p className="role">{m.role}</p>}
-              {m.degree && <p className="muted">{m.degree}</p>}
-            </article>
+        {/* Organigrama: presidencia arriba, vicepresidencia y tesorería en medio y el resto debajo (ver hierarchy.js) */}
+        <div className="org">
+          <OrgAmbient />
+          {groupByLevel(members.data ?? []).map(({ level, members: tier }) => (
+            <div key={level} className={`tier tier-${level}`} role="group" aria-label={TIER_LABEL[level]}>
+              <TierDecor level={level} />
+              {tier.map((m) => (
+                <article key={m._id} className="member">
+                  {m.photo ? <img src={fileUrl(m.photo, 640)} alt={m.name} loading="lazy" /> : <div className="avatar">{initials(m.name)}</div>}
+                  <div className="member-info">
+                    <h3>{m.name}</h3>
+                    {m.role && <p className="role">{m.role}</p>}
+                    {m.degree && <p className="muted">{m.degree}</p>}
+                    {semesterGroupLine(m) && <p className="muted">{semesterGroupLine(m)}</p>}
+                  </div>
+                </article>
+              ))}
+            </div>
           ))}
         </div>
 

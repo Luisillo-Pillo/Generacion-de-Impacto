@@ -95,6 +95,8 @@ const memberSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 100 },
     role: { type: String, trim: true, maxlength: 100, default: '' },
     degree: { type: String, trim: true, maxlength: 120, default: '' },
+    semester: { type: String, trim: true, maxlength: 20, default: '' },
+    group: { type: String, trim: true, maxlength: 20, default: '' }, // solo en licenciaturas con varios grupos
     photo: { type: Schema.Types.ObjectId },
     order: { type: Number, default: 0 },
     // Cuenta de acceso del integrante (rol Miembro o Moderador; ver User.role).

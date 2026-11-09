@@ -3,8 +3,8 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import { api, fileUrl, setToken } from '../api.js';
 import { useDialog } from '../components/Dialog.jsx';
-import { initials } from '../utils.js';
-import DegreeSelect from '../components/DegreeSelect.jsx';
+import { initials, semesterGroupLine } from '../utils.js';
+import AcademicFields from '../components/AcademicFields.jsx';
 import PasswordInput from '../components/PasswordInput.jsx';
 import Spinner from '../components/Spinner.jsx';
 import { ImageField, text } from './admin/shared.jsx';
@@ -15,7 +15,7 @@ const blank = { currentPassword: '', newPassword: '', confirm: '' };
 
 // Cada persona edita su propia información; el correo y el rol los cambia un Moderador
 function MyInfo({ member, onSaved }) {
-  const [form, setForm] = useState({ name: member.name ?? '', role: member.role ?? '', degree: member.degree ?? '', photo: member.photo ?? null });
+  const [form, setForm] = useState({ name: member.name ?? '', role: member.role ?? '', degree: member.degree ?? '', semester: member.semester ?? '', group: member.group ?? '', photo: member.photo ?? null });
   const [status, setStatus] = useState({ busy: false, error: '', ok: false });
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
   async function save(e) {
@@ -35,7 +35,7 @@ function MyInfo({ member, onSaved }) {
       <form className="form card" onSubmit={save}>
         {text('Nombre', form.name, set('name'), { required: true, minLength: 2, maxLength: 100, spellCheck: false })}
         {text('Cargo', form.role, set('role'), { maxLength: 100 })}
-        <DegreeSelect value={form.degree} onChange={set('degree')} />
+        <AcademicFields degree={form.degree} semester={form.semester} group={form.group} onChange={(key, value) => set(key)(value)} />
         <ImageField label="Foto" value={form.photo} onChange={set('photo')} />
         {status.error && <p className="error" role="alert">{status.error}</p>}
         {status.ok && <p role="status"><strong>Información actualizada ✔</strong></p>}
@@ -100,6 +100,7 @@ export default function Profile() {
             <p className="muted">{user.email}</p>
             {member?.role && <p className="role">{member.role}</p>}
             {member?.degree && <p className="muted">{member.degree}</p>}
+            {semesterGroupLine(member) && <p className="muted">{semesterGroupLine(member)}</p>}
             <span className="tag" title={ROLE_HELP[user.role]}>{ROLE_LABEL[user.role] ?? 'Sin rol'}</span>
           </div>
           <button type="button" className="btn btn-dark profile-logout" onClick={askLogout}>Cerrar sesión</button>

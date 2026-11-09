@@ -7,6 +7,7 @@ import { deleteFile } from '../db.js';
 import { objectId } from '../validators.js';
 import { hashPassword, passwordSchema } from '../passwords.js';
 import { audit } from '../audit.js';
+import { loadSettings } from '../settings.js';
 
 // Cada integrante de la planilla tiene una cuenta de acceso con un rol (ver la tabla de permisos en auth.js): Moderador (`admin`,
 // puede todo) o Miembro (por defecto). Solo el Moderador da de alta, edita a otros, cambia roles y orden y elimina; cada quien
@@ -17,6 +18,8 @@ const base = {
   name: z.string().trim().min(2, 'Escribe el nombre').max(100),
   role: z.string().trim().max(100).optional().default(''),
   degree: z.string().trim().max(120).optional().default(''),
+  semester: z.string().trim().max(20).optional().default(''),
+  group: z.string().trim().max(20).optional().default(''),
   photo: objectId,
   order: z.number().int().optional().default(0),
 };
@@ -32,28 +35,37 @@ const createSchema = z.object({ ...base, email, password, access: z.enum(ACCESS)
 // Al editar, correo y contraseña son opcionales: solo se cambian si se envían.
 const updateSchema = z.object({ ...base, email: blankToUndefined(email), password: blankToUndefined(password), access: z.enum(ACCESS).optional() });
 
+// El grupo solo aplica en las licenciaturas con varios grupos (Ajustes → groupDegrees); en las demás no se guarda, igual que en el buzón
+async function withoutInapplicableGroup(data) {
+  if (!data.group) return data;
+  const { groupDegrees } = await loadSettings();
+  return groupDegrees.includes(data.degree) ? data : { ...data, group: '' };
+}
+
 const toAdminJson = (member, user) => ({ ...member.toObject(), user: undefined, email: user?.email || '', access: user?.role === 'admin' ? 'admin' : 'miembro' });
 
 router.get('/', async (_req, res) => {
   res.json(await Member.find().sort({ order: 1, createdAt: 1 }).select('-user'));
 });
 
-// Directorio del panel: nombre, cargo, licenciatura, foto, correo y rol de cada integrante, para el Miembro y el Moderador.
+// Directorio del panel: nombre, cargo, licenciatura, semestre, grupo, foto, correo y rol de cada integrante, para el Miembro y el Moderador.
 // Nunca contraseñas.
 router.get('/all', panelUserOnly, async (_req, res) => {
   const members = await Member.find().sort({ order: 1, createdAt: 1 }).populate('user', 'email role');
   res.json(members.map((m) => toAdminJson(m, m.user)));
 });
 
-// Cada persona edita su propia información (nombre, cargo, licenciatura y foto). El correo, el rol de acceso y el orden
+// Cada persona edita su propia información (nombre, cargo, licenciatura, semestre, grupo y foto). El correo, el rol de acceso y el orden
 // los cambia solo el Moderador, y la contraseña cada quien en su perfil. Va antes de `/:id`.
 router.put('/me', requireAuth, async (req, res) => {
-  const { name, role, degree, photo } = z.object({ name: base.name, role: base.role, degree: base.degree, photo: base.photo }).parse(req.body);
+  const { name, role, degree, semester, group, photo } = await withoutInapplicableGroup(
+    z.object({ name: base.name, role: base.role, degree: base.degree, semester: base.semester, group: base.group, photo: base.photo }).parse(req.body)
+  );
   const member = await Member.findOne({ user: req.user._id });
   if (!member) return res.status(404).json({ error: 'Tu cuenta no tiene ficha de integrante' });
   const newPhoto = photo || undefined;
   if (member.photo && String(member.photo) !== String(newPhoto)) await deleteFile(member.photo);
-  Object.assign(member, { name, role, degree, photo: newPhoto });
+  Object.assign(member, { name, role, degree, semester, group, photo: newPhoto });
   await member.save();
   req.user.name = name;
   await req.user.save();
@@ -72,7 +84,8 @@ router.put('/order', adminOnly, async (req, res) => {
 });
 
 router.post('/', adminOnly, async (req, res) => {
-  const { email: mail, password: pass, access, ...data } = createSchema.parse(req.body);
+  const { email: mail, password: pass, access, ...parsed } = createSchema.parse(req.body);
+  const data = await withoutInapplicableGroup(parsed);
   if (await User.exists({ email: mail })) {
     return res.status(409).json({ error: 'Ya existe una cuenta con ese correo' });
   }
@@ -93,7 +106,8 @@ router.post('/', adminOnly, async (req, res) => {
 });
 
 router.put('/:id', adminOnly, async (req, res) => {
-  const { email: mail, password: pass, access, ...data } = updateSchema.parse(req.body);
+  const { email: mail, password: pass, access, ...parsed } = updateSchema.parse(req.body);
+  const data = await withoutInapplicableGroup(parsed);
   const member = await Member.findById(req.params.id);
   if (!member) return res.status(404).json({ error: 'Integrante no encontrado' });
 

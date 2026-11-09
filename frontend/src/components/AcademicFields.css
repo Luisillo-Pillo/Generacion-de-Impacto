@@ -1,0 +1,6 @@
+/* Semestre y grupo, uno al lado del otro (los formularios del panel y del perfil son de una sola columna) */
+.academic-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; }
+.academic-row label { display: grid; gap: .35rem; font-weight: 600; font-size: .92rem; }
+@media (max-width: 420px) {
+  .academic-row { grid-template-columns: 1fr; }
+}

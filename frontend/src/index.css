@@ -163,7 +163,7 @@ legend { padding: 0; margin-bottom: .5rem; }
   /* Al bajar, títulos, tarjetas y bloques suben y aparecen; el resaltado rojo de los títulos se «pinta» de izquierda a derecha.
      Solo en navegadores con animaciones ligadas al scroll; en los demás todo se ve de una vez, sin perder nada. */
   @supports (animation-timeline: view()) {
-    .section .title, .grid > *, .about > *, .cta-band .container > * {
+    .section .title, .grid > *, .tier > .member, .about > *, .cta-band .container > * {
       animation: reveal linear both;
       animation-timeline: view();
       animation-range: entry 0% entry 40%;

@@ -1,0 +1,41 @@
+/* Adornos decorativos compartidos por las páginas «Equipo» y «Buzón» (estrellas, cruces, líneas de marcador, retazos de puntos, rótulos a mano
+   y retazos de papel). Cada página los coloca con las variables --t (arriba, %), --o (distancia al borde), --s (tamaño), --r (giro) y --d (retraso)
+   y decide cuándo mostrarlos con consultas de contenedor, para que nunca se encimen con el contenido. Todo es decorativo (aria-hidden). */
+.d { position: absolute; top: var(--t); width: var(--s, 20px); height: var(--s, 20px); margin-top: calc(var(--s, 20px) / -2); rotate: var(--r, 0deg); }
+.d.l { left: var(--o); }
+.d.r { right: var(--o); }
+.d.wide { display: none; }
+.d-star { fill: var(--red); }
+.d-star.black { fill: var(--black); opacity: .75; }
+/* Cruz (+) */
+.d-plus::before, .d-plus::after { content: ''; position: absolute; background: var(--black); opacity: .6; border-radius: 2px; }
+.d-plus::before { left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; }
+.d-plus::after { top: 0; bottom: 0; left: 50%; width: 4px; margin-left: -2px; }
+/* Línea ondulada de marcador */
+.d-squig { height: calc(var(--s, 60px) * .17); margin-top: calc(var(--s, 60px) * -.085); fill: none; stroke: var(--red); stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.d-squig.black { stroke: var(--black); opacity: .7; }
+/* Retazo pequeño de puntos */
+.d-dots { height: calc(var(--s, 52px) * .8); margin-top: calc(var(--s, 52px) * -.4); opacity: .26; background: radial-gradient(var(--black) 1.8px, transparent 2.3px) 0 0 / 11px 11px; clip-path: polygon(0 8%, 20% 0, 50% 6%, 78% 0, 100% 10%, 96% 55%, 100% 92%, 70% 100%, 40% 94%, 12% 100%, 0 88%, 4% 50%); }
+
+/* Rótulo a mano con subrayado de marcador (solo con muchísimo espacio) */
+.d-tag { width: 210px; height: auto; margin-top: -2.2rem; font-family: var(--font-hand); font-size: 1.7rem; line-height: 1.15; text-align: center; color: var(--red-dark); }
+.d-tag::after { content: ''; display: block; height: 5px; width: 72%; margin: .4rem auto 0; background: var(--red); clip-path: polygon(0 45%, 22% 0, 52% 65%, 80% 10%, 100% 50%, 100% 100%, 0 100%); }
+/* Retazo de papel grande con puntos y cinta roja (solo con muchísimo espacio) */
+.d-patch { width: 210px; height: 150px; margin-top: -75px; }
+.d-patch::before { content: ''; position: absolute; inset: 0; opacity: .24; background: radial-gradient(var(--black) 2px, transparent 2.6px) 0 0 / 13px 13px; clip-path: polygon(0 6%, 12% 0, 30% 5%, 52% 0, 75% 6%, 100% 0, 97% 40%, 100% 70%, 96% 100%, 70% 94%, 45% 100%, 20% 95%, 0 100%, 3% 55%); }
+.d-patch::after { content: ''; position: absolute; left: -20px; bottom: 16px; width: 130px; height: 26px; rotate: -9deg; background: var(--red); clip-path: polygon(0 10%, 6% 0, 94% 8%, 100% 0, 97% 55%, 100% 100%, 6% 92%, 0 100%, 3% 50%); }
+.d-patch.l::after { left: auto; right: -20px; rotate: 9deg; }
+
+/* ---------- Movimiento (con «reducir movimiento» los adornos quedan quietos) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .d-star { animation: twinkle 3.6s ease-in-out var(--d, 0s) infinite; }
+  .d-plus { animation: spin-slow 16s linear var(--d, 0s) infinite; }
+  .d-squig path { stroke-dasharray: 1; animation: scribble 6s ease-in-out var(--d, 0s) infinite; }
+  .d-dots, .d-patch, .d-tag { animation: sway 9s ease-in-out var(--d, 0s) infinite; }
+  .d-patch.l, .d-tag.r { animation-delay: -4s; }
+}
+@keyframes twinkle { 0%, 100% { scale: 1; opacity: 1; } 50% { scale: .55; opacity: .55; } }
+@keyframes spin-slow { to { rotate: 360deg; } }
+/* La línea se dibuja, se queda un momento y se borra */
+@keyframes scribble { 0% { stroke-dashoffset: 1; } 40%, 70% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -1; } }
+@keyframes sway { 50% { translate: 0 -8px; } }

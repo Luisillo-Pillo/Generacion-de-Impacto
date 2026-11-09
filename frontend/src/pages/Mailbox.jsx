@@ -7,17 +7,20 @@ import Spinner from '../components/Spinner.jsx';
 import { URGENCY, DEFAULT_URGENCY } from '../urgency.js';
 import TrackingCode from '../components/TrackingCode.jsx';
 import { CheckStamp, EnvelopeSticker, IconClip, IconLock, IconSend } from '../components/MailboxIcons.jsx';
+import MailboxDecor from '../components/MailboxDecor.jsx';
 import './Mailbox.css';
 import { usePageMeta } from '../pageMeta.js';
 
+// La pregunta va primero y es la opción elegida hasta que la persona escoja otra
 const TYPES = [
+  ['pregunta', 'Pregunta'],
   ['queja', 'Queja'],
   ['propuesta', 'Propuesta'],
-  ['pregunta', 'Pregunta'],
   ['problema', 'Problema'],
 ];
 
-const empty = { type: 'propuesta', urgency: DEFAULT_URGENCY, anonymous: true, name: '', degree: '', semester: '', group: '', phone: '', consent: false, subject: '', body: '' };
+// «Con mis datos» va primero y es la opción elegida hasta que la persona escoja enviarlo de forma anónima
+const empty = { type: 'pregunta', urgency: DEFAULT_URGENCY, anonymous: false, name: '', degree: '', semester: '', group: '', phone: '', consent: false, subject: '', body: '' };
 
 const MAX_IMAGES = 3;
 const MAX_MB = 5;
@@ -146,7 +149,8 @@ export default function Mailbox() {
   const options = (list) => list?.map((v) => <option key={v} value={v}>{v}</option>);
 
   return (
-    <section className="section paper page-min">
+    <section className="section paper page-min mailbox-page">
+      <MailboxDecor />
       <div className="container narrow">
         <div className="mailbox-head">
           <h1 className="title">Buzón <mark>digital</mark></h1>
@@ -183,13 +187,13 @@ export default function Mailbox() {
           <fieldset>
             <legend>¿Cómo quieres enviarlo?</legend>
             <div className="chips">
-              <label className={`chip ${form.anonymous ? 'on' : ''}`}>
-                <input type="radio" name="anon" checked={form.anonymous} onChange={() => setForm({ ...form, anonymous: true })} />
-                De forma anónima
-              </label>
               <label className={`chip ${!form.anonymous ? 'on' : ''}`}>
                 <input type="radio" name="anon" checked={!form.anonymous} onChange={() => setForm({ ...form, anonymous: false })} />
                 Con mis datos
+              </label>
+              <label className={`chip ${form.anonymous ? 'on' : ''}`}>
+                <input type="radio" name="anon" checked={form.anonymous} onChange={() => setForm({ ...form, anonymous: true })} />
+                De forma anónima
               </label>
             </div>
             {form.anonymous && <p className="hint hint-icon"><IconLock /> No guardamos ningún dato personal con tu mensaje.</p>}
@@ -208,16 +212,18 @@ export default function Mailbox() {
                   Todavía no hay licenciaturas configuradas. Avisa a un moderador (Panel → Ajustes) o envía tu mensaje de forma anónima.
                 </p>
               )}
-              <label className="full">Nombre completo
-                <input required value={form.name} onChange={set('name')} maxLength={120} autoComplete="name" spellCheck={false} />
-              </label>
-              <label className="full">Teléfono
-                <input
-                  required type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="000 000 0000"
-                  value={form.phone} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
-                  pattern="\d{3} \d{3} \d{4}" maxLength={12} title="10 dígitos, en formato 000 000 0000"
-                />
-              </label>
+              <div className="full name-phone">
+                <label>Nombre completo
+                  <input required value={form.name} onChange={set('name')} maxLength={120} autoComplete="name" spellCheck={false} />
+                </label>
+                <label>Teléfono
+                  <input
+                    required type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="000 000 0000"
+                    value={form.phone} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+                    pattern="\d{3} \d{3} \d{4}" maxLength={12} title="10 dígitos, en formato 000 000 0000"
+                  />
+                </label>
+              </div>
               <label className="full">Licenciatura
                 <select required value={form.degree} onChange={setDegree}>
                   <option value="">{settingsLoading ? 'Cargando…' : 'Selecciona…'}</option>

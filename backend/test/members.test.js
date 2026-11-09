@@ -86,3 +86,45 @@ test('nadie puede eliminar su propia ficha: siempre queda un administrador', asy
   assert.equal(res.status, 400);
   assert.equal((await t.call('GET', '/auth/me', { token })).status, 200);
 });
+
+test('semestre y grupo del integrante: el grupo solo se guarda en las licenciaturas con varios grupos', async () => {
+  await t.call('PUT', '/settings/degrees', { token, body: { value: ['Licenciatura en Primaria', 'Licenciatura en Telesecundaria'] } });
+  await t.call('PUT', '/settings/groupDegrees', { token, body: { value: ['Licenciatura en Telesecundaria'] } });
+
+  // Alta: con grupo en una licenciatura que sí lo usa
+  const conGrupo = await t.call('POST', '/members', { token, body: integrante({ name: 'Con Grupo', email: 'grupo@test.com', degree: 'Licenciatura en Telesecundaria', semester: '3', group: 'B' }) });
+  assert.equal(conGrupo.status, 201, conGrupo.text);
+  assert.deepEqual([conGrupo.json.degree, conGrupo.json.semester, conGrupo.json.group], ['Licenciatura en Telesecundaria', '3', 'B']);
+
+  // Alta: el grupo se descarta si la licenciatura no lo usa; el semestre se conserva
+  const sinGrupo = await t.call('POST', '/members', { token, body: integrante({ name: 'Sin Grupo', email: 'singrupo@test.com', degree: 'Licenciatura en Primaria', semester: '5', group: 'A' }) });
+  assert.equal(sinGrupo.status, 201, sinGrupo.text);
+  assert.deepEqual([sinGrupo.json.semester, sinGrupo.json.group], ['5', '']);
+
+  // Ambos son opcionales: sin ellos quedan vacíos
+  const vacio = await t.call('POST', '/members', { token, body: integrante({ name: 'Sin Datos', email: 'sindatos@test.com' }) });
+  assert.deepEqual([vacio.json.semester, vacio.json.group], ['', '']);
+
+  // Edición por el Moderador: al cambiar a una licenciatura sin grupos, el grupo se borra
+  const editado = await t.call('PUT', `/members/${conGrupo.json._id}`, { token, body: { name: 'Con Grupo', degree: 'Licenciatura en Primaria', semester: '4', group: 'B' } });
+  assert.equal(editado.status, 200, editado.text);
+  assert.deepEqual([editado.json.semester, editado.json.group], ['4', '']);
+
+  // Se pueden pedir de vuelta en la lista pública y en la del panel
+  assert.equal((await t.call('GET', '/members')).json.find((m) => m.name === 'Sin Grupo').semester, '5');
+  assert.equal((await t.call('GET', '/members/all', { token })).json.find((m) => m.name === 'Sin Grupo').semester, '5');
+
+  // Valores demasiado largos se rechazan
+  assert.equal((await t.call('POST', '/members', { token, body: integrante({ name: 'Largo', email: 'largo@test.com', semester: 'x'.repeat(21) }) })).status, 400);
+});
+
+test('cada integrante edita su propio semestre y grupo en /members/me, con la misma regla del grupo', async () => {
+  const miToken = await t.login('grupo@test.com', 'clave-de-integrante-1');
+  const ok = await t.call('PUT', '/members/me', { token: miToken, body: { name: 'Con Grupo', degree: 'Licenciatura en Telesecundaria', semester: '6', group: 'C' } });
+  assert.equal(ok.status, 200, ok.text);
+  assert.deepEqual([ok.json.member.semester, ok.json.member.group], ['6', 'C']);
+
+  const sinAplicar = await t.call('PUT', '/members/me', { token: miToken, body: { name: 'Con Grupo', degree: 'Licenciatura en Primaria', semester: '6', group: 'C' } });
+  assert.deepEqual([sinAplicar.json.member.semester, sinAplicar.json.member.group], ['6', '']);
+  assert.equal((await t.call('PUT', '/members/me', { token: miToken, body: { name: 'Con Grupo', group: 'x'.repeat(21) } })).status, 400);
+});

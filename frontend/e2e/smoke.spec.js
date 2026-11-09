@@ -14,6 +14,7 @@ test('el inicio muestra las noticias y las propuestas', async ({ page }) => {
 test('se puede enviar un mensaje anónimo y no viaja ningún dato personal', async ({ page }) => {
   const state = await mockApi(page);
   await page.goto('/buzon');
+  await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
   await page.getByLabel('Asunto').fill('Baños en mal estado');
   await page.locator('textarea').fill('Los baños del edificio B necesitan mantenimiento.');
   await page.getByRole('button', { name: /Enviar mensaje/ }).click();
@@ -30,6 +31,60 @@ test('se puede enviar un mensaje anónimo y no viaja ningún dato personal', asy
   // Protecciones contra bots: el campo trampa viaja vacío y se informa cuánto tardó en llenarse
   expect(enviado).toMatch(/name="website"\r\n\r\n\r\n/);
   expect(enviado).toMatch(/name="fillMs"\r\n\r\n\d+\r\n/);
+});
+
+test('buzón: «Pregunta» va primero y viene elegida hasta que se escoja otro tipo', async ({ page }) => {
+  const state = await mockApi(page);
+  await page.goto('/buzon');
+  await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
+  const tipos = page.getByRole('radiogroup').or(page.locator('fieldset', { hasText: '¿Qué quieres enviarnos?' })).locator('.chip');
+  await expect(tipos).toHaveText(['Pregunta', 'Queja', 'Propuesta', 'Problema']);
+  await expect(page.getByRole('radio', { name: 'Pregunta' })).toBeChecked();
+
+  // Sin tocar el tipo, el mensaje viaja como pregunta
+  await page.getByLabel('Asunto').fill('¿Cuándo abre la biblioteca?');
+  await page.locator('textarea').fill('Quisiera saber el horario de la biblioteca.');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.getByRole('heading', { name: /Gracias por/ })).toBeVisible();
+  expect(state.sent.message).toMatch(/name="type"\r\n\r\npregunta\r\n/);
+
+  // Si se escoge otro, se respeta
+  await page.goto('/buzon');
+  await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
+  await page.getByText('Queja', { exact: true }).click();
+  await expect(page.getByRole('radio', { name: 'Queja' })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Pregunta' })).not.toBeChecked();
+  await page.getByLabel('Asunto').fill('Baños sin agua');
+  await page.locator('textarea').fill('Los baños del edificio B no tienen agua.');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.getByRole('heading', { name: /Gracias por/ })).toBeVisible();
+  expect(state.sent.message).toMatch(/name="type"\r\n\r\nqueja\r\n/);
+});
+
+test('buzón: «Con mis datos» va primero y viene elegido; si se cambia a anónimo, no viaja nada de lo que se había escrito', async ({ page }) => {
+  const state = await mockApi(page);
+  await page.goto('/buzon');
+  const forma = page.locator('fieldset', { hasText: '¿Cómo quieres enviarlo?' }).locator('.chip');
+  await expect(forma).toHaveText(['Con mis datos', 'De forma anónima']);
+  await expect(page.getByRole('radio', { name: 'Con mis datos' })).toBeChecked();
+  await expect(page.getByLabel('Nombre completo')).toBeVisible(); // con datos: se piden los campos personales
+  await expect(page.getByText('No guardamos ningún dato personal')).toHaveCount(0);
+
+  // Se escriben datos y luego se decide enviarlo de forma anónima: los datos no se envían
+  await page.getByLabel('Nombre completo').fill('Luis Pérez');
+  await page.getByLabel('Teléfono').fill('5512345678');
+  await page.getByText('De forma anónima').click();
+  await expect(page.getByLabel('Nombre completo')).toHaveCount(0);
+  await expect(page.getByText('No guardamos ningún dato personal')).toBeVisible();
+  await page.getByLabel('Asunto').fill('Una duda');
+  await page.locator('textarea').fill('¿Dónde entrego el formato?');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.getByRole('heading', { name: /Gracias por/ })).toBeVisible();
+  const enviado = state.sent.message;
+  expect(enviado).toMatch(/name="anonymous"\r\n\r\ntrue/);
+  for (const campo of ['name', 'phone', 'degree', 'semester', 'consent']) expect(enviado).not.toContain(`name="${campo}"`);
+  expect(enviado).not.toContain('Luis');
+  expect(enviado).not.toContain('5512345678');
 });
 
 test('el campo trampa del buzón no se ve ni se puede enfocar con el teclado', async ({ page }) => {
@@ -318,6 +373,7 @@ test('si falla el dibujo de una página se muestra un aviso con la opción de re
 test('el buzón permite elegir la urgencia del mensaje en un menú desplegable', async ({ page }) => {
   const state = await mockApi(page);
   await page.goto('/buzon');
+  await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
   const urgencia = page.getByLabel('Urgencia');
   await expect(urgencia).toHaveValue('media');
   await expect(urgencia.locator('option')).toHaveText(['Baja', 'Media', 'Alta', 'Urgente']);
@@ -611,6 +667,13 @@ test('cada página empieza arriba: al cambiar de ruta, al recargar y al volver a
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
   expect(await scrollY()).toBe(0);
+
+  // Pulsar el enlace de la página en la que ya estás también sube (la ruta no cambia)
+  await page.evaluate(() => window.scrollTo({ top: 99999, behavior: 'instant' }));
+  expect(await scrollY()).toBeGreaterThan(300);
+  await page.getByRole('link', { name: 'Generación de Impacto' }).first().click(); // el logo del encabezado lleva a «/»
+  await expect(page).toHaveURL(/\/$/);
+  await expect.poll(scrollY).toBe(0);
 });
 
 test('todo el sitio está en español de México: idioma de la página y corrector ortográfico en los campos de texto', async ({ page }) => {
@@ -666,6 +729,7 @@ test('buzón: si no hay licenciaturas configuradas se explica qué hacer', async
 
 async function enviarMensaje(page, asunto = 'Fuga de agua en el edificio B') {
   await page.goto('/buzon');
+  await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
   await page.getByLabel('Asunto').fill(asunto);
   await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
   await page.getByRole('button', { name: /Enviar mensaje/ }).click();
@@ -770,6 +834,7 @@ test('sin nada guardado no aparece «Mis mensajes»; y si el almacenamiento est�
   });
   await mockApi(page);
   await page.goto('/buzon');
+  await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
   await page.getByLabel('Asunto').fill('Con el almacenamiento bloqueado');
   await page.locator('textarea').fill('Aun así el mensaje se envía y se muestra el código.');
   await page.getByRole('button', { name: /Enviar mensaje/ }).click();
@@ -781,6 +846,7 @@ test('la pantalla de gracias no lleva pie de página y todo el contenido cabe si
   for (const [ancho, alto] of [[1920, 950], [1440, 800], [1366, 650], [1280, 600]]) {
     await page.setViewportSize({ width: ancho, height: alto });
     await page.goto('/buzon');
+    await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
     await page.getByLabel('Asunto').fill('Fuga de agua en el edificio B');
     await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
     await page.getByRole('button', { name: /Enviar mensaje/ }).scrollIntoViewIfNeeded();
@@ -801,6 +867,7 @@ test('la pantalla de gracias no lleva pie de página y todo el contenido cabe si
 test('el pie de página vuelve al salir de la pantalla de gracias', async ({ page }) => {
   await mockApi(page);
   await page.goto('/buzon');
+  await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
   await page.getByLabel('Asunto').fill('Fuga de agua en el edificio B');
   await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
   await page.getByRole('button', { name: /Enviar mensaje/ }).click();
@@ -809,6 +876,7 @@ test('el pie de página vuelve al salir de la pantalla de gracias', async ({ pag
   await expect(page.getByLabel('Asunto')).toBeVisible();
   await expect(page.locator('footer.footer')).toBeVisible();
 
+  await page.getByText('De forma anónima').click(); // el formulario vuelve a empezar en «Con mis datos»
   await page.getByLabel('Asunto').fill('Otro mensaje distinto del anterior');
   await page.locator('textarea').fill('Texto del segundo mensaje, suficientemente largo.');
   await page.getByRole('button', { name: /Enviar mensaje/ }).click();
@@ -822,6 +890,7 @@ test('en teléfono la pantalla de gracias sigue de corrido, sin desbordar de lad
   await mockApi(page);
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto('/buzon');
+  await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
   await page.getByLabel('Asunto').fill('Fuga de agua en el edificio B');
   await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
   await page.getByRole('button', { name: /Enviar mensaje/ }).click();
@@ -899,4 +968,277 @@ test('las animaciones decorativas se apagan si el sistema pide reducir el movimi
   await expect(page.locator('.hero-confetti')).toHaveAttribute('aria-hidden', 'true');
   expect(await page.locator('.hero-confetti').evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
   await expect(page.getByRole('link', { name: 'Escríbenos en el buzón' })).toBeVisible();
+});
+
+test('Equipo: se organiza por niveles (presidencia, vicepresidencia y tesorería, y el resto) según el cargo', async ({ page }) => {
+  await mockApi(page);
+  const equipo = [
+    { _id: 'a', name: 'Vocal Uno', role: 'Vocal de eventos' },
+    { _id: 'b', name: 'Tesorera Dos', role: 'Tesorería' },
+    { _id: 'c', name: 'Sin Cargo', role: '' },
+    { _id: 'd', name: 'Vice Tres', role: 'Vicepresidente' },
+    { _id: 'e', name: 'Presi Cuatro', role: 'Presidencia' },
+    { _id: 'f', name: 'Secretario Cinco', role: 'Secretaría' },
+  ];
+  await page.route('**/api/members', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(equipo) }));
+  await page.goto('/equipo');
+
+  const nivel = (n) => page.locator(`.tier-${n} .member h3`);
+  await expect(nivel(1)).toHaveText(['Presi Cuatro']);
+  await expect(nivel(2)).toHaveText(['Vice Tres', 'Tesorera Dos']); // la vicepresidencia va antes que la tesorería
+  await expect(nivel(3)).toHaveText(['Vocal Uno', 'Sin Cargo', 'Secretario Cinco']); // conservan el orden del panel
+  await expect(page.locator('.tier')).toHaveCount(3);
+  // De arriba hacia abajo: cada nivel está más abajo que el anterior
+  const y = async (n) => (await page.locator(`.tier-${n}`).boundingBox()).y;
+  expect(await y(1)).toBeLessThan(await y(2));
+  expect(await y(2)).toBeLessThan(await y(3));
+  // El nivel 1 tiene la tarjeta más grande
+  const ancho = async (n) => (await page.locator(`.tier-${n} .member`).first().boundingBox()).width;
+  expect(await ancho(1)).toBeGreaterThan(await ancho(2));
+  expect(await ancho(2)).toBeGreaterThan(await ancho(3));
+});
+
+test('Equipo: sin presidencia o sin segundo nivel no quedan huecos ni niveles vacíos', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/members', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ _id: 'a', name: 'Solo Vocal', role: 'Vocal' }]) }));
+  await page.goto('/equipo');
+  await expect(page.locator('.tier')).toHaveCount(1);
+  await expect(page.locator('.tier-3 .member h3')).toHaveText(['Solo Vocal']);
+});
+
+test('Equipo: las tarjetas son horizontales (foto a la izquierda, datos a la derecha) y de poca altura, también en teléfono', async ({ page }) => {
+  await mockApi(page);
+  for (const [ancho, alto] of [[1280, 720], [390, 800]]) {
+    await page.setViewportSize({ width: ancho, height: alto });
+    await page.goto('/equipo');
+    await expect(page.locator('.member').first()).toBeVisible();
+    for (const card of await page.locator('.member').all()) {
+      const c = await card.boundingBox();
+      const foto = await card.locator('.avatar, img').boundingBox();
+      const datos = await card.locator('.member-info').boundingBox();
+      expect(foto.x + foto.width, `a ${ancho}px la foto va a la izquierda de los datos`).toBeLessThanOrEqual(datos.x);
+      expect(Math.abs(foto.y + foto.height / 2 - (datos.y + datos.height / 2)), 'foto y datos alineados al centro').toBeLessThan(24);
+      expect(c.height, 'tarjeta compacta, no un recuadro grande').toBeLessThan(180);
+      expect(c.width).toBeGreaterThan(c.height); // más ancha que alta
+    }
+  }
+});
+
+test('el semestre y el grupo de un integrante se eligen en menús con las opciones de Ajustes; el grupo solo si la licenciatura lo usa', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await page.route('**/api/settings', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ degrees: ['Licenciatura en Primaria', 'Licenciatura en Telesecundaria'], groups: ['A', 'B'], semesters: ['1', '2', '3'], groupDegrees: ['Licenciatura en Telesecundaria'], social: {} }),
+  }));
+  await withSession(page);
+  await page.goto('/perfil');
+
+  const licenciatura = page.getByRole('combobox', { name: /^Licenciatura/ });
+  const semestre = page.getByRole('combobox', { name: 'Semestre' });
+  const grupo = page.getByRole('combobox', { name: /^Grupo/ });
+  await expect(semestre.locator('option')).toHaveText(['Sin especificar', '1', '2', '3']);
+  // Licenciatura sin grupos: el menú de grupo no aplica
+  await licenciatura.selectOption('Licenciatura en Primaria');
+  await expect(grupo).toBeDisabled();
+  await expect(grupo.locator('option:checked')).toHaveText('No aplica');
+  // Licenciatura con grupos: se habilita con las opciones de Ajustes
+  await licenciatura.selectOption('Licenciatura en Telesecundaria');
+  await expect(grupo).toBeEnabled();
+  await expect(grupo.locator('option')).toHaveText(['Sin especificar', 'A', 'B']);
+  await semestre.selectOption('2');
+  await grupo.selectOption('B');
+  await page.getByRole('button', { name: 'Guardar mi información' }).click();
+  await expect(page.getByText('Información actualizada ✔')).toBeVisible();
+  expect(state.sent.me).toMatchObject({ degree: 'Licenciatura en Telesecundaria', semester: '2', group: 'B' });
+
+  // Al cambiar a una licenciatura sin grupos, el grupo elegido se borra
+  await page.goto('/perfil');
+  await licenciatura.selectOption('Licenciatura en Telesecundaria');
+  await grupo.selectOption('A');
+  await licenciatura.selectOption('Licenciatura en Primaria');
+  await page.getByRole('button', { name: 'Guardar mi información' }).click();
+  await expect.poll(() => state.sent.me).toMatchObject({ degree: 'Licenciatura en Primaria', group: '' });
+
+  // El Moderador ve los mismos menús al editar a un integrante
+  await page.goto('/admin/equipo');
+  await page.getByRole('button', { name: 'Editar' }).first().click();
+  await expect(page.getByRole('combobox', { name: 'Semestre' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: /^Grupo/ })).toBeVisible();
+});
+
+test('Equipo: la tarjeta muestra el semestre y el grupo cuando los hay', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/members', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify([
+      { _id: 'a', name: 'Con Datos', role: 'Vocal', degree: 'Licenciatura en Telesecundaria', semester: '3', group: 'B' },
+      { _id: 'b', name: 'Solo Semestre', role: 'Vocal', degree: 'Licenciatura en Primaria', semester: '5' },
+      { _id: 'c', name: 'Sin Nada', role: 'Vocal' },
+    ]),
+  }));
+  await page.goto('/equipo');
+  const tarjeta = (nombre) => page.locator('.member', { hasText: nombre });
+  await expect(tarjeta('Con Datos')).toContainText('Semestre 3 · Grupo B');
+  await expect(tarjeta('Solo Semestre')).toContainText('Semestre 5');
+  await expect(tarjeta('Solo Semestre')).not.toContainText('Grupo');
+  await expect(tarjeta('Sin Nada')).not.toContainText('Semestre');
+});
+
+test('Equipo: la decoración es solo visual, se adapta al ancho y nunca se encima con una tarjeta', async ({ page }) => {
+  await mockApi(page);
+  const equipo = [
+    { _id: 'e', name: 'Presi Cuatro', role: 'Presidencia' },
+    { _id: 'd', name: 'Vice Tres', role: 'Vicepresidente' },
+    { _id: 'b', name: 'Tesorera Dos', role: 'Tesorería' },
+    { _id: 'a', name: 'Vocal Uno', role: 'Vocal' },
+    { _id: 'f', name: 'Secretario Cinco', role: 'Secretaría' },
+    { _id: 'g', name: 'Vocal Seis', role: 'Vocal' },
+    { _id: 'h', name: 'Vocal Siete', role: 'Vocal' },
+  ];
+  await page.route('**/api/members', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(equipo) }));
+
+  const encima = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+  for (const ancho of [1440, 1180, 1100, 1000, 940]) {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await page.goto('/equipo');
+    await expect(page.locator('.tier-1 .tier-decor')).toBeVisible();
+    // Todo lo decorativo va oculto para lectores de pantalla y sin recibir clics
+    for (const el of await page.locator('.tier-decor, .org-ambient, .team-slogan').all()) await expect(el).toHaveAttribute('aria-hidden', 'true');
+    expect(await page.locator('.tier-decor').first().evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
+    // Ningún adorno visible tapa una tarjeta de su nivel
+    for (const nivel of [1, 2, 3]) {
+      const tarjetas = await Promise.all((await page.locator(`.tier-${nivel} .member`).all()).map((c) => c.boundingBox()));
+      for (const adorno of await page.locator(`.tier-${nivel} .tier-decor .d`).all()) {
+        if (!(await adorno.isVisible())) continue;
+        const caja = await adorno.boundingBox();
+        for (const tarjeta of tarjetas) expect(encima(caja, tarjeta), `a ${ancho}px un adorno del nivel ${nivel} tapa una tarjeta`).toBe(false);
+      }
+    }
+  }
+  // Rótulos y retazos grandes solo con muchísimo espacio
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/equipo');
+  await expect(page.locator('.d-tag')).toHaveText(['Presidencia', 'Vicepresidencia y tesorería']);
+  await expect(page.locator('.d-tag').first()).toBeVisible();
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await expect(page.locator('.d-tag').first()).toBeHidden();
+  await expect(page.locator('.d-patch').first()).toBeHidden();
+  // En pantallas angostas y en teléfono no hay decoración
+  for (const ancho of [800, 390]) {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await expect(page.locator('.tier-decor').first()).toBeHidden();
+    await expect(page.locator('.org-ambient')).toBeHidden();
+  }
+});
+
+test('Equipo: la decoración se mueve solo si el sistema lo permite', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/equipo'); // las pruebas piden «reducir movimiento»
+  const animacion = (selector) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).animationName);
+  expect(await animacion('.d-star')).toBe('none');
+  await expect(page.locator('.org-ambient .bit').first()).toBeHidden(); // los papelitos no se ven
+  await expect(page.locator('.d-star').first()).toBeVisible(); // los adornos quedan quietos
+
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  expect(await animacion('.d-star')).toBe('twinkle');
+  expect(await animacion('.d-plus')).toBe('spin-slow');
+  expect(await animacion('.d-squig path')).toBe('scribble');
+  expect(await animacion('.org-ambient .bit')).toBe('org-drift');
+  await expect(page.locator('.org-ambient .bit').first()).toBeVisible();
+});
+
+test('buzón: nombre y teléfono van en una sola fila, 60 % y 40 %, y en teléfono se apilan', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/buzon');
+  const cajas = async () => [await page.getByLabel('Nombre completo').boundingBox(), await page.getByLabel('Teléfono').boundingBox()];
+
+  let [nombre, telefono] = await cajas();
+  expect(Math.abs(nombre.y - telefono.y), 'misma fila').toBeLessThan(2);
+  expect(nombre.x + nombre.width, 'el nombre va a la izquierda del teléfono').toBeLessThan(telefono.x);
+  const total = nombre.width + telefono.width;
+  expect(nombre.width / total).toBeGreaterThan(0.57);
+  expect(nombre.width / total).toBeLessThan(0.63);
+  expect(telefono.width / total).toBeGreaterThan(0.37);
+  expect(telefono.width / total).toBeLessThan(0.43);
+  // Ocupan el mismo ancho que el campo de Licenciatura de abajo
+  const licenciatura = await page.getByLabel('Licenciatura').boundingBox();
+  expect(Math.abs(nombre.x - licenciatura.x)).toBeLessThan(2);
+  expect(Math.abs(telefono.x + telefono.width - (licenciatura.x + licenciatura.width))).toBeLessThan(2);
+
+  // En una pantalla de teléfono se apilan: el teléfono queda debajo del nombre
+  await page.setViewportSize({ width: 390, height: 800 });
+  [nombre, telefono] = await cajas();
+  expect(telefono.y).toBeGreaterThan(nombre.y + nombre.height - 1);
+  expect(Math.abs(nombre.x - telefono.x)).toBeLessThan(2);
+});
+
+test('buzón: la decoración de los costados es solo visual, se adapta al ancho y nunca toca el formulario', async ({ page }) => {
+  await mockApi(page);
+  const encima = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+
+  for (const ancho of [1000, 1100, 1200, 1440, 1920]) {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await page.goto('/buzon');
+    const formulario = await page.locator('.mailbox-page > .container').boundingBox();
+    const adornos = page.locator('.mailbox-decor .d');
+    await expect(adornos.first()).toBeVisible();
+    for (const adorno of await adornos.all()) {
+      if (!(await adorno.isVisible())) continue;
+      const caja = await adorno.boundingBox();
+      expect(encima(caja, formulario), `a ${ancho}px un adorno toca el formulario`).toBe(false);
+      expect(caja.x, 'dentro de la pantalla').toBeGreaterThanOrEqual(-1);
+      expect(caja.x + caja.width, 'dentro de la pantalla').toBeLessThanOrEqual(ancho + 1);
+    }
+    // Todo lo decorativo va oculto para lectores de pantalla y sin recibir clics
+    await expect(page.locator('.mailbox-decor')).toHaveAttribute('aria-hidden', 'true');
+    expect(await page.locator('.mailbox-decor').evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
+    // Las piezas grandes (aviones, burbujas, sobres, rótulos) solo con ≥ 1200 px
+    const grandes = await page.locator('.mailbox-decor .d.wide').first().isVisible();
+    expect(grandes, `piezas grandes a ${ancho}px`).toBe(ancho >= 1200);
+  }
+
+  // Con las piezas grandes: avión, burbujas, sobre y rótulos del tema del buzón
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/buzon');
+  await expect(page.locator('.mailbox-decor .d-plane').first()).toBeVisible();
+  await expect(page.locator('.mailbox-decor .d-bubble')).toHaveCount(2);
+  await expect(page.locator('.mailbox-decor .d-env')).toBeVisible();
+  await expect(page.locator('.mailbox-decor .d-tag')).toHaveText(['Tu opinión cuenta', '¡Escríbenos!']);
+
+  // En pantallas angostas y en teléfono no hay decoración
+  for (const ancho of [980, 390]) {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await expect(page.locator('.mailbox-decor').first()).toBeHidden();
+  }
+
+  // La pantalla de agradecimiento (sin pie y de una sola columna) no lleva decoración
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/buzon');
+  await page.getByText('De forma anónima').click();
+  await page.getByLabel('Asunto').fill('Una duda');
+  await page.locator('textarea').fill('¿Dónde entrego el formato?');
+  await page.getByRole('button', { name: /Enviar mensaje/ }).click();
+  await expect(page.getByRole('heading', { name: /Gracias por/ })).toBeVisible();
+  await expect(page.locator('.mailbox-decor')).toHaveCount(0);
+});
+
+test('buzón: la decoración se mueve solo si el sistema lo permite', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/buzon'); // las pruebas piden «reducir movimiento»
+  const animacion = (selector) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).animationName);
+  expect(await animacion('.mailbox-decor .d-plane')).toBe('none');
+  expect(await animacion('.mailbox-decor .d-star')).toBe('none');
+  await expect(page.locator('.mailbox-ambient .bit').first()).toBeHidden(); // los papelitos no se ven
+  await expect(page.locator('.mailbox-decor .d-plane').first()).toBeVisible(); // las piezas quedan quietas
+
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  expect(await animacion('.mailbox-decor .d-plane')).toBe('fly');
+  expect(await animacion('.mailbox-decor .d-bubble')).toBe('bob');
+  expect(await animacion('.mailbox-decor .d-env')).toBe('bob');
+  expect(await animacion('.mailbox-decor .d-star')).toBe('twinkle');
+  expect(await animacion('.mailbox-ambient .bit')).toBe('mailbox-drift');
+  await expect(page.locator('.mailbox-ambient .bit').first()).toBeVisible();
 });

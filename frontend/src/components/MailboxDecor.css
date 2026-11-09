@@ -1,0 +1,48 @@
+/* Decoración de la página «Buzón». La página es un contenedor (`container: mailbox / inline-size`, ver Mailbox.css) y todo se
+   muestra según SU ancho, no el de la pantalla, para que nunca toque el formulario (columna de 760 px, centrada):
+     ≥ 1000 px: adornos pequeños pegados a los bordes y papelitos que suben (los costados miden ≥ 120 px).
+     ≥ 1200 px: además aviones de papel, burbujas, sobres y rótulos a mano (los costados miden ≥ 220 px).
+   Las formas pequeñas y su animación viven en DecorShapes.css. */
+.mailbox-decor, .mailbox-ambient { display: none; position: absolute; inset: 0; pointer-events: none; }
+.mailbox-ambient { overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); }
+@container mailbox (min-width: 1000px) {
+  .mailbox-decor, .mailbox-ambient { display: block; }
+}
+@container mailbox (min-width: 1200px) {
+  .mailbox-decor .d.wide { display: block; }
+}
+
+/* ---------- Piezas del tema del buzón ---------- */
+.d-plane, .d-bubble, .d-env { height: auto; margin-top: calc(var(--s, 90px) * -.3); overflow: visible; }
+.d-plane .trail { fill: none; stroke: var(--red); stroke-width: 3; stroke-linecap: round; stroke-dasharray: .06 .05; }
+.d-bubble path { fill: var(--red); stroke: var(--black); stroke-width: 3; stroke-linejoin: round; }
+.d-bubble.dark path { fill: var(--black); stroke: var(--black); }
+.d-bubble text { fill: #fff; font-family: var(--font-display); font-size: 30px; }
+/* Con 1200 px los costados miden 220 px: los rótulos a mano se hacen más angostos para no tocar el formulario */
+.mailbox-decor .d-tag { width: 170px; font-size: 1.4rem; }
+/* El segundo avión es más chico que el primero */
+.d-plane.small { margin-top: calc(var(--s, 70px) * -.3); }
+
+/* ---------- Papelitos que suben despacio ---------- */
+.mailbox-ambient .bit { position: absolute; left: var(--x); bottom: -30px; width: var(--s); height: calc(var(--s) * .62); background: var(--red); opacity: 0; clip-path: polygon(0 14%, 20% 0, 58% 12%, 100% 0, 91% 58%, 100% 100%, 42% 86%, 0 100%); }
+.mailbox-ambient .bit.paper { background: #cdbfa9; }
+
+/* ---------- Movimiento (con «reducir movimiento» las piezas quedan quietas y los papelitos no se ven) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .mailbox-ambient .bit { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .d-plane { animation: fly 8s ease-in-out var(--d, 0s) infinite; }
+  .d-bubble { animation: bob 5.5s ease-in-out var(--d, 0s) infinite; }
+  .d-env { animation: bob 7s ease-in-out var(--d, 0s) infinite reverse; }
+  .mailbox-ambient .bit { animation: mailbox-drift var(--t) linear var(--d) infinite; }
+}
+/* El avión se mece como si planeara */
+@keyframes fly { 50% { translate: 16px -12px; rotate: calc(var(--r, 0deg) + 5deg); } }
+@keyframes bob { 50% { translate: 0 -9px; } }
+@keyframes mailbox-drift {
+  0% { opacity: 0; translate: 0 0; rotate: 0deg; }
+  8% { opacity: .7; }
+  92% { opacity: .7; }
+  100% { opacity: 0; translate: var(--dx) -2600px; rotate: var(--r); }
+}

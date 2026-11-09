@@ -2,6 +2,9 @@
 export const initials = (name) =>
   name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 
+// Semestre y grupo de una persona del equipo: «Semestre 3 · Grupo A» (vacío si no hay ninguno)
+export const semesterGroupLine = (person) => [person?.semester && `Semestre ${person.semester}`, person?.group && `Grupo ${person.group}`].filter(Boolean).join(' · ');
+
 // "5512345678" o "551 234 5678" → "551 234 5678" (se queda con los primeros 10 dígitos)
 export const formatPhone = (value) => {
   const d = String(value ?? '').replace(/\D/g, '').slice(0, 10);

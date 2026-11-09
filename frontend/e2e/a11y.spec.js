@@ -74,6 +74,7 @@ for (const rol of ['miembro']) {
 test('accesibilidad: pantalla de gracias con el código y seguimiento con «Mis mensajes»', async ({ page }) => {
   await mockApi(page);
   await page.goto('/buzon');
+  await page.getByText('De forma anónima').click(); // la opción por defecto es «Con mis datos»
   await page.getByLabel('Asunto').fill('Fuga de agua en el edificio B');
   await page.locator('textarea').fill('Hay una fuga de agua en el pasillo desde la mañana.');
   await page.getByRole('button', { name: /Enviar mensaje/ }).click();

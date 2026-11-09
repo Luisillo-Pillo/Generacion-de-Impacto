@@ -1,0 +1,44 @@
+/* Decoración de la página «Equipo». Todo está oculto por defecto y aparece según el ancho del organigrama (consultas de
+   contenedor sobre `.org`): así nunca se encima con las tarjetas, sin importar el tamaño de la pantalla.
+     ≥ 900 px de organigrama: adornos pequeños pegados a los bordes, papelitos y arcos de fondo.
+     ≥ 1100 px: además los rótulos a mano y los retazos de papel grandes. */
+.tier-decor, .org-ambient { display: none; position: absolute; pointer-events: none; }
+.tier-decor { inset: 0; }
+.org-ambient { inset: -1.5rem -1rem; overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(transparent, #000 6%, #000 94%, transparent); }
+@container org (min-width: 900px) {
+  .tier-decor, .org-ambient { display: block; }
+  .tier-3 .tier-decor { display: none; } /* en el último nivel caben tres tarjetas por fila y los costados quedan muy angostos */
+}
+@container org (min-width: 1040px) {
+  .tier-3 .tier-decor { display: block; }
+}
+@container org (min-width: 1100px) {
+  .d.wide { display: block; }
+}
+/* El segundo nivel tiene menos espacio a los lados (dos tarjetas de 330 px): sus rótulos y retazos grandes son más chicos */
+.tier-2 .d-tag { width: 170px; font-size: 1.35rem; }
+.tier-2 .d-patch { width: 150px; height: 112px; margin-top: -56px; }
+.tier-2 .d-patch::after { width: 96px; height: 22px; }
+
+/* ---------- Fondo de todo el organigrama ---------- */
+.org-ring { position: absolute; width: 360px; height: 360px; border: 14px solid rgba(212, 20, 28, .09); border-radius: 50%; }
+.org-ring.l { left: -210px; top: 10%; border-right-color: transparent; }
+.org-ring.r { right: -210px; top: 52%; border-color: rgba(18, 18, 18, .06); border-left-color: transparent; }
+.org-ambient .bit { position: absolute; left: var(--x); bottom: -30px; width: var(--s); height: calc(var(--s) * .62); background: var(--red); opacity: 0; clip-path: polygon(0 14%, 20% 0, 58% 12%, 100% 0, 91% 58%, 100% 100%, 42% 86%, 0 100%); }
+.org-ambient .bit.paper { background: #cdbfa9; } /* papel más oscuro que el fondo, para que se note sobre el crema */
+
+/* ---------- Movimiento (apagado con «reducir movimiento»: los adornos quedan quietos y los papelitos no se ven) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .org-ambient .bit { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .org-ring.l { animation: spin-slow 90s linear infinite; }
+  .org-ring.r { animation: spin-slow 120s linear infinite reverse; }
+  .org-ambient .bit { animation: org-drift var(--t) linear var(--d) infinite; }
+}
+@keyframes org-drift {
+  0% { opacity: 0; translate: 0 0; rotate: 0deg; }
+  10% { opacity: .7; }
+  90% { opacity: .7; }
+  100% { opacity: 0; translate: var(--dx) -1500px; rotate: var(--r); }
+}

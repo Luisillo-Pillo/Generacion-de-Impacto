@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth.jsx';
 import { ROLE_LABEL, canEdit } from '../../roles.js';
-import DegreeSelect from '../../components/DegreeSelect.jsx';
+import AcademicFields from '../../components/AcademicFields.jsx';
 import PasswordInput from '../../components/PasswordInput.jsx';
 import MemberOrder from './MemberOrder.jsx';
 import { CrudPanel, ImageField, text } from './shared.jsx';
@@ -19,13 +19,13 @@ export default function AdminTeam() {
     <CrudPanel key={version}
       listPath="/members/all" endpoint="/members" newLabel="Nuevo integrante" newAtEnd
       deleteNote="También se eliminará su cuenta de acceso."
-      blank={(items) => ({ name: '', role: '', degree: '', photo: null, order: items?.length || 0, email: '', password: '', access: 'miembro' })}
+      blank={(items) => ({ name: '', role: '', degree: '', semester: '', group: '', photo: null, order: items?.length || 0, email: '', password: '', access: 'miembro' })}
       summary={(m) => <><strong>{m.name}</strong><br /><span className="muted">{m.role ? `${m.role} · ` : ''}{m.email}{m.access ? ` · ${ROLE_LABEL[m.access]}` : ''}</span></>}
       fields={(m, set) => (
         <>
           {text('Nombre', m.name, set('name'), { required: true, maxLength: 100, spellCheck: false })}
           {text('Cargo', m.role, set('role'), { maxLength: 100 })}
-          <DegreeSelect value={m.degree} onChange={set('degree')} />
+          <AcademicFields degree={m.degree} semester={m.semester} group={m.group} onChange={(key, value) => set(key)(value)} />
           {text('Correo de acceso', m.email, set('email'), { type: 'email', required: true, autoComplete: 'off' })}
           <label>{m._id ? 'Nueva contraseña (déjala vacía para no cambiarla)' : 'Contraseña (mínimo 10 caracteres)'}
             <PasswordInput required={!m._id} minLength={10} value={m.password ?? ''} onChange={(e) => set('password')(e.target.value)} autoComplete="new-password" />

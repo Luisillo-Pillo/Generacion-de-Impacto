@@ -25,19 +25,20 @@ const AdminProposals = lazy(() => import('./pages/admin/AdminProposals.jsx'));
 const AdminTeam = lazy(() => import('./pages/admin/AdminTeam.jsx'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings.jsx'));
 
-// Toda página empieza arriba, sin importar dónde se quedó el scroll en la anterior: al cambiar de ruta, al recargar y al
-// volver atrás. Por eso se apaga la restauración automática del navegador y el salto es inmediato (`instant`; el
+// Toda página empieza arriba, sin importar dónde se quedó el scroll en la anterior: al cambiar de ruta, al recargar, al
+// volver atrás y al pulsar un enlace a la página en la que ya estás (cada navegación trae su propia `key`; los enlaces con
+// ancla `#` se dejan al navegador). Por eso se apaga la restauración automática del navegador y el salto es inmediato (`instant`; el
 // `scroll-behavior: smooth` global lo animaría desde donde estaba y las páginas que cargan después lo cortarían a medias).
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 
 // Además, para quien usa teclado o lector de pantalla, el foco pasa al contenido nuevo (no en la primera carga, para no
 // robarle el foco a la página recién abierta)
 function ScrollToTop() {
-  const { pathname } = useLocation();
+  const { pathname, hash, key } = useLocation();
   const first = useRef(true);
   useLayoutEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); // antes de pintar: no se ve el salto
-  }, [pathname]);
+    if (!hash) window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); // antes de pintar: no se ve el salto
+  }, [key, hash]);
   useEffect(() => {
     if (first.current) first.current = false;
     else document.getElementById('contenido')?.focus({ preventScroll: true });
