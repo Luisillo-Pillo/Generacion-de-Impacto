@@ -1,0 +1,14 @@
+.empty-state {
+  display: grid; justify-items: center; gap: .5rem; text-align: center;
+  margin: 1.2rem 0; padding: 2rem 1.2rem 2.2rem;
+  background: rgba(255, 255, 255, .55); border: 3px dashed #bdb2a3; border-radius: 4px 14px 4px 14px;
+}
+.empty-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 4rem; height: 4rem; margin-bottom: .3rem; border-radius: 50%;
+  background: var(--black); color: var(--paper); box-shadow: 4px 4px 0 var(--red);
+}
+.empty-icon svg { width: 1.7rem; height: 1.7rem; }
+.empty-state h3 { margin: .3rem 0 0; font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: .02em; font-size: clamp(1.3rem, 3vw, 1.7rem); }
+.empty-state p { margin: 0; max-width: 28rem; color: var(--muted); line-height: 1.5; }
+.empty-state .btn { margin-top: .8rem; }

@@ -3,7 +3,8 @@ import { useOutletContext } from 'react-router-dom';
 import { api } from '../../api.js';
 import { useAuth } from '../../auth.jsx';
 import { canEdit } from '../../roles.js';
-import { IconSearch } from '../../components/ActionIcons.jsx';
+import { IconCheck, IconInbox, IconSearch, IconTrash } from '../../components/ActionIcons.jsx';
+import EmptyState from '../../components/EmptyState.jsx';
 import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { useList } from './shared.jsx';
@@ -55,6 +56,27 @@ export default function AdminMessages() {
     reload();
     refreshStats();
   };
+  // Qué decir cuando no hay nada que mostrar, según por qué: papelera vacía, todo al día (filtros por defecto), buzón sin
+  // mensajes, o filtros y búsqueda que no encuentran nada
+  const noFilters = !filters.type && !filters.status && !filters.review && !filters.urgency && !search;
+  const atDefaults = filters.status === 'nuevo' && filters.review === 'pendiente' && !filters.type && !filters.urgency && !search;
+  const showAll = () => {
+    setFilters({ type: '', status: '', review: '', urgency: '' });
+    setTyped('');
+    setSearch('');
+    setPage(1);
+  };
+  const showAllButton = <button type="button" className="btn btn-dark sm" onClick={showAll}>Ver todos los mensajes</button>;
+  const emptyState = trash ? (
+    <EmptyState icon={<IconTrash />} title="La papelera está vacía">Los mensajes que elimines se guardan aquí 30 días antes de borrarse para siempre.</EmptyState>
+  ) : atDefaults ? (
+    <EmptyState icon={<IconCheck />} title="Todo al día" action={showAllButton}>No hay mensajes nuevos pendientes de revisar.</EmptyState>
+  ) : noFilters ? (
+    <EmptyState icon={<IconInbox />} title="Aún no hay mensajes">Cuando alguien escriba en el buzón, su mensaje aparecerá aquí.</EmptyState>
+  ) : (
+    <EmptyState icon={<IconSearch />} title="No hay mensajes con estos filtros" action={showAllButton}>Prueba con otros filtros o quita la búsqueda.</EmptyState>
+  );
+
   const fail = (title) => (err) => notify({ title, message: err.message });
 
   const actions = {
@@ -114,7 +136,7 @@ export default function AdminMessages() {
           </form>
         )}
         <div className="toolbar-actions">
-          {!trash && <button type="button" className="btn btn-dark sm" disabled={exporting} onClick={exportCsv}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>}
+          {!trash && <button type="button" className="btn btn-dark sm" disabled={exporting || !data?.total} title={data && !data.total ? 'No hay mensajes para exportar con estos filtros' : undefined} onClick={exportCsv}>{exporting ? 'Exportando…' : 'Exportar CSV'}</button>}
           {isMod && (
             <button type="button" className="btn btn-dark sm" aria-pressed={trash} onClick={() => { setTrash(!trash); setPage(1); }}>
               {trash ? '← Volver a los mensajes' : 'Papelera'}
@@ -125,7 +147,7 @@ export default function AdminMessages() {
       {trash && <p className="muted">Los mensajes eliminados se quedan aquí 30 días y después se borran solos.</p>}
       {error && <p className="error">{error}</p>}
       {loading && <Spinner />}
-      {items?.length === 0 && <p className="muted">{trash ? 'La papelera está vacía.' : 'No hay mensajes con estos filtros.'}</p>}
+      {items?.length === 0 && emptyState}
       {items?.map((m) => <MessageCard key={m._id} m={m} trash={trash} role={role} actions={actions} />)}
       {data?.pages > 1 && (
         <nav className="pager" aria-label="Páginas de mensajes">

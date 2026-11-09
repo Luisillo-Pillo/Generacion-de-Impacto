@@ -16,6 +16,19 @@ export const IconSearch = () => (
   </svg>
 );
 
+export const IconInbox = () => (
+  <svg {...props}>
+    <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+    <path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z" />
+  </svg>
+);
+
+export const IconCheck = () => (
+  <svg {...props}>
+    <path d="M20 6 9 17l-5-5" />
+  </svg>
+);
+
 export const IconTrash = () => (
   <svg {...props}>
     <path d="M3 6h18" />

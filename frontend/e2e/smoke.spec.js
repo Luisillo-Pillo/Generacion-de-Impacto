@@ -121,7 +121,7 @@ test('eliminar un mensaje lo manda a la papelera, donde se puede restaurar', asy
   await expect(page.getByText('Un asunto')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Eliminar definitivamente' })).toBeVisible();
   await page.getByRole('button', { name: 'Restaurar' }).click();
-  await expect(page.getByText('La papelera está vacía.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'La papelera está vacía' })).toBeVisible();
 });
 
 test('las imágenes adjuntas de los mensajes se piden con la sesión y se muestran reducidas', async ({ page }) => {
@@ -197,7 +197,7 @@ test('el panel pagina, busca, muestra contadores y exporta a CSV', async ({ page
 
   await page.getByRole('searchbox').fill('no-existe');
   await page.getByRole('button', { name: 'Buscar', exact: true }).click(); // la lupa
-  await expect(page.getByText('No hay mensajes con estos filtros.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No hay mensajes con estos filtros' })).toBeVisible();
   expect(state.sent.query).toMatchObject({ q: 'no-existe', page: '1' });
   await page.getByRole('button', { name: 'Limpiar' }).click();
   await expect(page.getByText('Un asunto')).toBeVisible();
@@ -830,3 +830,56 @@ test('en teléfono la pantalla de gracias sigue de corrido, sin desbordar de lad
   expect(codigo.x + codigo.width).toBeLessThanOrEqual(390); // sin desbordar
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test('cuando no hay mensajes el panel lo explica según el motivo y ofrece salir del callejón', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.messages = [];
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+
+  // Filtros por defecto (Nuevos + Pendiente) y nada por atender
+  const vacio = page.locator('.empty-state');
+  await expect(vacio.getByRole('heading', { name: 'Todo al día' })).toBeVisible();
+  await expect(vacio).toContainText('No hay mensajes nuevos pendientes de revisar');
+
+  // «Ver todos los mensajes» quita los filtros; sin ningún mensaje en el buzón se dice
+  await vacio.getByRole('button', { name: 'Ver todos los mensajes' }).click();
+  await expect(vacio.getByRole('heading', { name: 'Aún no hay mensajes' })).toBeVisible();
+  await expect(vacio.getByRole('button')).toHaveCount(0);
+  expect(state.sent.query).not.toHaveProperty('status');
+  expect(state.sent.query).not.toHaveProperty('review');
+
+  // Con una búsqueda o un filtro que no encuentran nada
+  await page.getByRole('searchbox').fill('xyz');
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await expect(vacio.getByRole('heading', { name: 'No hay mensajes con estos filtros' })).toBeVisible();
+  await vacio.getByRole('button', { name: 'Ver todos los mensajes' }).click();
+  await expect(page.getByRole('searchbox')).toHaveValue(''); // también limpia la búsqueda
+  await expect(vacio.getByRole('heading', { name: 'Aún no hay mensajes' })).toBeVisible();
+
+  // Papelera vacía
+  await page.getByRole('button', { name: 'Papelera' }).click();
+  await expect(vacio.getByRole('heading', { name: 'La papelera está vacía' })).toBeVisible();
+  await expect(vacio).toContainText('30 días');
+});
+
+test('«Exportar CSV» se deshabilita cuando no hay mensajes con los filtros elegidos', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  const exportar = page.getByRole('button', { name: 'Exportar CSV' });
+  await expect(page.getByText('Un asunto')).toBeVisible();
+  await expect(exportar).toBeEnabled(); // hay mensajes
+
+  await page.getByRole('searchbox').fill('no-existe-nada');
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await expect(page.locator('.empty-state')).toBeVisible();
+  await expect(exportar).toBeDisabled();
+  await expect(exportar).toHaveAttribute('title', /No hay mensajes para exportar/);
+
+  await page.getByRole('button', { name: 'Limpiar' }).click();
+  await expect(page.getByText('Un asunto')).toBeVisible();
+  await expect(exportar).toBeEnabled(); // vuelve a habilitarse
+  expect(state.messages).toHaveLength(1);
+});
+
