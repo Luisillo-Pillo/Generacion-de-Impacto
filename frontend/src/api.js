@@ -62,6 +62,18 @@ export async function api(path, { method = 'GET', body, form, blob = false } = {
   return data;
 }
 
+// Avisa que esta sesión se desconecta (cerrar sesión o cerrar la pestaña). `keepalive` hace que la petición termine aunque la
+// página se esté cerrando; si no llega, el servidor igual da por desconectada la cuenta a los pocos minutos sin latidos.
+export function sendOffline() {
+  const token = getToken();
+  if (!token) return;
+  try {
+    fetch(`${BASE}/api/auth/offline`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, keepalive: true }).catch(() => {});
+  } catch {
+    /* sin red: el servidor la desconecta por tiempo */
+  }
+}
+
 export async function uploadImage(file) {
   const form = new FormData();
   form.append('file', file);

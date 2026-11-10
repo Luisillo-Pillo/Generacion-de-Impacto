@@ -4,9 +4,11 @@ import { ROLE_LABEL } from '../../roles.js';
 import { semesterGroupLine } from '../../utils.js';
 import './MemberSummary.css';
 
-// Cuánto hace que alguien se conectó, para el color del punto: hoy (verde), esta semana (ámbar) o hace más (gris)
+// Estado de conexión para el punto y el texto: conectado ahora (verde que late), o cuánto hace que se conectó: hoy (verde fijo),
+// esta semana (ámbar) o hace más (gris)
 const HOUR = 3600 * 1000;
-function seenState(iso) {
+function seenState(iso, online) {
+  if (online) return { cls: 'online', hint: '' };
   if (!iso) return { cls: 'none', hint: '' };
   const hours = (Date.now() - new Date(iso).getTime()) / HOUR;
   if (hours < 24) return { cls: 'today', hint: 'en las últimas 24 horas' };
@@ -28,9 +30,9 @@ function Fact({ kind, icon, label, children }) {
 }
 
 // Resumen de un integrante en Panel → Equipo: nombre y rol de acceso arriba; debajo, cargo, correo, estudios y (solo para el
-// Moderador: la API manda `lastSeenAt` solo a él) la última conexión.
+// Moderador: la API manda `lastSeenAt` y `online` solo a él) si está conectado ahora o cuándo fue su última conexión.
 export default function MemberSummary({ m }) {
-  const seen = 'lastSeenAt' in m ? seenState(m.lastSeenAt) : null;
+  const seen = 'lastSeenAt' in m ? seenState(m.lastSeenAt, m.online) : null;
   const academic = semesterGroupLine(m);
   return (
     <div className="member-summary">
@@ -52,10 +54,12 @@ export default function MemberSummary({ m }) {
           </Fact>
         )}
         {seen && (
-          <Fact kind="seen" icon={<IconClock />} label="Última conexión">
+          <Fact kind="seen" icon={<IconClock />} label="Conexión">
             <span className={`ms-when ms-when-${seen.cls}`}>
               <span className="ms-dot" aria-hidden="true" />
-              {m.lastSeenAt ? <>{formatDate(m.lastSeenAt)} · {formatTime(m.lastSeenAt)}{seen.hint && <span className="ms-hint">{seen.hint}</span>}</> : 'Sin registro todavía'}
+              {seen.cls === 'online' && <strong className="ms-online-text">Conectado</strong>}
+              {seen.cls !== 'online' && m.lastSeenAt && <>Última conexión: {formatDate(m.lastSeenAt)} · {formatTime(m.lastSeenAt)}{seen.hint && <span className="ms-hint">{seen.hint}</span>}</>}
+              {seen.cls === 'none' && 'Sin registro todavía'}
             </span>
           </Fact>
         )}

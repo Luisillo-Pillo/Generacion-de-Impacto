@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { z } from 'zod';
 import { Member, User } from '../models.js';
-import { adminOnly, requireAuth, panelUserOnly } from '../auth.js';
+import { adminOnly, requireAuth, panelUserOnly, isOnline } from '../auth.js';
 import { deleteFile } from '../db.js';
 import { objectId } from '../validators.js';
 import { hashPassword, passwordSchema } from '../passwords.js';
@@ -42,13 +42,14 @@ async function withoutInapplicableGroup(data) {
   return groupDegrees.includes(data.degree) ? data : { ...data, group: '' };
 }
 
-// `lastSeenAt` (última conexión) solo se incluye para el Moderador; `null` si la cuenta aún no ha entrado desde que existe el dato
+// `lastSeenAt` (última conexión) y `online` (¿conectado ahora?) solo se incluyen para el Moderador; `lastSeenAt` es `null` si la
+// cuenta aún no ha entrado desde que existe el dato
 const toAdminJson = (member, user, { withLastSeen = true } = {}) => ({
   ...member.toObject(),
   user: undefined,
   email: user?.email || '',
   access: user?.role === 'admin' ? 'admin' : 'miembro',
-  ...(withLastSeen && { lastSeenAt: user?.lastSeenAt ?? null }),
+  ...(withLastSeen && { lastSeenAt: user?.lastSeenAt ?? null, online: isOnline(user) }),
 });
 
 router.get('/', async (_req, res) => {
@@ -56,9 +57,9 @@ router.get('/', async (_req, res) => {
 });
 
 // Directorio del panel: nombre, cargo, licenciatura, semestre, grupo, foto, correo y rol de cada integrante, para el Miembro y el Moderador.
-// Nunca contraseñas. Solo el Moderador recibe además la última conexión (`lastSeenAt`).
+// Nunca contraseñas. Solo el Moderador recibe además la última conexión (`lastSeenAt`) y si está conectado ahora (`online`).
 router.get('/all', panelUserOnly, async (req, res) => {
-  const members = await Member.find().sort({ order: 1, createdAt: 1 }).populate('user', 'email role lastSeenAt');
+  const members = await Member.find().sort({ order: 1, createdAt: 1 }).populate('user', 'email role lastSeenAt onlineUntil');
   const withLastSeen = req.user.role === 'admin';
   res.json(members.map((m) => toAdminJson(m, m.user, { withLastSeen })));
 });

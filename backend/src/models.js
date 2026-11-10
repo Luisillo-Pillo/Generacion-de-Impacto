@@ -19,6 +19,9 @@ const userSchema = new Schema(
     // Última vez que la cuenta inició sesión o usó el panel (como máximo una escritura cada 5 minutos; ver auth.js). Solo lo ve el
     // Moderador. No se guarda ninguna IP ni dispositivo: solo la fecha y la hora.
     lastSeenAt: { type: Date },
+    // Presencia: la cuenta está «conectada» mientras `onlineUntil` esté en el futuro. Cada sesión abierta lo renueva con un
+    // latido (POST /auth/ping, cada minuto) y al cerrar sesión o la pestaña se adelanta a «ahora» (POST /auth/offline).
+    onlineUntil: { type: Date },
   },
   { timestamps: true }
 );

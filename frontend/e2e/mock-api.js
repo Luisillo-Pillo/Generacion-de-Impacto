@@ -37,6 +37,15 @@ export async function mockApi(page, { loggedIn = false, role = 'admin', email } 
       state.loggedIn = true;
       return json(route, { token: 'token-de-prueba', user: admin, member: MEMBER });
     }
+    // Presencia: el sitio manda un latido cada minuto y un aviso al cerrar sesión o la pestaña
+    if (path === '/auth/ping' && method === 'POST') {
+      state.pings = (state.pings ?? 0) + 1;
+      return route.fulfill({ status: 204 });
+    }
+    if (path === '/auth/offline' && method === 'POST') {
+      state.offline = (state.offline ?? 0) + 1;
+      return route.fulfill({ status: 204 });
+    }
     if (path === '/auth/me') return state.loggedIn ? json(route, { user: admin, member: MEMBER }) : json(route, { error: 'No autenticado' }, 401);
     if (path === '/news/all') return json(route, state.news);
     if (path === '/news' && method === 'POST') {
@@ -69,9 +78,10 @@ export async function mockApi(page, { loggedIn = false, role = 'admin', email } 
     // Correo y rol de cada integrante (nunca contraseñas): lo ven el Miembro y el Moderador
     // Igual que la API: solo el Moderador recibe la última conexión (`null` si la cuenta aún no ha entrado)
     if (path === '/members/all') {
-      return json(route, state.members.map(({ lastSeenAt, ...m }) => ({
+      return json(route, state.members.map(({ lastSeenAt, online, ...m }) => ({
         ...m, email: `${m._id}@test.com`, access: m._id === 'm1' ? role : 'miembro',
-        ...(role === 'admin' && { lastSeenAt: lastSeenAt ?? (m._id === 'm1' ? '2026-11-09T12:00:00Z' : null) }),
+        // La persona de la sesión (m1) está conectada ahora mismo, salvo que la prueba diga otra cosa
+        ...(role === 'admin' && { lastSeenAt: lastSeenAt ?? (m._id === 'm1' ? '2026-11-09T12:00:00Z' : null), online: online ?? m._id === 'm1' }),
       })));
     }
     if (path === '/members') return json(route, state.members);

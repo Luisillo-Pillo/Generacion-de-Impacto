@@ -171,3 +171,50 @@ test('última conexión: se anota al iniciar sesión y al usar el panel (máximo
   assert.equal(editado.status, 200, editado.text);
   assert.ok(editado.json.lastSeenAt);
 });
+
+test('presencia: el latido conecta a la cuenta por 2 minutos y medio, cerrar sesión la apaga al instante y solo el Moderador lo ve', async () => {
+  const alta = await t.call('POST', '/members', { token, body: integrante({ name: 'Presente', email: 'presente@test.com' }) });
+  assert.equal(alta.status, 201, alta.text);
+  const lista = async (tk) => (await t.call('GET', '/members/all', { token: tk })).json;
+  const de = (arr) => arr.find((m) => m.email === 'presente@test.com');
+  const User = t.models.User;
+  assert.equal(alta.json.online, false, 'una cuenta recién creada no está conectada');
+  assert.equal(de(await lista(token)).online, false);
+
+  // Sin sesión no hay latido ni aviso de salida
+  assert.equal((await t.call('POST', '/auth/ping')).status, 401);
+  assert.equal((await t.call('POST', '/auth/offline')).status, 401);
+
+  // Iniciar sesión ya cuenta como conectado
+  const tokenMiembro = await t.login('presente@test.com', 'clave-de-integrante-1');
+  assert.equal(de(await lista(token)).online, true, 'al iniciar sesión queda conectada');
+
+  // El latido la mantiene conectada: renueva el plazo (~2.5 minutos) y la última conexión
+  await User.updateOne({ email: 'presente@test.com' }, { $set: { onlineUntil: new Date(Date.now() + 5000), lastSeenAt: new Date(Date.now() - 3600 * 1000) } }, { timestamps: false });
+  const ping = await t.call('POST', '/auth/ping', { token: tokenMiembro });
+  assert.equal(ping.status, 204);
+  const tras = await User.findOne({ email: 'presente@test.com' });
+  assert.ok(tras.onlineUntil.getTime() - Date.now() > 140 * 1000 && tras.onlineUntil.getTime() - Date.now() <= 150 * 1000 + 1000, 'el plazo es de ~150 s');
+  assert.ok(Date.now() - tras.lastSeenAt.getTime() < 5000, 'el latido también actualiza la última conexión');
+
+  // Sin latidos, a los 2.5 minutos se apaga sola
+  await User.updateOne({ email: 'presente@test.com' }, { $set: { onlineUntil: new Date(Date.now() - 1000) } }, { timestamps: false });
+  assert.equal(de(await lista(token)).online, false, 'plazo vencido: desconectada');
+  assert.ok(de(await lista(token)).lastSeenAt, 'y se conserva la última conexión');
+
+  // Cerrar sesión o la pestaña la apaga al instante, sin esperar el plazo
+  await t.call('POST', '/auth/ping', { token: tokenMiembro });
+  assert.equal(de(await lista(token)).online, true);
+  assert.equal((await t.call('POST', '/auth/offline', { token: tokenMiembro })).status, 204);
+  assert.equal(de(await lista(token)).online, false, 'POST /auth/offline la apaga de inmediato');
+
+  // El Miembro no recibe `online` ni `lastSeenAt` de nadie; tampoco la lista pública ni /auth/me
+  assert.ok((await lista(tokenMiembro)).every((m) => !('online' in m) && !('lastSeenAt' in m)));
+  assert.ok((await t.call('GET', '/members')).json.every((m) => !('online' in m) && !('onlineUntil' in m)));
+  const yo = (await t.call('GET', '/auth/me', { token: tokenMiembro })).json;
+  assert.ok(!('online' in yo.user) && !('onlineUntil' in yo.user));
+  assert.ok(!JSON.stringify(await lista(token)).includes('onlineUntil'), 'el plazo interno no sale de la API');
+
+  // Muchos latidos seguidos desde la misma red se aceptan (no hay límites por IP)
+  for (let i = 0; i < 20; i++) assert.equal((await t.call('POST', '/auth/ping', { token: tokenMiembro })).status, 204);
+});

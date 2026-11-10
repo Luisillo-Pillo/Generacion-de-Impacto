@@ -1250,10 +1250,10 @@ test('Equipo (panel): el Moderador ve la última conexión de cada integrante y 
   await page.goto('/admin/equipo');
   const tarjeta = (nombre) => page.locator('.crud-grid li, .crud-grid > *', { hasText: nombre }).first();
 
-  await expect(tarjeta('Ana Prueba').locator('.ms-seen')).toContainText(/9 de noviembre de 2026 · \d{1,2}:\d{2}/);
-  await expect(tarjeta('Carla Tercera').locator('.ms-seen')).toContainText(/7 de noviembre de 2026/);
+  await expect(tarjeta('Ana Prueba').locator('.ms-seen')).toContainText('Conectado'); // la persona de la sesión está conectada ahora
+  await expect(tarjeta('Carla Tercera').locator('.ms-seen')).toContainText(/Última conexión: 7 de noviembre de 2026 · \d{1,2}:\d{2}/);
   await expect(tarjeta('Beto Segundo').locator('.ms-seen')).toContainText('Sin registro todavía'); // nunca ha entrado
-  await expect(tarjeta('Beto Segundo')).toContainText('Última conexión');
+  await expect(tarjeta('Beto Segundo').locator('.ms-label', { hasText: 'Conexión' })).toBeVisible();
   await expect(page.locator('.ms-seen')).toHaveCount(3);
 });
 
@@ -1265,12 +1265,13 @@ test('Equipo (panel): el Miembro ve el directorio pero ninguna última conexión
   await expect(page.getByText('Carla Tercera')).toBeVisible();
   await expect(page.getByText('m3@test.com')).toBeVisible(); // sí ve correos
   await expect(page.getByText('Última conexión')).toHaveCount(0);
+  await expect(page.getByText('Conectado')).toHaveCount(0);
 });
 
 test('Equipo (panel): cada dato de la tarjeta va en su propia fila, con etiqueta, ícono y estilo distintos', async ({ page }) => {
   const state = await mockApi(page, { loggedIn: true });
   state.members.length = 0;
-  state.members.push({ _id: 'm1', name: 'Amaury Villanueva', role: 'Presidente', degree: 'Licenciatura en Primaria', semester: '5', group: 'A', lastSeenAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString() });
+  state.members.push({ _id: 'm1', name: 'Amaury Villanueva', role: 'Presidente', degree: 'Licenciatura en Primaria', semester: '5', group: 'A', online: false, lastSeenAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString() });
   state.members.push({ _id: 'm2', name: 'Beto Segundo', role: '', lastSeenAt: null });
   await withSession(page);
   await page.goto('/admin/equipo');
@@ -1280,7 +1281,7 @@ test('Equipo (panel): cada dato de la tarjeta va en su propia fila, con etiqueta
   await expect(tarjeta.locator('.ms-access')).toHaveText('Moderador');
   await expect(tarjeta.locator('.ms-access')).toHaveClass(/ms-access-admin/);
   // Cada dato en su fila, con su etiqueta
-  await expect(tarjeta.locator('.ms-fact .ms-label')).toHaveText(['Cargo', 'Correo', 'Estudios', 'Última conexión']);
+  await expect(tarjeta.locator('.ms-fact .ms-label')).toHaveText(['Cargo', 'Correo', 'Estudios', 'Conexión']);
   await expect(tarjeta.locator('.ms-role .ms-value')).toHaveText('Presidente');
   await expect(tarjeta.locator('.ms-email .ms-value')).toHaveText('m1@test.com');
   await expect(tarjeta.locator('.ms-study .ms-degree')).toHaveText('Licenciatura en Primaria');
@@ -1309,4 +1310,94 @@ test('el archivo de verificación de Google Search Console se sirve tal cual, no
   const res = await request.get('/google32d12d8963a381d6.html');
   expect(res.status()).toBe(200);
   expect((await res.text()).trim()).toBe('google-site-verification: google32d12d8963a381d6.html');
+});
+
+test('presencia: la luz verde y el texto «Conectado» se encienden y se apagan solos, sin recargar', async ({ page }) => {
+  await page.clock.install();
+  const state = await mockApi(page, { loggedIn: true });
+  state.members.push({ _id: 'm3', name: 'Carla Tercera', role: 'Vocal', online: false, lastSeenAt: '2026-11-07T12:00:00Z' });
+  await withSession(page);
+  await page.goto('/admin/equipo');
+  const carla = page.locator('.crud-card', { hasText: 'Carla Tercera' }).locator('.ms-when');
+
+  // Desconectada: luz apagada (gris) y la fecha de su última conexión
+  await expect(carla).toHaveClass(/ms-when-(today|week|old)/);
+  await expect(carla).toContainText('Última conexión: 7 de noviembre de 2026');
+  await expect(carla).not.toContainText('Conectado');
+  const color = () => carla.locator('.ms-dot').evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await color()).toBe('rgb(154, 145, 134)');
+
+  // Carla se conecta: en el siguiente refresco (cada 15 s) se enciende la luz verde y el texto dice «Conectado»
+  state.members.find((m) => m._id === 'm3').online = true;
+  await page.clock.runFor(16000);
+  await expect(carla).toHaveClass(/ms-when-online/);
+  await expect(carla).toContainText('Conectado');
+  await expect(carla).not.toContainText('Última conexión');
+  expect(await color()).toBe('rgb(47, 158, 87)');
+
+  // Carla se desconecta: se apaga y el texto vuelve a su última conexión (ahora, la que acaba de tener)
+  const m3 = state.members.find((m) => m._id === 'm3');
+  m3.online = false;
+  m3.lastSeenAt = '2026-11-09T15:30:00Z';
+  await page.clock.runFor(16000);
+  await expect(carla).toHaveClass(/ms-when-(today|week|old)/);
+  await expect(carla).toContainText('Última conexión: 9 de noviembre de 2026');
+  await expect(carla).not.toContainText('Conectado');
+  expect(await color()).toBe('rgb(154, 145, 134)');
+});
+
+test('presencia: la sesión abierta manda un latido cada minuto y avisa al cerrar sesión o la pestaña', async ({ page }) => {
+  await page.clock.install();
+  const state = await mockApi(page, { loggedIn: true, role: 'miembro' });
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  await expect.poll(() => state.pings ?? 0).toBeGreaterThanOrEqual(1); // el primero, al abrir con sesión
+
+  // Un latido por minuto
+  const antes = state.pings;
+  await page.clock.runFor(61000);
+  await expect.poll(() => state.pings).toBeGreaterThan(antes);
+  const despues = state.pings;
+  await page.clock.runFor(61000);
+  await expect.poll(() => state.pings).toBeGreaterThan(despues);
+
+  // Con otra pestaña viva (otra anotada en localStorage), cerrar esta no desconecta a la cuenta
+  await page.evaluate(() => localStorage.setItem('gi_tab_otra', String(Date.now())));
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await page.waitForTimeout(300);
+  expect(state.offline ?? 0).toBe(0);
+
+  // Sin otras pestañas, al cerrar la pestaña se avisa de la salida
+  await page.evaluate(() => localStorage.removeItem('gi_tab_otra'));
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await expect.poll(() => state.offline ?? 0).toBe(1);
+});
+
+test('presencia: cerrar sesión avisa la salida al instante y deja de mandar latidos', async ({ page }) => {
+  await page.clock.install();
+  const state = await mockApi(page, { loggedIn: true, role: 'miembro' });
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  await expect.poll(() => state.pings ?? 0).toBeGreaterThanOrEqual(1);
+
+  await page.goto('/perfil');
+  await page.locator('.profile').getByRole('button', { name: 'Cerrar sesión' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cerrar sesión' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect.poll(() => state.offline ?? 0).toBeGreaterThanOrEqual(1); // se desconecta sin esperar el plazo
+
+  const pings = state.pings;
+  await page.clock.runFor(130000);
+  await page.waitForTimeout(300);
+  expect(state.pings, 'sin sesión no hay más latidos').toBe(pings);
+});
+
+test('presencia: un visitante sin sesión no manda ningún latido', async ({ page }) => {
+  await page.clock.install();
+  const state = await mockApi(page);
+  await page.goto('/');
+  await page.clock.runFor(130000);
+  await page.waitForTimeout(300);
+  expect(state.pings ?? 0).toBe(0);
+  expect(state.offline ?? 0).toBe(0);
 });

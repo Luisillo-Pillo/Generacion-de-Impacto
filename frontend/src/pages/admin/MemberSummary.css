@@ -26,12 +26,17 @@
 .ms-degree { display: block; }
 .ms-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .25rem; }
 .ms-chip { border: 2px solid var(--black); border-radius: 999px; padding: 0 .55rem; font-size: .74rem; font-weight: 700; }
-/* Última conexión: un punto de color según qué tan reciente fue (el texto dice lo mismo, el color solo lo refuerza) */
+/* Conexión: la luz verde está encendida (y late) mientras la persona está conectada y apagada (gris) cuando no; el texto dice lo mismo */
 .ms-seen .ms-icon { background: #6b6258; }
 .ms-when { display: block; }
 .ms-dot { display: inline-block; width: .6rem; height: .6rem; margin-right: .45rem; border-radius: 50%; background: #9a9186; vertical-align: .05em; }
-.ms-when-today .ms-dot { background: #2f9e57; box-shadow: 0 0 0 3px rgba(47, 158, 87, .2); }
-.ms-when-week .ms-dot { background: #d89a1d; }
+.ms-when-online .ms-dot { background: #2f9e57; box-shadow: 0 0 0 3px rgba(47, 158, 87, .25); }
+.ms-online-text { color: #1f7a42; }
 .ms-when-none { color: var(--muted); font-style: italic; }
 .ms-hint { display: block; margin-left: 1.05rem; color: var(--muted); font-size: .8rem; } /* debajo de la fecha, alineada con el texto */
 .ms-empty { color: var(--muted); font-style: italic; }
+/* La luz verde de «Conectado» late despacio (con «reducir movimiento» queda fija) */
+@media (prefers-reduced-motion: no-preference) {
+  .ms-when-online .ms-dot { animation: ms-pulse 2s ease-out infinite; }
+}
+@keyframes ms-pulse { 0% { box-shadow: 0 0 0 0 rgba(47, 158, 87, .55); } 70%, 100% { box-shadow: 0 0 0 9px rgba(47, 158, 87, 0); } }

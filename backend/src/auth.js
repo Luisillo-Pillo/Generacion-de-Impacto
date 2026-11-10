@@ -14,12 +14,23 @@ export const signToken = (user) =>
 
 const LEGACY_ROLES = ['presidente', 'moderador'];
 
-// «Última conexión»: se anota al iniciar sesión y cuando la cuenta usa el panel, pero con una escritura como máximo cada 5 minutos
+// Presencia en tiempo (casi) real: una sesión abierta manda un latido cada minuto y cuenta como «conectada» durante 2 minutos y
+// medio después del último (tolera un latido perdido). Al cerrar sesión o la pestaña se apaga al instante.
+export const PRESENCE_MS = 150 * 1000;
+export const isOnline = (user) => !!user?.onlineUntil && new Date(user.onlineUntil).getTime() > Date.now();
+export async function markPresence(user, online) {
+  const now = Date.now();
+  const fields = { lastSeenAt: new Date(now), onlineUntil: new Date(online ? now + PRESENCE_MS : now) };
+  Object.assign(user, fields);
+  await User.updateOne({ _id: user._id }, { $set: fields }, { timestamps: false });
+}
+
+// «Última conexión»: se anota cuando la cuenta usa el sitio con sesión, pero con una escritura como máximo cada 5 minutos
 // por cuenta (para no escribir en la base en cada petición). Va sin `timestamps` para no mover `updatedAt`.
 const SEEN_EVERY_MS = 5 * 60 * 1000;
-export async function touchLastSeen(user, force = false) {
+async function touchLastSeen(user) {
   const now = Date.now();
-  if (!force && user.lastSeenAt && now - new Date(user.lastSeenAt).getTime() < SEEN_EVERY_MS) return;
+  if (user.lastSeenAt && now - new Date(user.lastSeenAt).getTime() < SEEN_EVERY_MS) return;
   user.lastSeenAt = new Date(now);
   await User.updateOne({ _id: user._id }, { $set: { lastSeenAt: user.lastSeenAt } }, { timestamps: false });
 }
@@ -64,7 +75,7 @@ function requireAdmin(req, res, next) {
 //   eliminar noticias y propuestas                                   no          sí
 //   ver correos, nombres y roles del equipo (nunca contraseñas)      sí          sí
 //   editar su propia información                                     sí          sí
-//   ver la última conexión de cada integrante                       no          sí
+//   ver la última conexión y quién está conectado ahora              no          sí
 //   editar a otros, dar de alta, eliminar, cambiar roles y orden     no          sí
 //   ajustes del sitio y bitácora                                     no          sí
 //

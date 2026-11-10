@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { api, getToken, setToken, SESSION_EXPIRED } from './api.js';
+import { api, getToken, sendOffline, setToken, SESSION_EXPIRED } from './api.js';
+import { startPresence } from './presence.js';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -25,6 +26,10 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener(SESSION_EXPIRED, onExpired);
   }, []);
 
+  // Con una sesión iniciada, la pestaña avisa cada minuto que sigue conectada (ver presence.js)
+  const signedIn = !!user;
+  useEffect(() => (signedIn ? startPresence() : undefined), [signedIn]);
+
   useEffect(() => {
     if (!getToken()) return;
     api('/auth/me')
@@ -48,6 +53,7 @@ export function AuthProvider({ children }) {
       return d.user;
     },
     logout: () => {
+      sendOffline(); // se desconecta al instante, sin esperar a que venza el plazo (hay que mandarlo antes de borrar el token)
       setToken(null);
       setExpired(false);
       setUser(null);

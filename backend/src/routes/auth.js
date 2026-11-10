@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { User, Member } from '../models.js';
-import { signToken, publicUser, requireAuth, touchLastSeen } from '../auth.js';
+import { signToken, publicUser, requireAuth, markPresence } from '../auth.js';
 import { BCRYPT_COST, hashPassword, needsRehash, passwordSchema } from '../passwords.js';
 import { hit, peek, reset, retryAfter } from '../rateLimit.js';
 import { audit } from '../audit.js';
@@ -47,11 +47,25 @@ router.post('/login', async (req, res) => {
     user.passwordHash = await hashPassword(password);
     await user.save();
   }
-  await touchLastSeen(user, true);
+  await markPresence(user, true); // iniciar sesión también es estar conectado
   res.json({ token: signToken(user), ...(await session(user)) });
 });
 
 router.get('/me', requireAuth, async (req, res) => res.json(await session(req.user)));
+
+// Latido de presencia: el sitio lo manda cada minuto mientras haya una sesión abierta (sin límites por IP: solo escribe la
+// presencia de la propia cuenta). Responde 204 para no gastar ancho de banda.
+router.post('/ping', requireAuth, async (req, res) => {
+  await markPresence(req.user, true);
+  res.status(204).end();
+});
+
+// Al cerrar sesión o la pestaña: deja de estar «conectada» de inmediato (si queda otra pestaña abierta, su próximo latido la
+// vuelve a conectar).
+router.post('/offline', requireAuth, async (req, res) => {
+  await markPresence(req.user, false);
+  res.status(204).end();
+});
 
 router.patch('/password', requireAuth, async (req, res) => {
   const { currentPassword, newPassword } = z
