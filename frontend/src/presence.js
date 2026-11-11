@@ -4,7 +4,7 @@ import { api, sendOffline } from './api.js';
 // cerrarla le avisa que se fue. Así el Moderador ve en Panel → Equipo quién está conectado ahora.
 // Si hay varias pestañas abiertas, cada una se anota en localStorage (`gi_tab_*`): al cerrar una, solo se avisa de la salida
 // cuando no queda otra pestaña viva (si no, la cuenta aparecería desconectada hasta el siguiente latido de la otra).
-export const BEAT_MS = 60 * 1000;
+const BEAT_MS = 60 * 1000;
 const TAB_PREFIX = 'gi_tab_';
 const ALIVE_MS = BEAT_MS * 2.5;
 

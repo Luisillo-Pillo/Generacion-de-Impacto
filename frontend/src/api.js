@@ -62,6 +62,19 @@ export async function api(path, { method = 'GET', body, form, blob = false } = {
   return data;
 }
 
+// Abre el canal de eventos en vivo del panel (ver live.js) con la sesión de siempre: EventSource no puede mandar la cabecera de
+// sesión, por eso se usa `fetch` y se lee el flujo. Devuelve la respuesta (con `body`) o `null` si no se pudo abrir. Si el servidor
+// rechaza la sesión se confirma con /auth/me, que aplica la regla de siempre (cierra la sesión solo si el token sigue siendo el mismo).
+export async function openEventStream(signal) {
+  const token = getToken();
+  if (!token) return null;
+  const res = await fetch(`${BASE}/api/events`, { headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' }, cache: 'no-store', signal });
+  const renewed = res.headers.get('X-Renewed-Token');
+  if (renewed && getToken() === token) setToken(renewed);
+  if (res.status === 401) api('/auth/me').catch(() => {});
+  return res.ok && res.body ? res : null;
+}
+
 // Avisa que esta sesión se desconecta (cerrar sesión o cerrar la pestaña). `keepalive` hace que la petición termine aunque la
 // página se esté cerrando; si no llega, el servidor igual da por desconectada la cuenta a los pocos minutos sin latidos.
 export function sendOffline() {

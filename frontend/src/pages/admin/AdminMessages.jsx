@@ -7,6 +7,7 @@ import { IconCheck, IconInbox, IconSearch, IconTrash } from '../../components/Ac
 import EmptyState from '../../components/EmptyState.jsx';
 import { useDialog } from '../../components/Dialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
+import { useLive } from '../../hooks.js';
 import { useList } from './shared.jsx';
 import MessageCard from './MessageCard.jsx';
 import { TYPES, STATUS, REVIEW, URGENCY, TYPE_LABEL } from './messageLabels.js';
@@ -43,6 +44,7 @@ export default function AdminMessages() {
   const query = trash ? `trash=1&page=${page}` : `${filterQuery}${filterQuery ? '&' : ''}page=${page}`;
   const { items: data, loading, error, reload, setError } = useList(`/messages?${query}&limit=${PAGE_SIZE}`);
   const items = data?.items;
+  useLive(['messages'], reload); // mensajes nuevos, respuestas y cambios de estado de los compañeros aparecen solos (el contador lo mantiene AdminLayout)
 
   const setFilter = (key) => (value) => {
     setFilters((f) => ({ ...f, [key]: value }));

@@ -4,6 +4,7 @@ import { useAuth } from '../../auth.jsx';
 import { IconPencil, IconTrash } from '../../components/ActionIcons.jsx';
 import { canEdit } from '../../roles.js';
 import { useDialog } from '../../components/Dialog.jsx';
+import { useLive } from '../../hooks.js';
 import Spinner from '../../components/Spinner.jsx';
 import './shared.css';
 
@@ -110,13 +111,15 @@ export function GalleryField({ value = [], onChange, label = 'Galería', max = 6
 // Editor genérico (noticias / propuestas / equipo)
 // `newAtEnd`: el botón de crear va debajo de la lista en vez de encima
 // `memberCanCreate`: un Miembro también puede crear (noticias, propuestas); `memberCanEdit`: y editar lo ya creado; `memberActions(item,
-// reload)`: otras acciones suyas (cambiar el estado). Eliminar es solo del Moderador.
-export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote, newAtEnd = false, memberCanCreate = false, memberCanEdit = false, memberActions = null }) {
+// reload)`: otras acciones suyas (cambiar el estado). Eliminar es solo del Moderador. `liveTopics`: temas de eventos en vivo que
+// vuelven a cargar la lista cuando un compañero cambia algo (no tocan lo que se esté editando).
+export function CrudPanel({ listPath, endpoint, blank, fields, summary, newLabel, deleteNote, newAtEnd = false, memberCanCreate = false, memberCanEdit = false, memberActions = null, liveTopics = [] }) {
   const { confirm, notify } = useDialog();
   const { user } = useAuth();
   const isMod = canEdit(user?.role);
   const canCreate = isMod || memberCanCreate;
   const { items, loading, error, reload, setError } = useList(listPath);
+  useLive(liveTopics, reload, liveTopics.length > 0);
   const [editing, setEditing] = useState(null);
 
   async function save(e) {

@@ -18,6 +18,10 @@ export async function mockApi(page, { loggedIn = false, role = 'admin', email } 
     trash: [],
     sent: { message: null, news: null, patch: null, note: null, track: null, query: null, order: null, me: null, state: null },
     fileRequests: [],
+    hits: {}, // cuántas veces se pidió cada ruta (para comprobar cuándo el sitio deja de pedir)
+    live: false, // ¿el canal de eventos en vivo está disponible? (apagado: se prueba el respaldo con refresco periódico)
+    liveQueue: [], // temas que el canal entrega en la siguiente conexión
+    trackPatch: {}, // cambios al resultado del seguimiento (p. ej. que el equipo responda después)
     members: [MEMBER, { _id: 'm2', name: 'Beto Segundo', role: 'Secretaría' }],
     loggedIn,
   };
@@ -28,7 +32,16 @@ export async function mockApi(page, { loggedIn = false, role = 'admin', email } 
     const { pathname, searchParams } = new URL(req.url());
     const path = pathname.replace(/^\/api/, '');
     const method = req.method();
+    state.hits[path] = (state.hits[path] ?? 0) + 1;
 
+    // Canal en vivo (SSE): el simulador no puede mantener la conexión abierta, así que entrega los avisos pendientes y la cierra;
+    // el sitio reconecta solo y, al conectar, vuelve a pedir lo que muestra. Apagado, la conexión falla como con el servidor dormido.
+    if (path === '/events') {
+      if (!state.loggedIn) return json(route, { error: 'No autenticado' }, 401);
+      if (!state.live) return route.abort('failed');
+      const topics = state.liveQueue.splice(0);
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: `retry: 5000\n: conectado\n\n${topics.map((t) => `data: ${JSON.stringify({ topic: t })}\n\n`).join('')}` });
+    }
     if (path === '/settings') return json(route, { degrees: ['Licenciatura en Primaria'], groups: ['A'], semesters: ['1', '2'], groupDegrees: [], social: {} });
     // Las rutas del panel responden 401 cuando la sesión ya no vale
     const privada = path === '/messages' || path.startsWith('/messages/') || path === '/audit' || path.endsWith('/all');
@@ -92,7 +105,7 @@ export async function mockApi(page, { loggedIn = false, role = 'admin', email } 
     if (path === '/messages/track') {
       state.sent.track = req.postDataJSON();
       return state.sent.track.code.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === CODE.replace(/-/g, '')
-        ? json(route, { type: 'queja', subject: 'Baños sin agua', status: 'leido', review: 'en_proceso', createdAt: '2026-10-28T20:35:00Z', updatedAt: '2026-10-30T09:00:00Z', publicReply: 'Ya mandamos arreglarlos.', publicReplyAt: '2026-10-30T09:00:00Z', publicReplyBy: { name: 'Ana Prueba', role: 'Presidencia' } })
+        ? json(route, { type: 'queja', subject: 'Baños sin agua', status: 'leido', review: 'en_proceso', createdAt: '2026-10-28T20:35:00Z', updatedAt: '2026-10-30T09:00:00Z', publicReply: 'Ya mandamos arreglarlos.', publicReplyAt: '2026-10-30T09:00:00Z', publicReplyBy: { name: 'Ana Prueba', role: 'Presidencia' }, ...state.trackPatch })
         : json(route, { error: 'No encontramos un mensaje con ese código. Revisa que esté completo.' }, 404);
     }
     if (path === '/messages/stats') return json(route, { nuevos: state.messages.length, pendientes: state.messages.length, total: state.messages.length, porTipo: { queja: state.messages.length, propuesta: 0, pregunta: 0, problema: 0 } });

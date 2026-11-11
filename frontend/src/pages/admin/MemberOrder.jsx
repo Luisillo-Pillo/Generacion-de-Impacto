@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { api } from '../../api.js';
 import { useDialog } from '../../components/Dialog.jsx';
+import { useLive } from '../../hooks.js';
 import './MemberOrder.css';
 
 function Row({ member, index, last, move }) {
@@ -27,13 +28,11 @@ export default function MemberOrder({ onChange }) {
   const [members, setMembers] = useState(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
+  const load = useCallback(() => api('/members').then(setMembers).catch(() => {}), []);
   useEffect(() => {
-    let cancelled = false;
-    api('/members').then((list) => !cancelled && setMembers(list)).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    load();
+  }, [load]);
+  useLive(['team'], load); // si otro Moderador reordena o da de alta a alguien, la lista se actualiza
 
   async function reorder(next) {
     const before = members;

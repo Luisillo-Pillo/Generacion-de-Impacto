@@ -1327,9 +1327,9 @@ test('presencia: la luz verde y el texto «Conectado» se encienden y se apagan 
   const color = () => carla.locator('.ms-dot').evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(await color()).toBe('rgb(154, 145, 134)');
 
-  // Carla se conecta: en el siguiente refresco (cada 15 s) se enciende la luz verde y el texto dice «Conectado»
+  // Carla se conecta: sin canal en vivo (servidor dormido), el respaldo vuelve a pedir el directorio cada 30 s y se enciende la luz verde
   state.members.find((m) => m._id === 'm3').online = true;
-  await page.clock.runFor(16000);
+  await page.clock.runFor(31000);
   await expect(carla).toHaveClass(/ms-when-online/);
   await expect(carla).toContainText('Conectado');
   await expect(carla).not.toContainText('Última conexión');
@@ -1339,7 +1339,7 @@ test('presencia: la luz verde y el texto «Conectado» se encienden y se apagan 
   const m3 = state.members.find((m) => m._id === 'm3');
   m3.online = false;
   m3.lastSeenAt = '2026-11-09T15:30:00Z';
-  await page.clock.runFor(16000);
+  await page.clock.runFor(31000);
   await expect(carla).toHaveClass(/ms-when-(today|week|old)/);
   await expect(carla).toContainText('Última conexión: 9 de noviembre de 2026');
   await expect(carla).not.toContainText('Conectado');
@@ -1400,4 +1400,148 @@ test('presencia: un visitante sin sesión no manda ningún latido', async ({ pag
   await page.waitForTimeout(300);
   expect(state.pings ?? 0).toBe(0);
   expect(state.offline ?? 0).toBe(0);
+  expect(state.hits['/events'] ?? 0, 'sin sesión no se abre el canal en vivo').toBe(0);
+});
+
+// ---------------- En vivo ----------------
+const nuevaNoticia = (extra) => ({ _id: 'n9', slug: 'recien-publicada', title: 'Noticia recién publicada', excerpt: 'Resumen', body: 'Cuerpo', published: true, createdAt: '2026-11-10T10:00:00Z', publishedAt: '2026-11-10T10:00:00Z', ...extra });
+
+test('en vivo (panel): un mensaje nuevo y el contador aparecen solos cuando el canal avisa, sin recargar', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.live = true;
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  await expect(page.getByText('Un asunto')).toBeVisible();
+  await expect(page.locator('.tabs .count')).toHaveText('1');
+  await expect.poll(() => state.hits['/events']).toBeGreaterThanOrEqual(1); // con sesión del panel se abre el canal
+
+  // Llega un mensaje al buzón: el canal avisa («messages»), la lista y la insignia se ponen al día solas
+  state.messages.unshift({ _id: 'g2', type: 'pregunta', anonymous: true, subject: 'Mensaje que llegó en vivo', body: 'Texto', status: 'nuevo', review: 'pendiente', images: [], createdAt: '2026-11-10T10:00:00Z' });
+  state.liveQueue.push('messages');
+  await expect(page.getByText('Mensaje que llegó en vivo')).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('.tabs .count')).toHaveText('2');
+});
+
+test('en vivo (panel): si el canal no está disponible, el panel se mantiene al día con un respaldo cada 30 s', async ({ page }) => {
+  await page.clock.install();
+  const state = await mockApi(page, { loggedIn: true }); // el canal falla, como con el servidor dormido
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  await expect(page.getByText('Un asunto')).toBeVisible();
+
+  state.messages.unshift({ _id: 'g2', type: 'pregunta', anonymous: true, subject: 'Llegó con el canal caído', body: 'Texto', status: 'nuevo', review: 'pendiente', images: [], createdAt: '2026-11-10T10:00:00Z' });
+  await page.clock.runFor(31000);
+  await expect(page.getByText('Llegó con el canal caído')).toBeVisible();
+  await expect(page.locator('.tabs .count')).toHaveText('2');
+});
+
+test('en vivo (sitio público): lo nuevo se avisa con un botón sin mover la página; ediciones y eliminaciones se aplican en su lugar', async ({ page }) => {
+  await page.clock.install();
+  const state = await mockApi(page);
+  await page.goto('/noticias');
+  await expect(page.getByText('Primera noticia')).toBeVisible();
+  await expect(page.locator('.new-items')).toHaveCount(0);
+
+  // Un compañero edita la noticia que se está leyendo y publica otra
+  state.news[0].title = 'Primera noticia corregida';
+  state.news.unshift(nuevaNoticia());
+  await page.clock.runFor(70000);
+  await expect(page.getByText('Primera noticia corregida')).toBeVisible(); // lo editado cambia en su lugar
+  await expect(page.getByText('Noticia recién publicada')).toHaveCount(0); // lo nuevo NO se inserta solo
+  await expect(page.locator('.new-items')).toContainText('Hay 1 noticia nueva');
+  await expect(page.locator('.new-items')).not.toHaveAttribute('aria-live', /.+/); // sin anuncios automáticos
+
+  await page.locator('.new-items').getByRole('button', { name: 'Ver' }).click();
+  await expect(page.getByText('Noticia recién publicada')).toBeVisible();
+  await expect(page.locator('.new-items')).toHaveCount(0);
+
+  // Si la despublican, desaparece sola (no quedaría un enlace que lleve a un 404)
+  state.news = state.news.filter((n) => n._id !== 'n9');
+  await page.clock.runFor(70000);
+  await expect(page.getByText('Noticia recién publicada')).toHaveCount(0);
+  await expect(page.getByText('Primera noticia corregida')).toBeVisible();
+});
+
+test('en vivo (sitio público): inicio y propuestas también avisan lo nuevo y actualizan el avance en su lugar', async ({ page }) => {
+  await page.clock.install();
+  const state = await mockApi(page);
+  await page.goto('/propuestas');
+  await expect(page.getByText('Propuesta uno')).toBeVisible();
+
+  state.proposals[0].progress = 'en_marcha';
+  state.proposals[0].progressNote = 'Arrancamos esta semana';
+  state.proposals.push({ _id: 'p3', number: 3, title: 'Propuesta tres', objective: 'Objetivo tres', published: true, progress: 'planeada' });
+  await page.clock.runFor(70000);
+  await expect(page.getByText('Arrancamos esta semana')).toBeVisible();
+  await expect(page.getByText('Propuesta tres')).toHaveCount(0);
+  await expect(page.locator('.new-items')).toContainText('Hay 1 propuesta nueva');
+  await page.locator('.new-items').getByRole('button', { name: 'Ver' }).click();
+  await expect(page.getByText('Propuesta tres')).toBeVisible();
+
+  // En el inicio, noticias y propuestas
+  await page.goto('/');
+  await expect(page.getByText('Primera noticia')).toBeVisible();
+  state.news.unshift(nuevaNoticia());
+  await page.clock.runFor(70000);
+  await expect(page.locator('.new-items')).toContainText('Hay 1 noticia nueva');
+});
+
+test('en vivo (sitio público): no pide nada con la pestaña oculta ni tras 10 minutos sin actividad, y se reanuda al volver o al tocar la página', async ({ page }) => {
+  await page.clock.install();
+  const state = await mockApi(page);
+  await page.goto('/noticias');
+  await expect(page.getByText('Primera noticia')).toBeVisible();
+  const pedidos = () => state.hits['/news'] ?? 0;
+  const visibilidad = (estado) => page.evaluate((v) => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, estado);
+
+  // Con la pestaña oculta no pide nada
+  await visibilidad('hidden');
+  const oculta = pedidos();
+  await page.clock.runFor(180000);
+  await page.waitForTimeout(300);
+  expect(pedidos(), 'oculta: sin peticiones').toBe(oculta);
+
+  // Al volver a verla pide enseguida (pasó más de medio minuto)
+  await visibilidad('visible');
+  await expect.poll(pedidos).toBeGreaterThan(oculta);
+
+  // Con la pestaña a la vista pide cada ~minuto…
+  const antes = pedidos();
+  await page.clock.runFor(70000);
+  await expect.poll(pedidos).toBeGreaterThan(antes);
+
+  // …pero tras 10 minutos sin tocar la página se detiene
+  for (let i = 0; i < 12; i++) {
+    await page.clock.runFor(60000);
+    await page.waitForTimeout(40);
+  }
+  const quieta = pedidos();
+  await page.clock.runFor(180000);
+  await page.waitForTimeout(300);
+  expect(pedidos(), 'inactiva: sin peticiones').toBe(quieta);
+
+  // Al tocar la página se reanuda
+  await page.mouse.click(5, 5);
+  await expect.poll(pedidos).toBeGreaterThan(quieta);
+});
+
+test('en vivo (seguimiento): la respuesta del equipo aparece sola en la página de quien la espera', async ({ page }) => {
+  await page.clock.install();
+  const state = await mockApi(page);
+  state.trackPatch = { review: 'pendiente', status: 'nuevo', publicReply: null, publicReplyAt: null, publicReplyBy: null };
+  await page.goto('/seguimiento');
+  await page.getByLabel('Código de seguimiento').fill(CODE);
+  await page.getByRole('button', { name: 'Consultar' }).click();
+  await expect(page.getByText('Todavía no hay una respuesta del equipo')).toBeVisible();
+  await expect(page.getByText('Ya mandamos arreglarlos.')).toHaveCount(0);
+
+  // El equipo responde: a más tardar en un minuto se ve, sin volver a consultar
+  state.trackPatch = {};
+  await page.clock.runFor(70000);
+  await expect(page.getByText('Ya mandamos arreglarlos.')).toBeVisible();
+  await expect(page.getByText('Todavía no hay una respuesta del equipo')).toHaveCount(0);
+  await expect(page.getByText('En proceso')).toBeVisible();
 });

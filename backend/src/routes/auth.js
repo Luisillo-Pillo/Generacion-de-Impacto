@@ -6,6 +6,7 @@ import { signToken, publicUser, requireAuth, markPresence } from '../auth.js';
 import { BCRYPT_COST, hashPassword, needsRehash, passwordSchema } from '../passwords.js';
 import { hit, peek, reset, retryAfter } from '../rateLimit.js';
 import { audit } from '../audit.js';
+import { closeUser } from '../events.js';
 
 // No hay registro público: las cuentas se crean al dar de alta a un integrante de la planilla
 // (panel → Equipo) o con `npm run create-admin` para el primer administrador.
@@ -78,6 +79,7 @@ router.patch('/password', requireAuth, async (req, res) => {
   req.user.tokenVersion = (req.user.tokenVersion ?? 0) + 1; // cierra las sesiones abiertas en otros dispositivos
   await req.user.save();
   await audit(req, 'auth.contrasena', 'usuario', req.user._id, 'Cambió su contraseña');
+  closeUser(req.user._id); // los canales en vivo abiertos con el token anterior se cierran; este dispositivo reconecta con el nuevo
   res.json({ ok: true, token: signToken(req.user) }); // este dispositivo sigue con sesión
 });
 
@@ -86,6 +88,7 @@ router.post('/logout-all', requireAuth, async (req, res) => {
   req.user.tokenVersion = (req.user.tokenVersion ?? 0) + 1;
   await req.user.save();
   await audit(req, 'auth.cerrar_todas', 'usuario', req.user._id, 'Cerró sesión en todos los dispositivos');
+  closeUser(req.user._id);
   res.json({ ok: true, token: signToken(req.user) });
 });
 

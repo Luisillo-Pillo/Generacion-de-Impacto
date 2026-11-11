@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { useFetch } from '../hooks.js';
+import { useFeed } from '../hooks.js';
 import Spinner from '../components/Spinner.jsx';
 import ProposalCard from '../components/ProposalCard.jsx';
 import NewsCard from '../components/NewsCard.jsx';
+import NewItemsBanner from '../components/NewItemsBanner.jsx';
 import './Home.css';
 
 // Papelitos decorativos del héroe: posición horizontal (%), tamaño (px), duración y retraso (s), deriva lateral y giro.
@@ -20,8 +21,9 @@ const CONFETTI = [
 ];
 
 export default function Home() {
-  const proposals = useFetch('/proposals');
-  const news = useFetch('/news');
+  // Se actualizan solas cada minuto sin mover lo que se lee: lo nuevo se avisa con un botón (ver useFeed)
+  const proposals = useFeed('/proposals');
+  const news = useFeed('/news');
 
   return (
     <>
@@ -50,6 +52,7 @@ export default function Home() {
       <section className="section paper">
         <div className="container">
           <h2 className="title">Últimas <mark>noticias</mark></h2>
+          <NewItemsBanner count={news.incoming} singular="noticia nueva" plural="noticias nuevas" onShow={news.showIncoming} />
           {news.loading && <Spinner />}
           {news.error && <p className="error">{news.error}</p>}
           {news.data?.length === 0 && <p className="muted">Pronto publicaremos novedades.</p>}
@@ -84,6 +87,7 @@ export default function Home() {
       <section className="section paper">
         <div className="container">
           <h2 className="title">Nuestras <mark>propuestas</mark></h2>
+          <NewItemsBanner count={proposals.incoming} singular="propuesta nueva" plural="propuestas nuevas" onShow={proposals.showIncoming} />
           {proposals.loading && <Spinner />}
           {proposals.error && <p className="error">{proposals.error}</p>}
           <div className="grid">

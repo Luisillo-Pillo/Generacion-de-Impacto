@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { User } from './models.js';
+import { publish } from './events.js';
 
 const secret = () => {
   if (!process.env.JWT_SECRET) throw new Error('Falta la variable de entorno JWT_SECRET');
@@ -16,13 +17,30 @@ const LEGACY_ROLES = ['presidente', 'moderador'];
 
 // Presencia en tiempo (casi) real: una sesión abierta manda un latido cada minuto y cuenta como «conectada» durante 2 minutos y
 // medio después del último (tolera un latido perdido). Al cerrar sesión o la pestaña se apaga al instante.
-export const PRESENCE_MS = 150 * 1000;
+const PRESENCE_MS = 150 * 1000;
 export const isOnline = (user) => !!user?.onlineUntil && new Date(user.onlineUntil).getTime() > Date.now();
+// Si pasan 2.5 minutos sin latidos, la cuenta deja de estar conectada sin que nadie lo avise: un temporizador por cuenta lo
+// anuncia a los paneles abiertos (cada latido lo reinicia).
+const presenceTimers = new Map();
 export async function markPresence(user, online) {
+  const wasOnline = isOnline(user);
   const now = Date.now();
   const fields = { lastSeenAt: new Date(now), onlineUntil: new Date(online ? now + PRESENCE_MS : now) };
   Object.assign(user, fields);
   await User.updateOne({ _id: user._id }, { $set: fields }, { timestamps: false });
+  const key = String(user._id);
+  clearTimeout(presenceTimers.get(key));
+  if (online) {
+    const timer = setTimeout(() => {
+      presenceTimers.delete(key);
+      publish('presence');
+    }, PRESENCE_MS + 500);
+    timer.unref();
+    presenceTimers.set(key, timer);
+  } else {
+    presenceTimers.delete(key);
+  }
+  if (wasOnline !== online) publish('presence'); // solo cuando cambia el estado: los latidos normales no avisan a nadie
 }
 
 // «Última conexión»: se anota cuando la cuenta usa el sitio con sesión, pero con una escritura como máximo cada 5 minutos

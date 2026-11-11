@@ -6,6 +6,7 @@ import { deleteFile } from '../db.js';
 import { loadSettings } from '../settings.js';
 import { objectId } from '../validators.js';
 import { audit } from '../audit.js';
+import { publish } from '../events.js';
 import mongoose from 'mongoose';
 
 const router = Router();
@@ -68,6 +69,7 @@ router.post('/news', panelUserOnly, async (req, res) => {
     author: req.user.name,
   });
   await audit(req, 'noticia.crear', 'noticia', item._id, `Creó la noticia «${item.title}»`);
+  publish('news');
   res.status(201).json(item);
 });
 
@@ -87,6 +89,7 @@ router.patch('/news/:id/state', panelUserOnly, async (req, res) => {
   }
   await item.save();
   await audit(req, 'noticia.estado', 'noticia', item._id, `${published ? 'Publicó' : 'Pasó a borrador'} la noticia «${item.title}»`);
+  publish('news');
   res.json(item);
 });
 
@@ -107,6 +110,7 @@ router.put('/news/:id', panelUserOnly, async (req, res) => {
   Object.assign(item, { ...rest, coverImage: newCover });
   await item.save();
   await audit(req, 'noticia.editar', 'noticia', item._id, `Editó la noticia «${item.title}»`);
+  publish('news');
   res.json(item);
 });
 
@@ -115,6 +119,7 @@ router.delete('/news/:id', adminOnly, async (req, res) => {
   if (item) {
     await dropFiles([item.coverImage, ...(item.gallery ?? [])]);
     await audit(req, 'noticia.eliminar', 'noticia', item._id, `Eliminó la noticia «${item.title}»`);
+    publish('news');
   }
   res.status(204).end();
 });
@@ -145,6 +150,7 @@ router.post('/proposals', panelUserOnly, async (req, res) => {
   }
   const item = await Proposal.create({ ...data, image: data.image || undefined });
   await audit(req, 'propuesta.crear', 'propuesta', item._id, `Creó la propuesta #${item.number}`);
+  publish('proposals');
   res.status(201).json(item);
 });
 
@@ -160,6 +166,7 @@ router.patch('/proposals/:id/state', panelUserOnly, async (req, res) => {
   Object.assign(item, changes);
   await item.save();
   await audit(req, 'propuesta.estado', 'propuesta', item._id, `Actualizó el estado de la propuesta #${item.number}`);
+  publish('proposals');
   res.json(item);
 });
 
@@ -175,6 +182,7 @@ router.put('/proposals/:id', panelUserOnly, async (req, res) => {
   Object.assign(item, { ...data, image: newImage });
   await item.save();
   await audit(req, 'propuesta.editar', 'propuesta', item._id, `Editó la propuesta #${item.number}`);
+  publish('proposals');
   res.json(item);
 });
 
@@ -183,6 +191,7 @@ router.delete('/proposals/:id', adminOnly, async (req, res) => {
   if (item) {
     await deleteFile(item.image);
     await audit(req, 'propuesta.eliminar', 'propuesta', item._id, `Eliminó la propuesta #${item.number}`);
+    publish('proposals');
   }
   res.status(204).end();
 });

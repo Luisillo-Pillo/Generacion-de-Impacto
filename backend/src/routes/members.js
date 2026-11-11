@@ -8,6 +8,7 @@ import { objectId } from '../validators.js';
 import { hashPassword, passwordSchema } from '../passwords.js';
 import { audit } from '../audit.js';
 import { loadSettings } from '../settings.js';
+import { closeUser, publish } from '../events.js';
 
 // Cada integrante de la planilla tiene una cuenta de acceso con un rol (ver la tabla de permisos en auth.js): Moderador (`admin`,
 // puede todo) o Miembro (por defecto). Solo el Moderador da de alta, edita a otros, cambia roles y orden y elimina; cada quien
@@ -79,6 +80,7 @@ router.put('/me', requireAuth, async (req, res) => {
   req.user.name = name;
   await req.user.save();
   await audit(req, 'integrante.editar', 'integrante', member._id, 'Actualizó su propia información');
+  publish('team');
   res.json({ user: { id: String(req.user._id), name: req.user.name, email: req.user.email, role: req.user.role }, member: await Member.findById(member._id).select('-user') });
 });
 
@@ -89,6 +91,7 @@ router.put('/order', adminOnly, async (req, res) => {
   if (new Set(ids).size !== ids.length) return res.status(400).json({ error: 'Hay integrantes repetidos' });
   await Member.bulkWrite(ids.map((id, index) => ({ updateOne: { filter: { _id: id }, update: { $set: { order: index } } } })));
   await audit(req, 'integrante.reordenar', 'integrante', undefined, 'Cambió el orden del equipo');
+  publish('team');
   res.json(await Member.find().sort({ order: 1, createdAt: 1 }).select('-user'));
 });
 
@@ -107,6 +110,7 @@ router.post('/', adminOnly, async (req, res) => {
   try {
     const member = await Member.create({ ...data, photo: data.photo || undefined, user: user._id });
     await audit(req, 'integrante.crear', 'integrante', member._id, `Dio de alta a ${data.name}${access === 'moderador' ? ' como moderador' : ''}`);
+    publish('team');
     res.status(201).json(toAdminJson(member, user));
   } catch (err) {
     await User.findByIdAndDelete(user._id); // no dejar una cuenta huérfana
@@ -153,6 +157,9 @@ router.put('/:id', adminOnly, async (req, res) => {
   Object.assign(member, { ...data, photo: newPhoto, user: user._id });
   await member.save();
   await audit(req, 'integrante.editar', 'integrante', member._id, `Editó a ${data.name}${pass ? ' (cambió su contraseña)' : ''}${changedRole ? ` (ahora es ${newRole})` : ''}`);
+  // Con otro rol o contraseña, sus canales en vivo abiertos se cierran: al reconectar se vuelve a validar su sesión y su rol
+  if (pass || changedRole) closeUser(user._id);
+  publish('team');
   res.json(toAdminJson(member, user));
 });
 
@@ -170,6 +177,8 @@ router.delete('/:id', adminOnly, async (req, res) => {
   await member.deleteOne();
   await deleteFile(member.photo);
   await audit(req, 'integrante.eliminar', 'integrante', member._id, `Eliminó a ${member.name} y su cuenta`);
+  if (member.user) closeUser(member.user);
+  publish('team');
   res.status(204).end();
 });
 

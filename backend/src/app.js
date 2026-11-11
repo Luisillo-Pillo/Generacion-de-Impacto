@@ -9,6 +9,7 @@ import messageRoutes from './routes/messages.js';
 import memberRoutes from './routes/members.js';
 import contentRoutes from './routes/content.js';
 import auditRoutes from './routes/audit.js';
+import eventRoutes from './routes/events.js';
 import { reportError, sanitizeMessage } from './monitoring.js';
 
 // La aplicación Express sin arrancar (ni base de datos ni puerto): así las pruebas pueden montarla por su cuenta.
@@ -55,6 +56,7 @@ app.use('/api/files', fileRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/events', eventRoutes);
 app.use('/api', contentRoutes);
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));

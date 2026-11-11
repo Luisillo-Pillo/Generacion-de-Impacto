@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, formatDate, formatTime } from '../api.js';
+import { startPolling } from '../hooks.js';
 import Spinner from '../components/Spinner.jsx';
 import SavedMessages from '../components/SavedMessages.jsx';
 import './Track.css';
@@ -17,6 +18,7 @@ export default function Track() {
   const [state, setState] = useState({ loading: false, error: '', result: null });
 
   async function consult(value) {
+    lastCode.current = value;
     setState({ loading: true, error: '', result: null });
     try {
       setState({ loading: false, error: '', result: await api('/messages/track', { method: 'POST', body: { code: value } }) });
@@ -24,6 +26,23 @@ export default function Track() {
       setState({ loading: false, error: err.message, result: null });
     }
   }
+  // Con un resultado a la vista, se vuelve a consultar cada minuto en silencio: si el equipo responde o cambia el estado, se ve solo
+  // (el resultado es `aria-live`, así que un lector de pantalla lo anuncia). Los fallos del refresco se callan.
+  const lastCode = useRef('');
+  const hasResult = !!state.result;
+  useEffect(() => {
+    if (!hasResult) return undefined;
+    return startPolling(() => {
+      const asked = lastCode.current;
+      api('/messages/track', { method: 'POST', body: { code: asked } })
+        .then((result) => {
+          if (lastCode.current !== asked) return;
+          setState((cur) => (cur.result && JSON.stringify(cur.result) !== JSON.stringify(result) ? { ...cur, result } : cur));
+        })
+        .catch(() => {});
+    });
+  }, [hasResult]);
+
   const submit = (e) => {
     e.preventDefault();
     consult(code);

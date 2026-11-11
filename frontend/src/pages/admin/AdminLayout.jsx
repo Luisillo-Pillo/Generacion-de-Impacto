@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { api } from '../../api.js';
 import { useAuth } from '../../auth.jsx';
+import { useLive } from '../../hooks.js';
 import Spinner from '../../components/Spinner.jsx';
 import { SECTIONS_BY_ROLE } from '../../roles.js';
 import './AdminLayout.css';
@@ -24,6 +25,7 @@ export default function AdminLayout() {
   useEffect(() => {
     if (staff) refreshStats();
   }, [staff, refreshStats, pathname]);
+  useLive(['messages'], refreshStats, staff); // llega o cambia un mensaje: la insignia y el resumen se actualizan solos
 
   if (loading) return <section className="section paper page-min"><div className="container"><Spinner /></div></section>;
   if (!user) return <Navigate to="/acceso" replace />;

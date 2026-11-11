@@ -1,0 +1,28 @@
+/* Aviso «Hay 1 noticia nueva · Ver»: una píldora negra que se queda a la vista (debajo del encabezado) mientras se baja por la página */
+.new-items {
+  position: sticky;
+  top: 88px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 1.2rem;
+  padding: .35rem .4rem .35rem 1.1rem;
+  background: var(--black);
+  color: #fff;
+  border: 2px solid var(--red);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .new-items { animation: new-items-in .35s ease-out; }
+}
+@keyframes new-items-in {
+  from { opacity: 0; translate: 0 -10px; }
+  to { opacity: 1; translate: 0 0; }
+}

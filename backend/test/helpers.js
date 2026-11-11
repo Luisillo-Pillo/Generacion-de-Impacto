@@ -89,6 +89,7 @@ export async function startServer(env = {}) {
   }
 
   async function stop() {
+    server.closeAllConnections?.(); // los canales de eventos en vivo (SSE) siguen abiertos y no dejarían cerrar
     await new Promise((resolve) => server.close(resolve));
     if (external) await mongoose.connection.dropDatabase();
     await mongoose.disconnect();

@@ -8,6 +8,7 @@ import { loadSettings } from '../settings.js';
 import { audit } from '../audit.js';
 import { newCode, hashCode, normalizeCode } from '../tracking.js';
 import { toCsv } from '../csv.js';
+import { publish } from '../events.js';
 
 const router = Router();
 
@@ -80,6 +81,7 @@ router.post('/', imageUpload.array('images', MAX_IMAGES), async (req, res) => {
     await Promise.all(images.map(deleteFile));
     throw err;
   }
+  publish('messages'); // el panel ve llegar el mensaje al instante (el aviso no lleva su contenido)
   res.status(201).json({ ok: true, code });
 });
 
@@ -211,6 +213,7 @@ router.patch('/:id', panelUserOnly, async (req, res) => {
     .map(([k, v]) => (k === 'status' ? `estado: ${v}` : k === 'review' ? `revisión: ${v}` : v ? 'escribió la respuesta pública' : 'quitó la respuesta pública'))
     .join(', ');
   await audit(req, 'mensaje.actualizar', 'mensaje', msg._id, `Cambió ${detail}`);
+  publish('messages');
   res.json(msg.toObject());
 });
 
@@ -224,13 +227,17 @@ router.post('/:id/notes', panelUserOnly, async (req, res) => {
   );
   if (!msg) return res.status(404).json({ error: 'Mensaje no encontrado' });
   await audit(req, 'mensaje.nota', 'mensaje', msg._id, 'Agregó una nota interna');
+  publish('messages');
   res.status(201).json(msg.toObject());
 });
 
 // Eliminar manda el mensaje a la papelera; a los 30 días se borra de verdad (ver maintenance.js).
 router.delete('/:id', adminOnly, async (req, res) => {
   const msg = await Message.findOneAndUpdate({ _id: req.params.id, deletedAt: null }, { deletedAt: new Date() });
-  if (msg) await audit(req, 'mensaje.papelera', 'mensaje', msg._id, 'Envió un mensaje a la papelera');
+  if (msg) {
+    await audit(req, 'mensaje.papelera', 'mensaje', msg._id, 'Envió un mensaje a la papelera');
+    publish('messages');
+  }
   res.status(204).end();
 });
 
@@ -238,6 +245,7 @@ router.post('/:id/restore', adminOnly, async (req, res) => {
   const msg = await Message.findOneAndUpdate({ _id: req.params.id, deletedAt: { $ne: null } }, { $unset: { deletedAt: 1 } }, { new: true });
   if (!msg) return res.status(404).json({ error: 'El mensaje no está en la papelera' });
   await audit(req, 'mensaje.restaurar', 'mensaje', msg._id, 'Restauró un mensaje de la papelera');
+  publish('messages');
   res.json(msg);
 });
 
@@ -247,6 +255,7 @@ router.delete('/:id/permanent', adminOnly, async (req, res) => {
   if (!msg) return res.status(404).json({ error: 'El mensaje no está en la papelera' });
   await Promise.all(msg.images.map(deleteFile));
   await audit(req, 'mensaje.eliminar', 'mensaje', msg._id, 'Eliminó definitivamente un mensaje');
+  publish('messages');
   res.status(204).end();
 });
 

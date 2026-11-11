@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api, getToken, sendOffline, setToken, SESSION_EXPIRED } from './api.js';
 import { startPresence } from './presence.js';
+import { startLive } from './live.js';
+import { hasPanel } from './roles.js';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -29,6 +31,9 @@ export function AuthProvider({ children }) {
   // Con una sesión iniciada, la pestaña avisa cada minuto que sigue conectada (ver presence.js)
   const signedIn = !!user;
   useEffect(() => (signedIn ? startPresence() : undefined), [signedIn]);
+  // Miembro o Moderador: además, una conexión abierta con el servidor que avisa al instante de lo que cambia (ver live.js)
+  const inPanel = hasPanel(user?.role);
+  useEffect(() => (inPanel ? startLive() : undefined), [inPanel]);
 
   useEffect(() => {
     if (!getToken()) return;
