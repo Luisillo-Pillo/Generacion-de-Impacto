@@ -191,6 +191,44 @@ test('las imágenes adjuntas de los mensajes se piden con la sesión y se muestr
   expect(state.fileRequests).toEqual([{ path: '/files/img1?w=640', auth: 'Bearer token-de-prueba' }]);
 });
 
+test('una imagen adjunta se abre en un visor dentro de la misma página (sin pestañas nuevas) y se puede descargar la original', async ({ page, context }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  state.messages[0].images = ['img1'];
+  await withSession(page);
+  await page.goto('/admin/mensajes');
+  await expect(page.getByRole('img', { name: 'Imagen adjunta' })).toBeVisible();
+
+  const abrir = () => page.getByRole('button', { name: 'Imagen adjunta' }).click();
+  const visor = page.getByRole('dialog', { name: 'Imagen adjunta ampliada' });
+  await abrir();
+  await expect(visor).toBeVisible();
+  expect(context.pages(), 'no se abre ninguna pestaña nueva').toHaveLength(1);
+  expect(page.url()).toContain('/admin/mensajes');
+
+  // Se muestra al instante la miniatura ampliada y llega la versión grande (1280 px), siempre con la sesión
+  await expect.poll(() => state.fileRequests.map((r) => r.path)).toContain('/files/img1?w=1280');
+  expect(state.fileRequests.every((r) => r.auth === 'Bearer token-de-prueba')).toBe(true);
+  await expect(visor.getByRole('img')).toHaveAttribute('src', /^blob:/);
+  await expect(visor.getByText('Cargando…')).toHaveCount(0);
+
+  // La original se descarga con la sesión desde el visor
+  const descarga = page.waitForEvent('download');
+  await visor.getByRole('button', { name: 'Descargar original' }).click();
+  expect((await descarga).suggestedFilename()).toBe('imagen-adjunta.png');
+  expect(state.fileRequests.map((r) => r.path)).toContain('/files/img1');
+
+  // Se cierra con Esc, con el botón y con un clic fuera de la imagen
+  await page.keyboard.press('Escape');
+  await expect(visor).toHaveCount(0);
+  await abrir();
+  await visor.getByRole('button', { name: 'Cerrar' }).click();
+  await expect(visor).toHaveCount(0);
+  await abrir();
+  await page.mouse.click(4, 4);
+  await expect(visor).toHaveCount(0);
+  await expect(page.getByRole('img', { name: 'Imagen adjunta' })).toBeVisible();
+});
+
 test('con datos personales hace falta aceptar el aviso de privacidad y el consentimiento viaja con el mensaje', async ({ page }) => {
   const state = await mockApi(page);
   await page.goto('/buzon');

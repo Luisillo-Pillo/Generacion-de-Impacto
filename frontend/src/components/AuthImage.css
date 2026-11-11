@@ -1,0 +1,24 @@
+/* Miniatura de un adjunto: un botón sin estilo propio que contiene la imagen (la imagen conserva el estilo de `.attachments img`) */
+.auth-image-thumb { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; line-height: 0; }
+.auth-image-thumb:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; border-radius: 8px; }
+
+/* Visor de imagen dentro de la página: ocupa casi toda la pantalla sobre un fondo oscuro */
+.image-viewer {
+  border: 0; padding: 0; background: transparent; color: #fff;
+  max-width: 100vw; max-height: 100dvh; width: 100vw; height: 100dvh;
+  overflow: hidden;
+}
+.image-viewer[open] { display: grid; grid-template-rows: 1fr auto; justify-items: center; gap: .8rem; padding: 1rem; }
+.image-viewer::backdrop { background: rgba(0, 0, 0, .88); }
+.viewer-stage { position: relative; min-height: 0; width: 100%; display: grid; place-items: center; }
+.viewer-stage img {
+  max-width: 100%; max-height: calc(100dvh - 5.5rem); width: auto; height: auto; object-fit: contain;
+  border-radius: 6px; background: #fff; box-shadow: 0 10px 40px rgba(0, 0, 0, .5);
+}
+/* Mientras llega la versión grande se ve la miniatura ampliada, un poco atenuada */
+.viewer-stage img.viewer-loading { opacity: .75; min-width: min(60vw, 360px); }
+.viewer-wait {
+  position: absolute; left: 50%; bottom: .8rem; translate: -50% 0;
+  padding: .3rem .8rem; border-radius: 999px; background: rgba(0, 0, 0, .75); font-size: .85rem;
+}
+.viewer-actions { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; }
