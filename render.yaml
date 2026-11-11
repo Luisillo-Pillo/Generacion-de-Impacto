@@ -18,6 +18,11 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         sync: false # URL(s) de Vercel separadas por coma, ej. https://generacion-impacto.vercel.app
+      # Aviso por correo de mensajes nuevos (opcional; sin estas dos no se envía nada). Se capturan en el panel de Render.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: NOTIFY_EMAIL_TO
+        sync: false # correo(s) que reciben el aviso, separados por coma
 
   # Entorno de pruebas (staging): misma API pero con su propia base de datos (`gi_staging`) y su propio usuario de Atlas,
   # para probar cambios reales sin tocar los datos de producción. Se enciende solo cuando se necesita: Render gratuito

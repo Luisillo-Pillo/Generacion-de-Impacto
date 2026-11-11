@@ -19,6 +19,8 @@ export async function startServer(env = {}) {
   // Estas variables se leen al cargar app.js, por eso se fijan antes de importarlo.
   process.env.JWT_SECRET = 'secreto-solo-para-pruebas-'.repeat(3);
   delete process.env.CORS_ORIGIN_PATTERN;
+  // Nunca se manda un correo real desde las pruebas: el aviso queda apagado salvo que la prueba lo configure y reemplace `mail.send`
+  for (const name of ['RESEND_API_KEY', 'NOTIFY_EMAIL_TO', 'MAIL_FROM', 'SITE_URL', 'NOTIFY_WINDOW_MS']) delete process.env[name];
   // El límite de envíos del buzón se sube para que las pruebas normales no lo topen; sus pruebas lo fijan en `env`.
   Object.assign(process.env, { CORS_ORIGIN: 'http://localhost:5173', ...env });
 

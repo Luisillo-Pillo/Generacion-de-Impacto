@@ -9,6 +9,7 @@ import { audit } from '../audit.js';
 import { newCode, hashCode, normalizeCode } from '../tracking.js';
 import { toCsv } from '../csv.js';
 import { publish } from '../events.js';
+import { notifyNewMessage } from '../notify.js';
 
 const router = Router();
 
@@ -74,14 +75,16 @@ router.post('/', imageUpload.array('images', MAX_IMAGES), async (req, res) => {
   }
   const images = [];
   const code = newCode();
+  let created;
   try {
     for (const file of req.files ?? []) images.push(await saveImage(file, { isPrivate: true }));
-    await Message.create({ ...data, images, codeHash: hashCode(code) });
+    created = await Message.create({ ...data, images, codeHash: hashCode(code) });
   } catch (err) {
     await Promise.all(images.map(deleteFile));
     throw err;
   }
   publish('messages'); // el panel ve llegar el mensaje al instante (el aviso no lleva su contenido)
+  notifyNewMessage(created); // correo para quien no tiene el panel abierto (solo tipo y urgencia; un fallo no afecta a nadie)
   res.status(201).json({ ok: true, code });
 });
 

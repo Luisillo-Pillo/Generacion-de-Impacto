@@ -70,6 +70,8 @@ npm run dev                            # API en :4000, web en :5173 (Vite usa ot
 | `CORS_ORIGIN_PATTERN` | backend | **Solo staging.** Acepta las previews de Vercel, p. ej. `https://generacion-impacto-*.vercel.app` (el `*` es un tramo de letras, números y guiones; no admite expresiones regulares). No se define en producción. |
 | `TEST_MONGODB_URI` | pruebas | Opcional: base `gi_test` para correr las pruebas sin MongoDB en memoria (ver sección 2). |
 | `RETENTION_MONTHS` | backend, GitHub (variable) | Opcional. Meses que se conservan los mensajes **resueltos** (archivados, completados o rechazados) antes de borrarlos con sus imágenes. Sin definir (o 0) no se borra nada por antigüedad. Pendientes y en proceso nunca se borran. |
+| `RESEND_API_KEY` · `NOTIFY_EMAIL_TO` | backend | Opcional. Activan el **aviso por correo** de mensajes nuevos (ver «Aviso por correo»); sin las dos no se envía nada. La clave es un **secreto** (solo en Render y en `backend/.env`). `NOTIFY_EMAIL_TO` admite varios correos separados por coma. |
+| `MAIL_FROM` · `SITE_URL` · `NOTIFY_WINDOW_MS` | backend | Opcionales del aviso por correo. `MAIL_FROM`: remitente (por defecto el de pruebas de Resend; con dominio propio verificado, p. ej. `Buzón <avisos@tu-dominio.com>`). `SITE_URL`: URL pública del sitio para el enlace del correo (si falta se usa el primer valor de `CORS_ORIGIN`). `NOTIFY_WINDOW_MS`: ventana para juntar ráfagas, por defecto 300000 (5 min). |
 | `SENTRY_DSN` · `SENTRY_ENVIRONMENT` | backend | Opcional. Activa el reporte de errores a Sentry (ver «Monitoreo»). Sin `SENTRY_DSN` no se envía nada. |
 | `VITE_SENTRY_DSN` | frontend | Opcional. Lo mismo para el navegador; el código de Sentry solo se descarga si está definida. |
 | `API_URL` | frontend (funciones de Vercel) | Opcional. URL de la API para `frontend/api`; si falta se usa `VITE_API_URL`. |
@@ -179,6 +181,23 @@ El sitio es una app de una sola página y los rastreadores de WhatsApp, Facebook
 - **Contraste medido** (mínimo 4.5:1 para texto normal, 3:1 para texto grande y componentes): tinta sobre papel 14.2 · negro sobre papel 15.4 · papel sobre negro 15.4 · gris `--muted` sobre papel 4.9 y sobre blanco 6.0 · blanco sobre rojo 5.4 · rojo oscuro sobre papel 6.3 · pie `#b9afa3` sobre negro 8.7. **El rojo de la marca sobre papel da 4.42:1** (no llega a 4.5), por eso los textos y enlaces rojos sobre papel usan el rojo oscuro (`--red-dark`); el rojo solo se deja en texto grande, números y fondos de botones con texto blanco. El gris `--muted` sobre `--paper-2` da 4.4: no usarlo en esa combinación.
 - **Falta una prueba humana** (ninguna herramienta la sustituye): recorrer el envío de un mensaje con un lector de pantalla (NVDA en Windows, gratuito) y comprobar el orden de lectura y que se anuncian los errores.
 
+### Aviso por correo
+
+Cada vez que alguien envía un mensaje al buzón, el servidor puede mandar un correo **aunque el panel esté cerrado**. Va por la API HTTPS de **Resend** (Render gratis bloquea SMTP) con `fetch`, sin dependencias nuevas (`backend/src/notify.js`).
+
+- **Qué dice:** «Nuevo mensaje en el buzón · queja · urgencia alta», el tipo, la urgencia y el enlace a Panel → Mensajes. **Nunca** el asunto, el texto ni datos de quien escribe (los anónimos no deben poder identificarse por correo; por eso tampoco hay que cambiar el aviso de privacidad: el proveedor del correo no recibe datos personales).
+- **Orden y fallos:** primero se guarda el mensaje y después se avisa, sin esperar al correo. Si Resend falla o tarda, quien escribe recibe su código normalmente y el panel lo ve igual; el fallo solo queda como una línea JSON (`event: "aviso-correo"`, sin correos ni la clave) en los registros de Render.
+- **Ráfagas:** el primer mensaje avisa al instante; los que lleguen en los 5 minutos siguientes se juntan en **un solo correo de resumen** («3 mensajes nuevos», por tipo y urgencia). Es solo para tu bandeja: el buzón sigue sin límite de envíos y no hay límite por IP. El resumen pendiente vive en memoria (un reinicio en esos minutos lo pierde, no los mensajes).
+- **Descartados:** los envíos que el buzón descarta como bots (campo trampa o llenado demasiado rápido) no avisan.
+
+**Configuración (la haces tú; el sitio queda igual hasta que existan las variables):**
+1. Crea una cuenta gratuita en resend.com **con el correo donde quieres recibir los avisos**.
+2. En Resend → *API Keys* crea una clave (permiso «Sending access») y cópiala.
+3. En Render → servicio de la API → *Environment* agrega `RESEND_API_KEY` (la clave) y `NOTIFY_EMAIL_TO` (ese mismo correo). Guarda: Render reinicia el servicio. Nunca pongas la clave en un archivo del repositorio.
+4. Prueba enviando un mensaje desde el buzón: debe llegar el correo en segundos (revisa también la carpeta de spam la primera vez).
+
+**Límites a tener presentes:** sin dominio propio, Resend solo permite el remitente de pruebas `onboarding@resend.dev` y **solo entrega al correo de la cuenta de Resend**, así que `NOTIFY_EMAIL_TO` debe ser ese correo (un destinatario). Para avisar a **varios** correos hace falta un **dominio propio verificado** en Resend (registros DNS) y definir `MAIL_FROM` con ese dominio; al comprar el dominio del sitio se puede hacer en el mismo paso. El plan gratuito de Resend (≈100 correos al día, 3 000 al mes según su documentación; confírmalo en su página de precios) sobra por las ráfagas agrupadas. Brevo no sirve sin dominio propio: no autentica remitentes de Gmail y los sustituye por su propia dirección. Si el correo llegara a spam, marca «No es spam» una vez.
+
 ### Monitoreo
 
 - **Disponibilidad (tú):** crea una cuenta gratuita en UptimeRobot y un monitor HTTP(s) a `https://<tu-api>.onrender.com/api/health` cada 5 minutos, con aviso por correo. Además de avisar si cae, mantiene despierto el servicio gratuito de Render (ojo: con dos servicios encendidos todo el mes se exceden las 750 horas gratuitas; ver «Entorno de pruebas»).
@@ -260,7 +279,7 @@ Cuarta revisión (2026-11-09), tras el rediseño del equipo, la decoración, el 
 - Propuesta **#7**: aún no definida; agregarla desde Panel → Propuestas.
 - **Licenciaturas** por defecto son una suposición: confirmarlas con la ENSFA y editarlas en Panel → Ajustes.
 - Integrantes del equipo, Instagram y correo de contacto: capturar desde el panel. (Facebook y TikTok se quitaron de Ajustes el 2026-11-07.)
-- **Aviso por correo de mensajes nuevos: aplazado por decisión del cliente** (no hay código ni variables). Si se retoma: Render gratis bloquea SMTP (puertos 25/465/587), así que hay que usar una API HTTPS (p. ej. Brevo, verificando el remitente) o SMTP en hosting de pago; `ensfa.edu.mx` usa Google Workspace (SMTP con contraseña de aplicación entrega mejor). Guardar el mensaje antes de enviar el correo y que un fallo del correo nunca afecte al usuario; el correo no debe incluir datos personales de mensajes anónimos.
+- **Aviso por correo de mensajes nuevos (tú):** el código está hecho (0.25.0) pero **apagado hasta configurarlo**: crear la cuenta de Resend con el correo que recibirá los avisos, crear la clave y definir `RESEND_API_KEY` y `NOTIFY_EMAIL_TO` en Render (ver «Aviso por correo»). Para avisar a varios correos, o con otro remitente, falta un dominio propio verificado.
 - **Rotar la contraseña de Atlas (S1):** la cadena de conexión se compartió en el chat durante el desarrollo. Decisión del cliente (2026-11-06): se deja igual por ahora y se hace al terminar el plan de trabajo, que ya terminó (ver «Rotar la contraseña de Atlas»). Conviene además un usuario de base de datos con permisos solo sobre la base del sitio.
 - **Staging (Q2):** crear la base `gi_staging` en Atlas, el servicio de staging en Render desde `render.yaml` y la variable `VITE_API_URL` del entorno Preview en Vercel (ver «Entorno de pruebas (staging)»). Pospuesto por el cliente igual que S1.
 - ~~**Migraciones de datos** (`npm run migrate`)~~ **Hecho el 2026-11-09** contra la base real: 001 sin imágenes de mensajes que marcar (aún no había), 002 revisó 2 imágenes y creó 3 versiones reducidas, 003 sin cuentas con roles antiguos. Es idempotente: se puede volver a correr tras futuras migraciones sin riesgo; si algún día se agrega una migración nueva, se corre igual.
@@ -271,6 +290,12 @@ Cuarta revisión (2026-11-09), tras el rediseño del equipo, la decoración, el 
 - **Dependabot:** los PR de actualización mayor (React 19, ESLint 10, Vite 8, Mongoose 9, etc.) no se fusionan sin migrar y probar; los que fallen en el CI se pueden cerrar o dejar abiertos.
 
 ## 10. Registro de cambios
+
+### 2026-11-10 — Aviso por correo de mensajes nuevos (0.25.0)
+- **Qué:** se retoma el aviso por correo (aplazado desde 0.2.1) por petición del cliente, para enterarse de un mensaje nuevo **aunque el panel esté cerrado**. Correo por la API HTTPS de **Resend** con `fetch` (sin `nodemailer` ni dependencias nuevas): `backend/src/notify.js`, llamado desde `POST /api/messages` con el mensaje ya guardado y sin esperar al envío.
+- **Decisiones de diseño:** el correo lleva solo **tipo, urgencia y enlace al panel**, nunca asunto, texto ni datos personales; un fallo o una caída de Resend solo se anota en el registro del servidor (sin correos ni la clave) y no afecta a quien escribe; los envíos descartados como bots no avisan; **ráfagas agrupadas** (el primero al instante, los siguientes 5 min en un solo resumen) sin tocar la regla de que el buzón no limita envíos ni usa límites por IP. Apagado si faltan `RESEND_API_KEY` o `NOTIFY_EMAIL_TO`.
+- **Por qué Resend y con estos límites:** Render gratis bloquea SMTP y Brevo no admite remitentes de Gmail (los sustituye, rompiendo la autenticación DMARC). Sin dominio propio, Resend entrega solo a su propia cuenta con el remitente `onboarding@resend.dev`, así que el aviso llega a **un correo**; con un dominio verificado y `MAIL_FROM` se pueden agregar más destinatarios (`NOTIFY_EMAIL_TO` admite varios).
+- Variables nuevas (opcionales): `RESEND_API_KEY`, `NOTIFY_EMAIL_TO`, `MAIL_FROM`, `SITE_URL`, `NOTIFY_WINDOW_MS`; en `render.yaml` las dos primeras (`sync: false`) y en `backend/.env.example` con marcadores. Las pruebas nunca mandan correo real (reemplazan `mail.send`; el ayudante borra las variables). Pruebas nuevas: 9 de API (`aviso-correo.test.js`: apagado, contenido solo con tipo y urgencia, nada de datos personales ni de la clave, ráfagas, fallo del correo, envíos descartados, correo colgado, formato de la petición a Resend). Total: 173 de API y 101 de navegador.
 
 ### 2026-11-10 — Las imágenes de los mensajes se abren en un visor dentro de la página (0.24.1)
 - **Problema:** al hacer clic en una imagen adjunta de un mensaje se abría una pestaña en blanco que tardaba mucho en mostrarla: la imagen es privada (exige sesión), así que había que descargar la **original** (hasta 5 MB) desde el servidor gratuito antes de poder mostrarla.
